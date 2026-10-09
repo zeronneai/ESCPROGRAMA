@@ -6,6 +6,8 @@ const ITEM_TONE: Record<ItemStatus, string> = {
   cotizada: "bg-green-100 text-green-800",
   no_encontrada: "bg-slate-200 text-slate-700",
   enviada_cliente: "bg-brand-100 text-brand-900",
+  actualizacion_solicitada: "bg-orange-100 text-orange-800",
+  esperando_aclaracion: "bg-purple-100 text-purple-800",
 };
 
 export function ItemStatusBadge({ estado, vencida }: { estado: ItemStatus; vencida?: boolean }) {

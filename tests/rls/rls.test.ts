@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { fase4Suite } from "./fase4.suite";
 import { calcTabulador } from "@/lib/pricing/tabulador";
 import { DATABASE_URL, as, failure, pool, type Actor } from "./helpers";
 
@@ -75,10 +76,6 @@ describe.skipIf(!DATABASE_URL)("RLS e integridad (requiere Postgres con migracio
       const c = await q("insert into public.customers (nombre, tipo) values ('Cliente SA','cliente') returning id");
       customerId = c.rows[0].id;
     });
-  });
-
-  afterAll(async () => {
-    await pool?.end();
   });
 
   describe("usuarios", () => {
@@ -468,7 +465,7 @@ describe.skipIf(!DATABASE_URL)("RLS e integridad (requiere Postgres con migracio
       );
     });
 
-    it("las cotizaciones son versionadas: v1 por respond_item, v2 solo sobre cotizada y en orden", async () => {
+    it("las cotizaciones son versionadas: v1 por respond_item; una v2 directa sin solicitud abierta se rechaza", async () => {
       await respondQuoted(B1, i2, "100", null);
       const v = await as(S1, (q) => q("select version from public.item_quotes where item_id=$1", [i2]));
       expect(v.rows).toEqual([{ version: 1 }]);
@@ -487,14 +484,12 @@ describe.skipIf(!DATABASE_URL)("RLS e integridad (requiere Postgres con migracio
           );
         });
       expect(await failure(insertV(3))).toMatch(/Version de cotizacion invalida/);
-      await insertV(2);
-      // Cada version queda intacta y bloqueada; el vendedor ve las versiones sin costos.
-      expect((await as(S1, (q) => q("select * from public.item_quotes where item_id=$1", [i2]))).rowCount).toBe(2);
+      expect(await failure(insertV(2))).toMatch(/solicitud de actualizacion abierta/);
       expect(await failure(as("postgres", (q) => q("update public.item_quotes set price_1=1 where version=1")))).toMatch(/inmutable/);
-      // El envio al cliente usa la version vigente (2).
+      // El flujo completo de revisiones se prueba en fase4.test.ts.
       await as(S1, (q) => q("select public.mark_item_dispatched($1,1)", [i2]));
       const d = await as(S1, (q) => q("select quote_version, valor::text from public.item_dispatch where item_id=$1", [i2]));
-      expect(d.rows[0]).toEqual({ quote_version: 2, valor: "320.32" });
+      expect(d.rows[0]).toEqual({ quote_version: 1, valor: "160.16" });
     });
   });
 
@@ -532,3 +527,10 @@ async function newPendingItem(): Promise<string> {
     return i.rows[0].id as string;
   });
 }
+
+// La suite de la fase 4 corre DESPUES de la anterior y con sus propios usuarios.
+fase4Suite();
+
+afterAll(async () => {
+  await pool?.end();
+});

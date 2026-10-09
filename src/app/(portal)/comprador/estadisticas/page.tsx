@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { CountBar, WeeklyTrend } from "@/components/stats-charts";
+import { CountBar, RateBar, WeeklyTrend } from "@/components/stats-charts";
+import { LOSS_REASON_LABEL, type LossReason } from "@/lib/quotes/types";
 import { Button, Card, Field, Input, Select } from "@/components/ui";
 import { requireBuyer } from "@/lib/auth/guards";
 import { getBusinessSettings } from "@/lib/quotes/server";
@@ -37,7 +38,7 @@ export default async function Estadisticas({ searchParams }: { searchParams: Pro
     supabase.from("profiles").select("id, nombre").eq("rol", "vendedor").order("nombre"),
     supabase.from("customers").select("id, nombre").order("nombre"),
   ]);
-  const s = computeBuyerStats(toStatRows(items), cfg.timezone);
+  const s = computeBuyerStats(toStatRows(items, cfg), cfg.timezone);
   const qs = new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]).toString();
 
   return (
@@ -107,7 +108,23 @@ export default async function Estadisticas({ searchParams }: { searchParams: Pro
         <Kpi label="Tiempo promedio de respuesta" value={s.promedioHoras === null ? "-" : `${Math.round(s.promedioHoras * 10) / 10} h habiles`} />
         <Kpi label="Tasa de no encontrada" value={pct(s.tasaNoEncontrada)} hint={`${s.noEncontradas} partidas`} />
         <Kpi label="Enviado al cliente" value={pct(s.pctEnviado)} hint={`${s.enviadas} de ${s.cotizadas} cotizadas`} />
+        <Kpi label="Tasa de conversión" value={pct(s.conversionGlobal.tasa)} hint={`${s.conversionGlobal.ganadas} ganadas, ${s.conversionGlobal.perdidas} perdidas`} />
+        <Kpi label="Actualizaciones solicitadas" value={String(s.actualizaciones.solicitadas)} hint={`${s.actualizaciones.resueltas} resueltas`} />
+        <Kpi label="Respuesta a actualizaciones" value={s.actualizaciones.promedioHoras === null ? "-" : `${Math.round(s.actualizaciones.promedioHoras * 10) / 10} h hábiles`} />
       </div>
+
+      {s.valorPorMoneda.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          {s.valorPorMoneda.map((v) => (
+            <Kpi
+              key={v.moneda}
+              label={`Valor cotizado vs ganado (${v.moneda})`}
+              value={`$${Math.round(v.ganado).toLocaleString("es-MX")} de $${Math.round(v.cotizado).toLocaleString("es-MX")}`}
+              hint={v.cotizado > 0 ? `${Math.round((v.ganado / v.cotizado) * 1000) / 10}% del valor cotizado se ganó` : undefined}
+            />
+          ))}
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <CountBar title="Cotizaciones por vendedor" data={s.porVendedor} horizontal />
@@ -116,6 +133,11 @@ export default async function Estadisticas({ searchParams }: { searchParams: Pro
         <CountBar title="Que precio eligen los vendedores (enviadas al cliente)" data={s.distribucionPrecio} />
         <CountBar title="Razones mas frecuentes de no encontrada" data={s.razones} horizontal />
         <WeeklyTrend data={s.tendenciaSemanal} />
+        <RateBar title="Conversión por vendedor" data={s.conversionPorVendedor} />
+        <RateBar title="Conversión por cliente" data={s.conversionPorCliente} />
+        <RateBar title="Conversión por mes" data={s.conversionPorMes} />
+        <RateBar title="Conversión por precio elegido" data={s.conversionPorPrecio} />
+        <CountBar title="Motivos de pérdida más frecuentes" data={s.motivosPerdida.map((m) => ({ label: LOSS_REASON_LABEL[m.label as LossReason] ?? m.label, count: m.count }))} horizontal />
       </div>
     </div>
   );

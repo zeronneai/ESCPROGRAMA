@@ -6,8 +6,11 @@ import { requireUser } from "@/lib/auth/guards";
 const NAV = {
   comprador: [
     { href: "/comprador", label: "Pendientes" },
+    { href: "/comprador/por-comprar", label: "Por comprar" },
     { href: "/comprador/estadisticas", label: "Estadisticas" },
+    { href: "/comprador/historial", label: "Historial" },
     { href: "/comprador/clientes", label: "Clientes" },
+    { href: "/comprador/proveedores", label: "Proveedores" },
     { href: "/comprador/usuarios", label: "Usuarios" },
     { href: "/comprador/configuracion", label: "Configuracion" },
     { href: "/comprador/auditoria", label: "Auditoria" },

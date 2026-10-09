@@ -50,6 +50,8 @@ export const requestDraftSchema = z.object({
   request_id: uuid,
   customer_id: uuid,
   notas: z.string().default(""),
+  atencion: z.string().max(200).default(""),
+  destino_entrega: z.string().max(300).default(""),
   items: z.array(itemDraftSchema).max(100),
 });
 export type RequestDraft = z.infer<typeof requestDraftSchema>;
@@ -118,6 +120,8 @@ export function toDraftPayload(d: RequestDraft) {
     request_id: d.request_id,
     customer_id: d.customer_id,
     notas: d.notas,
+    atencion: d.atencion,
+    destino_entrega: d.destino_entrega,
     items: d.items.map((i) => ({
       id: i.id,
       producto: i.producto,

@@ -46,6 +46,10 @@ export async function partidasReport(supabase: SupabaseClient, f: StatFilters, c
       num(d?.valor),
       fmt(d?.enviado_at, tz),
       i.not_found_note ?? "",
+      q?.version ?? "",
+      latest(i.item_outcomes)?.resultado ?? "",
+      latest(i.item_outcomes)?.motivo ?? "",
+      i.item_update_requests?.length ?? 0,
     ];
   });
   return {
@@ -54,7 +58,7 @@ export async function partidasReport(supabase: SupabaseClient, f: StatFilters, c
       "Folio solicitud", "Folio partida", "Enviada", "Vence", "Vendedor", "Cliente", "Producto", "Cantidad", "Unidad", "Talla",
       "Estado", "Primera respuesta", "Horas habiles de respuesta", "Dentro de plazo", "Moneda", "Costo", "Envio", "Base",
       "Proveedor", "Precio 1", "Precio 2", "Precio 3", "Precio 4", "Precio 5", "Precio elegido", "Valor enviado",
-      "Fecha envio al cliente", "Nota (no encontrada)",
+      "Fecha envio al cliente", "Nota (no encontrada)", "Version vigente", "Resultado", "Motivo de perdida", "Actualizaciones solicitadas",
     ],
     rows,
   };
@@ -103,3 +107,32 @@ export async function auditReport(
 }
 
 export { businessHoursBetween };
+
+/** Por comprar (solo comprador): partidas ganadas y donde conseguirlas. */
+export async function porComprarReport(
+  supabase: SupabaseClient,
+  f: { proveedor?: string; desde?: string; hasta?: string; estado?: string },
+  tz: string,
+): Promise<Table> {
+  const iso = (d: string | undefined, end: boolean) =>
+    d ? (end ? DateTime.fromISO(d, { zone: tz }).endOf("day") : DateTime.fromISO(d, { zone: tz }).startOf("day")).toUTC().toISO() : null;
+  const { data, error } = await supabase.rpc("por_comprar", {
+    p_proveedor: f.proveedor || null,
+    p_desde: iso(f.desde, false),
+    p_hasta: iso(f.hasta, true),
+    p_estado: f.estado || "pendientes",
+  });
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as Array<Record<string, string | number | boolean | null>>;
+  return {
+    name: "Por comprar",
+    columns: ["Folio partida", "Cliente", "Producto", "Cantidad", "Unidad", "Proveedor", "Link", "Contacto", "Numero de parte", "Notas de compra",
+      "Costo", "Envio", "Moneda", "Version", "Ganada", "Comprada", "Comprada por", "Falta proveedor"],
+    rows: rows.map((r) => [
+      r.folio as string, r.cliente as string, r.producto as string, r.cantidad === null ? "" : Number(r.cantidad), (r.unidad as string) ?? (r.talla ? `Talla ${r.talla}` : ""),
+      (r.proveedor as string) ?? "", (r.link_producto as string) ?? "", (r.contacto as string) ?? "", (r.numero_parte as string) ?? "", (r.notas_compra as string) ?? "",
+      num(r.costo as number), num(r.envio as number | null), r.moneda as string, r.version as number,
+      fmt(r.ganada_at as string, tz), fmt(r.comprada_at as string | null, tz), (r.comprada_por as string) ?? "", r.falta_proveedor ? "Si" : "No",
+    ]),
+  };
+}

@@ -30,3 +30,22 @@ export function computeDeadlineNotices(
   }
   return out;
 }
+
+export const DIAS_SIN_RESULTADO = 15;
+
+export interface DispatchedItem {
+  itemId: string;
+  requestId: string;
+  folio: string;
+  producto: string;
+  vendedorId: string;
+  /** Fecha del envio al cliente de la version vigente. */
+  enviadoAt: string;
+  resultado: "sin_respuesta" | "ganada" | "perdida";
+}
+
+/** Cotizaciones enviadas que llevan mas de `days` dias naturales sin resultado (aviso al vendedor). */
+export function computeSinResultado(items: DispatchedItem[], now: Date, days = DIAS_SIN_RESULTADO): DispatchedItem[] {
+  const limit = now.getTime() - days * 86_400_000;
+  return items.filter((i) => i.resultado === "sin_respuesta" && new Date(i.enviadoAt).getTime() < limit);
+}

@@ -40,7 +40,7 @@ describe("formatProblems / toDraftPayload", () => {
   it("payload: cantidad numerica, sin unidad si no hay cantidad", () => {
     const id = "00000000-0000-4000-8000-000000000001";
     const d = toDraftPayload({
-      request_id: id, customer_id: id, notas: "",
+      request_id: id, customer_id: id, notas: "", atencion: "", destino_entrega: "",
       items: [{ id, producto: "a", descripcion: "b", cantidad: "1,250.5", unidad: "kg", talla: "", notas: "", refs: [] },
               { id, producto: "a", descripcion: "b", cantidad: "", unidad: "kg", talla: "M", notas: "", refs: [] }],
     });

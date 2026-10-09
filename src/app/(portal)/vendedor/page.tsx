@@ -29,6 +29,8 @@ const ESTADOS = [
   ["cotizada", "Respondida sin enviar"],
   ["no_encontrada", "No encontrada"],
   ["vencida", "Vencida"],
+  ["actualizacion_solicitada", "Actualización solicitada"],
+  ["esperando_aclaracion", "Esperando aclaración"],
   ["enviada_cliente", "Enviada al cliente"],
 ] as const;
 
@@ -93,7 +95,7 @@ export default async function VendedorHome({ searchParams }: { searchParams: Pro
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
         <Counter label="Solicitudes creadas" value={c.solicitudes} />
         <Counter label="Pendientes" value={c.pendientes} />
         <Counter label="Respondidas" value={c.respondidas} />
@@ -101,6 +103,8 @@ export default async function VendedorHome({ searchParams }: { searchParams: Pro
         <Counter label="Vencidas" value={c.vencidas} />
         <Counter label="Enviadas al cliente" value={c.enviadas} />
         <Counter label="Respondidas sin enviar" value={c.sinEnviar} tone={c.sinEnviar > 0 ? "border-amber-400 bg-amber-50" : ""} />
+        <Counter label="Actualizaciones solicitadas" value={c.actualizaciones} />
+        <Counter label="Esperando tu aclaración" value={c.aclaraciones} tone={c.aclaraciones > 0 ? "border-purple-400 bg-purple-50" : ""} />
       </div>
 
       {(drafts ?? []).length > 0 && (

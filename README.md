@@ -2,7 +2,7 @@
 
 Herramienta interna (con login) para solicitar, cotizar y dar seguimiento a cotizaciones, con trazabilidad para ISO 9001.
 
-Estado: **Fase 3** (dashboards, notificaciones, exportaciones, auditoria, configuracion). Ver `ROADMAP.md` para lo que sigue.
+Estado: **Fase 4** (vigencia y revisiones, resultado ganada o perdida, historial de precios, aclaraciones, PDF de cotizacion y abastecimiento). Ver `ROADMAP.md` para lo que sigue.
 
 ## Stack
 Next.js 15 (App Router), TypeScript, Tailwind 4, Supabase (Postgres, Auth, Storage, RLS), Zod, React Hook Form, decimal.js, Luxon, Vitest.
@@ -62,6 +62,15 @@ Sin Docker, `tests/rls/run-local-pg.sh` levanta un Postgres temporal con un shim
 - El vendedor nunca puede leer costos: viven en `item_costs`, con RLS solo para comprador.
 - Una partida cotizada es inmutable por triggers en la base de datos.
 - `audit_log` es solo insercion (triggers); nada se borra de verdad.
+
+## Fase 4
+- **Vigencia y revisiones:** cada cotizacion vale 15 dias naturales (configurable). Al vencer, el vendedor ve "Vigencia vencida" y puede **Solicitar actualizacion**; el comprador responde con **Confirmar sin cambios** o **Actualizar costo**. La version original nunca se edita: cada actualizacion es una version nueva (v2, v3) con folio `...-R2`.
+- **Resultado:** despues de "Enviado al cliente" el vendedor marca Ganada, Perdida (con motivo) o Sin respuesta. Indicadores de conversion en las estadisticas.
+- **Historial de precios** (solo comprador): cotizaciones parecidas por nombre, grafica de costo en el tiempo, catalogo de proveedores.
+- **Aclaraciones:** chat por partida con imagen opcional. "Pedir aclaracion" pausa el reloj de 48 horas habiles hasta que el vendedor responda.
+- **PDF de cotizacion** para el cliente: boton "Descargar PDF" por solicitud. Muestra solo el precio elegido por partida, nunca los 5 precios, costos ni proveedor. La plantilla vive en `src/lib/pdf/quote-template.tsx`.
+- **Abastecimiento** (solo comprador): "Donde conseguirlo (interno)" por partida y vista **Por comprar** con las cotizaciones ganadas.
+- Pruebas manuales sugeridas: `docs/pruebas-manuales-fase-4.md`.
 
 ## Que incluye
 - **Vendedor:** contadores, filtros por estado, cliente y fecha, alerta de respondidas sin enviar, linea de tiempo por solicitud.

@@ -1,17 +1,21 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
+import { requestClarificationAction } from "@/actions/clarifications";
 import { respondNotFoundAction, respondQuoteAction } from "@/actions/responses";
-import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
-import { ItemStatusBadge, qtyText, ReferenceList } from "@/components/status";
+import { respondRevisionAction } from "@/actions/revisions";
+import { getSourcingBaseAction, saveSourcingAction, type SimilarQuote } from "@/actions/sourcing";
+import { ItemChat } from "@/components/item-chat";
+import { QuoteForm, type Factors } from "@/components/quote-form";
+import { SimilarQuotes } from "@/components/similar-quotes";
+import { emptySourcing, SourcingPanel } from "@/components/sourcing-panel";
+import { ItemStatusBadge, qtyText, ReferenceList, SemaforoBadge } from "@/components/status";
+import { Alert, Button, Card, Field } from "@/components/ui";
 import { formatDelivery, formatMinPurchase } from "@/lib/format/quote-text";
-import { calcTabulador, lineTotal, type PricingFactors } from "@/lib/pricing/tabulador";
-import { latestDispatch, latestQuote, type ItemRow } from "@/lib/quotes/types";
-import { UNIDADES } from "@/lib/validation/request";
+import { isVigenciaVencida, revisionFolio } from "@/lib/quotes/revisions";
+import { latestOutcome, latestQuote, LOSS_REASON_LABEL, openPause, openUpdateRequest, type ItemRow, type QuoteRow } from "@/lib/quotes/types";
 import { emptyQuoteForm, parseQuoteForm, type QuoteFormValues } from "@/lib/validation/response";
-
-export type Factors = PricingFactors & { noShippingMarkup: string };
 
 export interface CostRow {
   version: number;
@@ -21,268 +25,303 @@ export interface CostRow {
   proveedor: string | null;
 }
 
+export type BuyerItem = ItemRow & {
+  item_costs: CostRow[];
+  item_sourcing: { proveedor: string | null; link_producto: string | null; contacto: string | null; numero_parte: string | null; notas_compra: string | null } | null;
+  item_purchases: { comprada_at: string | null } | null;
+};
+
+/** Formulario precargado con la version anterior (para "Actualizar costo"). */
+function formFromVersion(q: QuoteRow, c: CostRow | undefined): QuoteFormValues {
+  return {
+    costo: c ? String(Number(c.costo)) : "",
+    envio: c?.envio ? String(Number(c.envio)) : "",
+    moneda: q.moneda,
+    entregaModo: q.entrega_fecha && q.entrega_dias === null ? "fecha" : "dias",
+    entregaDias: q.entrega_dias === null ? "" : String(q.entrega_dias),
+    entregaTipo: q.entrega_tipo ?? "habiles",
+    entregaFecha: q.entrega_fecha ?? "",
+    minModo: q.compra_min_cantidad ? "cantidad" : q.compra_min_monto ? "monto" : "ninguna",
+    minCantidad: q.compra_min_cantidad ? String(Number(q.compra_min_cantidad)) : "",
+    minUnidad: q.compra_min_unidad ?? "pieza",
+    minMonto: q.compra_min_monto ? String(Number(q.compra_min_monto)) : "",
+    proveedor: c?.proveedor ?? "",
+    nota: "",
+  };
+}
+
+const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
+
 export function BuyerItemCard({
-  item,
-  factors,
-  proveedores,
-  requestOverdue,
+  item, requestId, factors, proveedores, remaining, updateRemaining, nowIso,
 }: {
-  item: ItemRow & { item_costs: CostRow[] };
+  item: BuyerItem;
+  requestId: string;
   factors: Factors;
   proveedores: string[];
-  requestOverdue: boolean;
+  remaining: number;
+  updateRemaining: number | null;
+  nowIso: string;
 }) {
   const router = useRouter();
+  const now = new Date(nowIso);
   const [pending, start] = useTransition();
+  const q = latestQuote(item);
+  const costs = [...(item.item_costs ?? [])].sort((a, b) => b.version - a.version);
+  const cost = costs[0];
+  const d = q ? item.item_dispatch.find((x) => x.quote_version === q.version) : undefined;
+  const outcome = latestOutcome(item);
+  const open = openUpdateRequest(item);
+  const pause = openPause(item);
+  const locked = item.estado === "cotizada" || item.estado === "enviada_cliente";
+  const respondable = item.estado === "pendiente" || item.estado === "no_encontrada";
+  const vencida = isVigenciaVencida(q, now);
+
   const [mode, setMode] = useState<"quote" | "not_found">(item.estado === "no_encontrada" ? "not_found" : "quote");
+  const [editing, setEditing] = useState(item.estado === "pendiente");
   const [form, setForm] = useState<QuoteFormValues>(emptyQuoteForm);
   const [nota, setNota] = useState(item.not_found_note ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<{ tone: "error" | "success"; text: string } | null>(null);
-  const [editing, setEditing] = useState(item.estado === "pendiente");
+  const [sourcing, setSourcing] = useState(() => ({
+    ...emptySourcing,
+    proveedor: item.item_sourcing?.proveedor ?? "",
+    link_producto: item.item_sourcing?.link_producto ?? "",
+    contacto: item.item_sourcing?.contacto ?? "",
+    numero_parte: item.item_sourcing?.numero_parte ?? "",
+    notas_compra: item.item_sourcing?.notas_compra ?? "",
+  }));
+  const [updateMode, setUpdateMode] = useState<"confirm" | "update_cost" | null>(null);
+  const [updateForm, setUpdateForm] = useState<QuoteFormValues>(() => (q ? formFromVersion(q, cost) : emptyQuoteForm));
+  const [confirmNota, setConfirmNota] = useState("");
+  const [clar, setClar] = useState("");
+  const [showClar, setShowClar] = useState(false);
 
-  const q = latestQuote(item);
-  const d = latestDispatch(item);
-  const cost = [...(item.item_costs ?? [])].sort((a, b) => b.version - a.version)[0];
-  const locked = item.estado === "cotizada" || item.estado === "enviada_cliente";
-  const set = <K extends keyof QuoteFormValues>(k: K, v: QuoteFormValues[K]) => setForm((f) => ({ ...f, [k]: v }));
+  function useAsBase(r: SimilarQuote) {
+    setForm((f) => ({ ...f, costo: String(Number(r.costo)), envio: r.envio ? String(Number(r.envio)) : "", moneda: r.moneda, proveedor: r.proveedor ?? f.proveedor }));
+    setMode("quote");
+    setNotice({ tone: "success", text: "Formulario precargado con esa cotización. Revisa los datos antes de guardar." });
+    void getSourcingBaseAction(r.item_id).then((res) => {
+      if (res.ok && res.sourcing) setSourcing(res.sourcing);
+    });
+  }
 
-  // Vista previa en vivo con los factores vigentes.
-  const preview = useMemo(() => {
-    const c = Number(form.costo.replace(/,/g, ""));
-    const e = Number(form.envio.replace(/,/g, "") || 0);
-    if (!form.costo.trim() || !(c > 0) || Number.isNaN(e) || e < 0) return null;
-    try {
-      return calcTabulador(c, e, factors);
-    } catch {
-      return null;
-    }
-  }, [form.costo, form.envio, factors]);
-  const hasQty = item.cantidad !== null && Number(item.cantidad) > 0;
-  const withShipping = Number(form.envio.replace(/,/g, "") || 0) > 0;
-
-  function submitQuote() {
+  function run(fn: () => Promise<{ ok: boolean; error?: string; problems?: string[] }>, okText: string, after?: () => void) {
     setNotice(null);
-    const parsed = parseQuoteForm(form);
-    if (!parsed.ok) {
-      setErrors(parsed.errors);
-      return;
-    }
-    setErrors({});
     start(async () => {
-      const r = await respondQuoteAction(item.id, form);
-      if (!r.ok) setNotice({ tone: "error", text: r.error });
+      const r = await fn();
+      if (!r.ok) setNotice({ tone: "error", text: r.problems?.length ? `${r.error}: ${r.problems.join("; ")}` : (r.error ?? "Error") });
       else {
-        setNotice({ tone: "success", text: "Cotizacion guardada. Quedo bloqueada y el vendedor ya puede verla." });
-        setEditing(false);
+        setNotice({ tone: "success", text: okText });
+        after?.();
         router.refresh();
       }
     });
   }
 
-  function submitNotFound() {
-    setNotice(null);
-    start(async () => {
-      const r = await respondNotFoundAction(item.id, nota);
-      if (!r.ok) {
-        setErrors({ nota: r.error });
-        return;
+  function submitQuote() {
+    const parsed = parseQuoteForm(form);
+    if (!parsed.ok) return setErrors(parsed.errors);
+    setErrors({});
+    run(async () => {
+      // Si capturaste datos de abastecimiento, se guardan junto con la cotizacion.
+      const src = { ...sourcing, proveedor: sourcing.proveedor.trim() || form.proveedor.trim() };
+      if (Object.values(src).some((v) => v.trim())) {
+        const s = await saveSourcingAction(item.id, src);
+        if (!s.ok) return s;
       }
-      setErrors({});
-      setNotice({ tone: "success", text: "Marcada como no encontrada. Puedes cotizarla despues si la encuentras." });
-      setEditing(false);
-      router.refresh();
-    });
+      return respondQuoteAction(item.id, form);
+    }, "Cotización guardada. Quedó bloqueada y el vendedor ya puede verla.", () => setEditing(false));
   }
+
+  function submitUpdateCost() {
+    const parsed = parseQuoteForm(updateForm);
+    if (!parsed.ok) return setErrors(parsed.errors);
+    setErrors({});
+    run(() => respondRevisionAction(item.id, "update_cost", updateForm), "Nueva versión creada con los factores vigentes.", () => setUpdateMode(null));
+  }
+
+  const folio = q ? revisionFolio(item.folio!, q.version) : item.folio;
 
   return (
     <Card className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="text-xs text-slate-500">{item.folio}</p>
+          <p className="text-xs text-slate-500">{folio}</p>
           <h2 className="font-medium">{item.producto}</h2>
           <p className="text-sm text-slate-600">{item.descripcion}</p>
           <p className="mt-1 text-sm">{qtyText(item.cantidad, item.unidad, item.talla)}</p>
           {item.notas && <p className="text-xs text-slate-500">Notas del vendedor: {item.notas}</p>}
         </div>
-        <div className="flex items-center gap-2">
-          {item.first_response_at && item.estado !== "pendiente" && requestOverdue && (
-            <span className="text-xs text-slate-500">(plazo vencido)</span>
-          )}
-          <ItemStatusBadge estado={item.estado} vencida={requestOverdue} />
+        <div className="flex flex-wrap items-center gap-2">
+          {vencida && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Vigencia vencida</span>}
+          <ItemStatusBadge estado={item.estado} vencida={item.estado === "pendiente" && remaining <= 0} />
+          {item.estado === "pendiente" && <SemaforoBadge remaining={remaining} />}
+          {item.estado === "esperando_aclaracion" && <span className="text-xs text-purple-700">Reloj en pausa</span>}
         </div>
       </div>
       <ReferenceList refs={item.item_references} />
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
 
-      {locked && q && (
+      {pause && <Alert tone="info">Esperando aclaración del vendedor desde {fmtDate(pause.clarification_requested_at)}. El reloj de 48 horas hábiles está en pausa.</Alert>}
+
+      {/* Cotizacion registrada (bloqueada) */}
+      {q && (locked || item.estado === "actualizacion_solicitada") && (
         <div className="space-y-2 rounded-md bg-slate-50 p-3 text-sm">
-          <p className="font-medium">Cotizacion registrada (bloqueada)</p>
+          <p className="font-medium">Cotización v{q.version} registrada (bloqueada)</p>
           {cost && (
             <p className="text-slate-700">
-              Costo ${Number(cost.costo).toFixed(2)} · Envio {cost.envio ? `$${Number(cost.envio).toFixed(2)}` : "sin envio"} · Base $
-              {Number(cost.base).toFixed(2)} · Proveedor {cost.proveedor ?? "sin proveedor"}
+              Costo ${Number(cost.costo).toFixed(2)} · Envío {cost.envio ? `$${Number(cost.envio).toFixed(2)}` : "sin envío"} · Base ${Number(cost.base).toFixed(2)} · Proveedor {cost.proveedor ?? "sin proveedor"}
             </p>
           )}
+          <p>Precios ({q.moneda}): {[q.price_1, q.price_2, q.price_3, q.price_4, q.price_5].map((p, i) => `P${i + 1} $${Number(p).toFixed(2)}`).join(" · ")}</p>
           <p>
-            Precios ({q.moneda}): {[q.price_1, q.price_2, q.price_3, q.price_4, q.price_5].map((p, i) => `P${i + 1} $${Number(p).toFixed(2)}`).join(" · ")}
-          </p>
-          <p>
-            Entrega: {formatDelivery(q)} · Compra minima: {formatMinPurchase(q) ?? "sin minimo"}
+            Entrega: {formatDelivery(q)} · Compra mínima: {formatMinPurchase(q) ?? "sin mínimo"} · Vigencia hasta {q.valid_until ? fmtDate(q.valid_until) : "-"}
+            {vencida ? " (vencida)" : ""}
           </p>
           {q.nota && <p>Nota: {q.nota}</p>}
-          {d && <p className="text-slate-600">El vendedor lo envio al cliente con el Precio {d.precio_elegido}.</p>}
+          {d && <p className="text-slate-600">El vendedor lo envió al cliente con el Precio {d.precio_elegido}.</p>}
+          {outcome && outcome.resultado !== "sin_respuesta" && (
+            <p className="font-medium">
+              Resultado: {outcome.resultado === "ganada" ? "Ganada" : `Perdida (${outcome.motivo ? LOSS_REASON_LABEL[outcome.motivo] : ""}${outcome.motivo_texto ? `: ${outcome.motivo_texto}` : ""})`}
+              {outcome.resultado === "ganada" && outcome.cantidad_final ? `, cantidad final ${Number(outcome.cantidad_final)}` : ""}
+            </p>
+          )}
+          {costs.length > 1 && (
+            <details>
+              <summary className="cursor-pointer text-slate-600">Versiones anteriores ({costs.length - 1})</summary>
+              <ul className="mt-1 space-y-1 text-xs">
+                {item.item_quotes.filter((v) => v.version !== q.version).sort((a, b) => b.version - a.version).map((v) => {
+                  const c = costs.find((x) => x.version === v.version);
+                  return (
+                    <li key={v.version}>v{v.version} ({fmtDate(v.quoted_at)}): costo ${c ? Number(c.costo).toFixed(2) : "-"}, envío {c?.envio ? `$${Number(c.envio).toFixed(2)}` : "sin envío"}, P1 ${Number(v.price_1).toFixed(2)} ... P5 ${Number(v.price_5).toFixed(2)} {v.moneda}</li>
+                  );
+                })}
+              </ul>
+            </details>
+          )}
         </div>
       )}
 
-      {!locked && item.estado === "no_encontrada" && !editing && (
+      {/* Actualizacion solicitada por el vendedor */}
+      {item.estado === "actualizacion_solicitada" && open && q && (
+        <div className="space-y-3 rounded-md border border-orange-300 bg-orange-50 p-3">
+          <p className="text-sm font-medium text-orange-900">
+            Actualización solicitada el {fmtDate(open.requested_at)}
+            {updateRemaining !== null && <SemaforoBadge remaining={updateRemaining} />}
+          </p>
+          {open.nota && <p className="text-sm">Nota del vendedor: {open.nota}</p>}
+          {!updateMode && (
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={pending} onClick={() => setUpdateMode("confirm")}>Confirmar sin cambios</Button>
+              <Button variant="secondary" disabled={pending} onClick={() => setUpdateMode("update_cost")}>Actualizar costo</Button>
+            </div>
+          )}
+          {updateMode === "confirm" && (
+            <div className="space-y-2">
+              <p className="text-sm">Se crea la versión {q.version + 1} con los mismos costos y precios, y una vigencia nueva.</p>
+              <Field label="Nota (opcional, la ve el vendedor)">
+                <input value={confirmNota} onChange={(e) => setConfirmNota(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+              </Field>
+              <div className="flex gap-2">
+                <Button disabled={pending} onClick={() => run(() => respondRevisionAction(item.id, "confirm", undefined, confirmNota), "Cotización confirmada con una versión nueva.", () => setUpdateMode(null))}>
+                  Confirmar versión {q.version + 1}
+                </Button>
+                <Button variant="ghost" onClick={() => setUpdateMode(null)}>Cancelar</Button>
+              </div>
+            </div>
+          )}
+          {updateMode === "update_cost" && (
+            <div className="space-y-2">
+              <p className="text-sm">Captura el costo y el envío nuevos: los 5 precios se recalculan con los factores vigentes ahora. Las condiciones vienen de la versión anterior.</p>
+              <QuoteForm form={updateForm} setForm={setUpdateForm} errors={errors} factors={factors} proveedores={proveedores} cantidad={item.cantidad} listId={`provs-upd-${item.id}`} />
+              <div className="flex gap-2">
+                <Button disabled={pending} onClick={submitUpdateCost}>Guardar versión {q.version + 1}</Button>
+                <Button variant="ghost" onClick={() => setUpdateMode(null)}>Cancelar</Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* No encontrada: reabrir */}
+      {item.estado === "no_encontrada" && !editing && (
         <div className="space-y-2">
-          <Alert tone="info">
-            <strong>No encontrada:</strong> {item.not_found_note}
-          </Alert>
-          <Button variant="secondary" onClick={() => setEditing(true)}>
-            Reabrir (editar nota o cotizar)
-          </Button>
+          <Alert tone="info"><strong>No encontrada:</strong> {item.not_found_note}</Alert>
+          <Button variant="secondary" onClick={() => setEditing(true)}>Reabrir (editar nota o cotizar)</Button>
         </div>
       )}
 
-      {!locked && editing && (
+      {/* Responder (pendiente / no encontrada) */}
+      {respondable && editing && (
         <div className="space-y-3 rounded-md border border-slate-200 p-3">
           <div className="flex gap-2">
-            <Button variant={mode === "quote" ? "primary" : "secondary"} onClick={() => setMode("quote")}>
-              Cotizada
-            </Button>
-            <Button variant={mode === "not_found" ? "primary" : "secondary"} onClick={() => setMode("not_found")}>
-              No encontrada
-            </Button>
+            <Button variant={mode === "quote" ? "primary" : "secondary"} onClick={() => setMode("quote")}>Cotizada</Button>
+            <Button variant={mode === "not_found" ? "primary" : "secondary"} onClick={() => setMode("not_found")}>No encontrada</Button>
           </div>
-
           {mode === "not_found" ? (
             <div className="space-y-2">
-              <Field label="Nota (obligatoria): por que no se encontro" error={errors.nota}>
+              <Field label="Nota (obligatoria): por qué no se encontró" error={errors.nota}>
                 <textarea value={nota} onChange={(e) => setNota(e.target.value)} rows={3} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
               </Field>
-              <Button onClick={submitNotFound} disabled={pending}>
+              <Button
+                disabled={pending}
+                onClick={() => run(async () => {
+                  const r = await respondNotFoundAction(item.id, nota);
+                  if (!r.ok) setErrors({ nota: r.error });
+                  return r;
+                }, "Marcada como no encontrada. Puedes cotizarla después si la encuentras.", () => setEditing(false))}
+              >
                 Guardar como no encontrada
               </Button>
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Field label="Costo del producto *" error={errors.costo}>
-                  <Input value={form.costo} onChange={(e) => set("costo", e.target.value)} inputMode="decimal" />
-                </Field>
-                <Field label="Costo de envio (opcional)" error={errors.envio}>
-                  <Input value={form.envio} onChange={(e) => set("envio", e.target.value)} inputMode="decimal" placeholder="0 = sin envio" />
-                </Field>
-                <Field label="Moneda *" error={errors.moneda}>
-                  <Select value={form.moneda} onChange={(e) => set("moneda", e.target.value)}>
-                    <option value="MXN">MXN</option>
-                    <option value="USD">USD</option>
-                  </Select>
-                </Field>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Field label="Tiempo de entrega *">
-                  <Select value={form.entregaModo} onChange={(e) => set("entregaModo", e.target.value as "dias" | "fecha")}>
-                    <option value="dias">En dias</option>
-                    <option value="fecha">Fecha estimada</option>
-                  </Select>
-                </Field>
-                {form.entregaModo === "dias" ? (
-                  <>
-                    <Field label="Dias" error={errors.entregaDias}>
-                      <Input value={form.entregaDias} onChange={(e) => set("entregaDias", e.target.value)} inputMode="numeric" />
-                    </Field>
-                    <Field label="Tipo" error={errors.entregaTipo}>
-                      <Select value={form.entregaTipo} onChange={(e) => set("entregaTipo", e.target.value)}>
-                        <option value="habiles">Habiles</option>
-                        <option value="naturales">Naturales</option>
-                      </Select>
-                    </Field>
-                  </>
-                ) : (
-                  <Field label="Fecha" error={errors.entregaFecha}>
-                    <Input type="date" value={form.entregaFecha} onChange={(e) => set("entregaFecha", e.target.value)} />
-                  </Field>
-                )}
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Field label="Compra minima (opcional)">
-                  <Select value={form.minModo} onChange={(e) => set("minModo", e.target.value as QuoteFormValues["minModo"])}>
-                    <option value="ninguna">Sin minimo</option>
-                    <option value="cantidad">Por cantidad</option>
-                    <option value="monto">Por monto</option>
-                  </Select>
-                </Field>
-                {form.minModo === "cantidad" && (
-                  <>
-                    <Field label="Cantidad minima" error={errors.minCantidad}>
-                      <Input value={form.minCantidad} onChange={(e) => set("minCantidad", e.target.value)} inputMode="decimal" />
-                    </Field>
-                    <Field label="Unidad" error={errors.minUnidad}>
-                      <Select value={form.minUnidad} onChange={(e) => set("minUnidad", e.target.value)}>
-                        {UNIDADES.map((u) => (
-                          <option key={u} value={u}>
-                            {u}
-                          </option>
-                        ))}
-                      </Select>
-                    </Field>
-                  </>
-                )}
-                {form.minModo === "monto" && (
-                  <Field label={`Monto minimo (${form.moneda})`} error={errors.minMonto}>
-                    <Input value={form.minMonto} onChange={(e) => set("minMonto", e.target.value)} inputMode="decimal" />
-                  </Field>
-                )}
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field label="Proveedor (opcional)">
-                  <Input list={`provs-${item.id}`} value={form.proveedor} onChange={(e) => set("proveedor", e.target.value)} />
-                  <datalist id={`provs-${item.id}`}>
-                    {proveedores.map((p) => (
-                      <option key={p} value={p} />
-                    ))}
-                  </datalist>
-                </Field>
-                <Field label="Nota (opcional)">
-                  <Input value={form.nota} onChange={(e) => set("nota", e.target.value)} />
-                </Field>
-              </div>
-
-              <div className="rounded-md bg-slate-50 p-3 text-sm">
-                <p className="mb-1 font-medium">Vista previa</p>
-                {preview ? (
-                  <div className="space-y-1">
-                    <p className="text-slate-600">
-                      Base de calculo: ${preview.base} ({withShipping ? "costo + envio" : "costo + 4%"})
-                    </p>
-                    <div className="grid grid-cols-2 gap-x-6 gap-y-0.5 sm:grid-cols-5">
-                      {(["p1", "p2", "p3", "p4", "p5"] as const).map((k, i) => (
-                        <div key={k} className="tabular-nums">
-                          <span className="text-slate-500">Precio {i + 1}: </span>${preview[k]}
-                          {hasQty && <div className="text-xs text-slate-500">Total ${lineTotal(preview[k], item.cantidad!)}</div>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-slate-500">Captura el costo para ver los 5 precios.</p>
-                )}
-              </div>
-
-              <Button onClick={submitQuote} disabled={pending}>
-                Guardar cotizacion
-              </Button>
-              <p className="text-xs text-amber-800">Al guardar, la cotizacion queda bloqueada y no se podra editar.</p>
+              <SimilarQuotes itemId={item.id} producto={item.producto} onUse={useAsBase} />
+              <QuoteForm form={form} setForm={setForm} errors={errors} factors={factors} proveedores={proveedores} cantidad={item.cantidad} listId={`provs-${item.id}`} />
+              {!sourcing.proveedor.trim() && !sourcing.link_producto.trim() && (
+                <p className="text-xs text-amber-800">Recordatorio: anota dónde conseguirlo (proveedor o link) en la sección interna de abajo.</p>
+              )}
+              <Button onClick={submitQuote} disabled={pending}>Guardar cotización</Button>
+              <p className="text-xs text-amber-800">Al guardar, la cotización queda bloqueada y no se podrá editar.</p>
             </div>
           )}
         </div>
       )}
+
+      {/* Dónde conseguirlo (interno): siempre editable */}
+      <SourcingPanel
+        itemId={item.id}
+        values={sourcing}
+        setValues={setSourcing}
+        proveedores={proveedores}
+        listId={`provs-src-${item.id}`}
+        showReminder={respondable && editing && mode === "quote"}
+        comprada={outcome?.resultado === "ganada" ? { at: item.item_purchases?.comprada_at ?? null } : undefined}
+      />
+
+      {/* Pedir aclaración */}
+      {(item.estado === "pendiente" || item.estado === "no_encontrada" || item.estado === "actualizacion_solicitada") && (
+        <div>
+          {!showClar ? (
+            <Button variant="ghost" onClick={() => setShowClar(true)}>Pedir aclaración al vendedor</Button>
+          ) : (
+            <div className="space-y-2 rounded-md border border-purple-200 bg-purple-50 p-3">
+              <Field label="Pregunta para el vendedor (el reloj de 48 horas hábiles se pausa hasta que responda)">
+                <textarea value={clar} onChange={(e) => setClar(e.target.value)} rows={2} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+              </Field>
+              <div className="flex gap-2">
+                <Button disabled={pending || !clar.trim()} onClick={() => run(() => requestClarificationAction(item.id, clar), "Aclaración solicitada. El reloj quedó en pausa.", () => { setClar(""); setShowClar(false); })}>
+                  Pedir aclaración
+                </Button>
+                <Button variant="ghost" onClick={() => setShowClar(false)}>Cancelar</Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <ItemChat itemId={item.id} requestId={requestId} me="comprador" messages={item.item_messages ?? []} waitingForSeller={!!pause} />
     </Card>
   );
 }

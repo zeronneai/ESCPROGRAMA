@@ -11,14 +11,14 @@ export default async function EditarBorrador({ params }: { params: Promise<{ id:
   const supabase = await createClient();
   const { data: req } = await supabase
     .from("quote_requests")
-    .select("id, customer_id, notas, estado, vendedor_id, archived_at")
+    .select("id, customer_id, notas, atencion, destino_entrega, estado, vendedor_id, archived_at")
     .eq("id", id)
     .maybeSingle();
   if (!req || req.vendedor_id !== user.id || req.archived_at) notFound();
   if (req.estado !== "borrador") redirect(`/vendedor/solicitudes/${id}`);
 
   const [{ data: customers }, { data: items }] = await Promise.all([
-    supabase.from("customers").select("id, nombre, tipo").eq("activo", true).order("nombre"),
+    supabase.from("customers").select("id, nombre").eq("activo", true).order("nombre"),
     supabase
       .from("quote_items")
       .select("id, posicion, producto, descripcion, cantidad, unidad, talla, notas, item_references(id, tipo, url)")
@@ -39,6 +39,8 @@ export default async function EditarBorrador({ params }: { params: Promise<{ id:
         request_id: id,
         customer_id: req.customer_id,
         notas: req.notas ?? "",
+        atencion: req.atencion ?? "",
+        destino_entrega: req.destino_entrega ?? "",
         saved: true,
         previews,
         items: withUrls.map((i) => ({

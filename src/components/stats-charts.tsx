@@ -1,7 +1,7 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { Count } from "@/lib/stats/buyer-stats";
+import type { Conversion, Count } from "@/lib/stats/buyer-stats";
 
 // Paleta categorica validada: slot 1 azul, slot 2 naranja (ver skill dataviz).
 const BLUE = "#2a78d6";
@@ -96,6 +96,36 @@ export function WeeklyTrend({ data }: { data: { semana: string; enviadas: number
       <DataTable
         rows={data}
         cols={[["semana", "Semana"], ["enviadas", "Enviadas"], ["respondidas", "Respondidas"]]}
+      />
+    </div>
+  );
+}
+
+/** Tasa de conversion (ganadas entre enviadas con resultado) por grupo. */
+export function RateBar({ title, data }: { title: string; data: Conversion[] }) {
+  const rows = data.slice(0, 12).map((d) => ({ label: d.label, tasa: d.tasa === null ? 0 : Math.round(d.tasa * 1000) / 10, enviadas: d.enviadas, ganadas: d.ganadas, perdidas: d.perdidas, sin: d.tasa === null }));
+  return (
+    <div>
+      <Box title={title} empty={rows.length === 0}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={rows} margin={{ right: 12 }}>
+            <CartesianGrid stroke={GRID} vertical={false} />
+            <XAxis dataKey="label" tick={{ fill: INK, fontSize: 12 }} axisLine={false} tickLine={false} />
+            <YAxis domain={[0, 100]} unit="%" tick={{ fill: INK, fontSize: 12 }} axisLine={false} tickLine={false} />
+            <Tooltip
+              cursor={{ fill: "#f1f5f9" }}
+              formatter={(v, _n, item) => {
+                const p = item.payload as (typeof rows)[number];
+                return [p.sin ? "Sin resultados aún" : `${v}% (${p.ganadas} ganadas, ${p.perdidas} perdidas)`, "Conversión"];
+              }}
+            />
+            <Bar dataKey="tasa" name="Conversión" fill={BLUE} radius={[4, 4, 0, 0]} maxBarSize={28} />
+          </BarChart>
+        </ResponsiveContainer>
+      </Box>
+      <DataTable
+        rows={rows.map((r) => ({ label: r.label, enviadas: r.enviadas, ganadas: r.ganadas, perdidas: r.perdidas, tasa: r.sin ? "-" : `${r.tasa}%` }))}
+        cols={[["label", "Grupo"], ["enviadas", "Enviadas"], ["ganadas", "Ganadas"], ["perdidas", "Perdidas"], ["tasa", "Conversión"]]}
       />
     </div>
   );

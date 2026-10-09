@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { addHolidayAction, removeHolidayAction, savePricingAction, saveSettingsAction } from "@/actions/config";
+import { addHolidayAction, removeHolidayAction, saveCompanyAction, savePricingAction, saveSettingsAction } from "@/actions/config";
+import type { CompanyProfile } from "@/lib/quotes/server";
 import type { Result } from "@/actions/requests";
 import { Alert, Button, Card, Field, Input } from "@/components/ui";
 
@@ -15,7 +16,8 @@ interface PricingRow {
 
 export function ConfigPanel(props: {
   history: PricingRow[];
-  settings: { timezone: string; sla_business_hours: number; warn_business_hours: number };
+  settings: { timezone: string; sla_business_hours: number; warn_business_hours: number; vigencia_dias: number };
+  company: CompanyProfile;
   holidays: { fecha: string; descripcion: string | null }[];
 }) {
   const cur = props.history[0];
@@ -29,6 +31,12 @@ export function ConfigPanel(props: {
     timezone: props.settings.timezone,
     sla: String(props.settings.sla_business_hours),
     warn: String(props.settings.warn_business_hours),
+    vigencia: String(props.settings.vigencia_dias),
+  });
+  const [company, setCompany] = useState({
+    nombre_comercial: props.company.nombre_comercial, razon_social: props.company.razon_social, telefono: props.company.telefono,
+    web: props.company.web, direccion: props.company.direccion, rfc: props.company.rfc,
+    condiciones_default: props.company.condiciones_default, pie: props.company.pie_lineas.join("\n"),
   });
   const [holiday, setHoliday] = useState({ fecha: "", descripcion: "" });
 
@@ -104,7 +112,10 @@ export function ConfigPanel(props: {
 
       <Card className="space-y-3">
         <h2 className="font-medium">Plazos y zona horaria</h2>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-4">
+          <Field label="Vigencia de las cotizaciones (días naturales)">
+            <Input value={settings.vigencia} onChange={(e) => setSettings({ ...settings, vigencia: e.target.value })} inputMode="numeric" />
+          </Field>
           <Field label="Zona horaria">
             <Input value={settings.timezone} onChange={(e) => setSettings({ ...settings, timezone: e.target.value })} />
           </Field>
@@ -119,6 +130,24 @@ export function ConfigPanel(props: {
           Guardar
         </Button>
         <p className="text-xs text-slate-500">El plazo aplica a solicitudes que se envien desde ahora. Sabado y domingo nunca cuentan.</p>
+      </Card>
+
+      <Card className="space-y-3">
+        <h2 className="font-medium">Datos de la empresa para el PDF</h2>
+        <p className="text-sm text-slate-600">Encabezado y pie de la cotización que se entrega al cliente. Solo se imprime la leyenda de impuestos; no se calculan.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Nombre comercial"><Input value={company.nombre_comercial} onChange={(e) => setCompany({ ...company, nombre_comercial: e.target.value })} /></Field>
+          <Field label="Razón social"><Input value={company.razon_social} onChange={(e) => setCompany({ ...company, razon_social: e.target.value })} /></Field>
+          <Field label="Teléfono"><Input value={company.telefono} onChange={(e) => setCompany({ ...company, telefono: e.target.value })} /></Field>
+          <Field label="Sitio web"><Input value={company.web} onChange={(e) => setCompany({ ...company, web: e.target.value })} /></Field>
+          <Field label="Dirección"><Input value={company.direccion} onChange={(e) => setCompany({ ...company, direccion: e.target.value })} /></Field>
+          <Field label="RFC"><Input value={company.rfc} onChange={(e) => setCompany({ ...company, rfc: e.target.value })} /></Field>
+          <Field label="Condiciones por defecto"><Input value={company.condiciones_default} onChange={(e) => setCompany({ ...company, condiciones_default: e.target.value })} /></Field>
+        </div>
+        <Field label="Leyendas del pie (una por línea)">
+          <textarea value={company.pie} onChange={(e) => setCompany({ ...company, pie: e.target.value })} rows={3} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+        </Field>
+        <Button disabled={pending} onClick={() => run(() => saveCompanyAction(company), "Datos de la empresa guardados")}>Guardar datos del PDF</Button>
       </Card>
 
       <Card className="space-y-3">

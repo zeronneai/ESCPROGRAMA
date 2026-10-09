@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/auth/guards";
-import { auditReport, partidasReport } from "@/lib/export/reports";
+import { auditReport, partidasReport, porComprarReport } from "@/lib/export/reports";
 import { toCsv, toXlsx } from "@/lib/export/tabular";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { defaultRange } from "@/lib/stats/queries";
@@ -11,13 +11,15 @@ export const runtime = "nodejs";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
 const schema = z.object({
-  tipo: z.enum(["partidas", "auditoria"]),
+  tipo: z.enum(["partidas", "auditoria", "por_comprar"]),
   formato: z.enum(["xlsx", "csv"]).default("xlsx"),
   desde: date,
   hasta: date,
   vendedor: z.string().uuid().optional(),
   cliente: z.string().uuid().optional(),
   moneda: z.enum(["MXN", "USD"]).optional(),
+  proveedor: z.string().max(120).optional(),
+  estado: z.enum(["pendientes", "compradas", "todas"]).optional(),
 });
 
 /** Solo compradores (el middleware ya lo exige para /api/admin; aqui se verifica de nuevo). */
@@ -36,7 +38,9 @@ export async function GET(request: NextRequest) {
   const table =
     p.tipo === "partidas"
       ? await partidasReport(supabase, { ...range, vendedor: p.vendedor, cliente: p.cliente, moneda: p.moneda }, cfg)
-      : await auditReport(supabase, range, cfg.timezone);
+      : p.tipo === "por_comprar"
+        ? await porComprarReport(supabase, { proveedor: p.proveedor, desde: p.desde, hasta: p.hasta, estado: p.estado }, cfg.timezone)
+        : await auditReport(supabase, range, cfg.timezone);
 
   const base = `${p.tipo}_${range.desde}_a_${range.hasta}`;
   if (p.formato === "csv") {

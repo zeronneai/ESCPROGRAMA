@@ -42,6 +42,7 @@ const settingsSchema = z.object({
   }, "Zona horaria invalida (ej. America/Chihuahua)"),
   sla: z.coerce.number().int("Debe ser entero").min(1).max(720),
   warn: z.coerce.number().int("Debe ser entero").min(1).max(720),
+  vigencia: z.coerce.number().int("Debe ser entero").min(1, "Mínimo 1 día").max(365, "Máximo 365 días"),
 });
 
 export async function saveSettingsAction(input: Record<string, string>): Promise<Result> {
@@ -56,6 +57,7 @@ export async function saveSettingsAction(input: Record<string, string>): Promise
       timezone: parsed.data.timezone,
       sla_business_hours: parsed.data.sla,
       warn_business_hours: parsed.data.warn,
+      vigencia_dias: parsed.data.vigencia,
       updated_by: u.id,
       updated_at: new Date().toISOString(),
     })
@@ -89,10 +91,9 @@ export async function removeHolidayAction(fecha: string): Promise<Result> {
 // ---- Clientes (catalogo) -----------------------------------------------------
 const customerSchema = z.object({
   nombre: z.string().trim().min(2, "Escribe el nombre"),
-  tipo: z.enum(["cliente", "prospecto"]),
 });
 
-export async function createCustomerBuyerAction(input: { nombre: string; tipo: string }): Promise<Result> {
+export async function createCustomerBuyerAction(input: { nombre: string }): Promise<Result> {
   const u = await requireBuyer();
   const parsed = customerSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
@@ -103,7 +104,7 @@ export async function createCustomerBuyerAction(input: { nombre: string; tipo: s
   return { ok: true };
 }
 
-export async function updateCustomerAction(id: string, input: { nombre: string; tipo: string; activo: boolean }): Promise<Result> {
+export async function updateCustomerAction(id: string, input: { nombre: string; activo: boolean }): Promise<Result> {
   await requireBuyer();
   if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "Cliente invalido" };
   const parsed = customerSchema.extend({ activo: z.boolean() }).safeParse(input);
@@ -112,5 +113,35 @@ export async function updateCustomerAction(id: string, input: { nombre: string; 
   const { error } = await supabase.from("customers").update(parsed.data).eq("id", id);
   if (error) return { ok: false, error: /duplicate/i.test(error.message) ? "Ya existe un cliente con ese nombre" : friendlyError(error.message) };
   revalidatePath("/comprador/clientes");
+  return { ok: true };
+}
+
+// ---- Datos de la empresa para el PDF ------------------------------------------
+const companySchema = z.object({
+  nombre_comercial: z.string().trim().min(1, "Falta el nombre comercial").max(120),
+  razon_social: z.string().trim().min(1, "Falta la razón social").max(200),
+  telefono: z.string().trim().min(1, "Falta el teléfono").max(60),
+  web: z.string().trim().min(1, "Falta el sitio web").max(120),
+  direccion: z.string().trim().min(1, "Falta la dirección").max(300),
+  rfc: z.string().trim().min(1, "Falta el RFC").max(60),
+  condiciones_default: z.string().trim().min(1, "Falta la condición por defecto").max(120),
+  pie: z.string().max(1000),
+});
+export type CompanyInput = z.infer<typeof companySchema>;
+
+/** Datos fijos del encabezado y leyendas del pie del PDF (no se calculan impuestos: solo la leyenda). */
+export async function saveCompanyAction(input: CompanyInput): Promise<Result> {
+  const u = await requireBuyer();
+  const parsed = companySchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  const { pie, ...rest } = parsed.data;
+  const lines = pie.split("\n").map((l) => l.trim()).filter(Boolean);
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("company_profile")
+    .update({ ...rest, pie_lineas: lines, updated_by: u.id, updated_at: new Date().toISOString() })
+    .eq("id", true);
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/comprador/configuracion");
   return { ok: true };
 }
