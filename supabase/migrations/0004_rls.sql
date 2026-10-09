@@ -42,14 +42,14 @@ grant execute on function public.is_enabled(), public.is_active_user(), public.i
 grant insert (nombre, tipo, created_by) on public.customers to authenticated;
 grant update (nombre, tipo, activo, razon_social, rfc, direccion, contacto_nombre,
   contacto_correo, contacto_telefono) on public.customers to authenticated;
-grant insert (vendedor_id, customer_id, notas, estado) on public.quote_requests to authenticated;
+grant insert (id, vendedor_id, customer_id, notas, estado) on public.quote_requests to authenticated;
 grant update (customer_id, notas, estado, due_at, archived_at) on public.quote_requests to authenticated;
-grant insert (request_id, posicion, producto, descripcion, cantidad, unidad, talla, notas)
+grant insert (id, request_id, posicion, producto, descripcion, cantidad, unidad, talla, notas)
   on public.quote_items to authenticated;
 grant update (posicion, producto, descripcion, cantidad, unidad, talla, notas)
   on public.quote_items to authenticated;
 grant delete on public.quote_items to authenticated;
-grant insert (item_id, tipo, url) on public.item_references to authenticated;
+grant insert (id, item_id, tipo, url) on public.item_references to authenticated;
 grant delete on public.item_references to authenticated;
 grant insert (no_shipping_markup, p1, p2, p3, p4, p5, created_by) on public.pricing_config to authenticated;
 grant update (timezone, sla_business_hours, warn_business_hours, updated_by, updated_at)
@@ -69,9 +69,9 @@ begin
     'complete_password_change()',
     'touch_login()',
     'log_event(text,text,text,jsonb)',
-    'respond_item_quoted(uuid,numeric,numeric,public.currency,jsonb,numeric,numeric,numeric,numeric,numeric,integer,public.delivery_kind,date,numeric,text,numeric,text,text,numeric)',
-    'respond_item_not_found(uuid,text,numeric)',
-    'mark_item_dispatched(uuid,integer)'
+    'respond_item(uuid,text,jsonb)',
+    'mark_item_dispatched(uuid,integer)',
+    'save_draft(jsonb)'
   ] loop
     execute format('revoke all on function public.%s from public, anon', f);
     execute format('grant execute on function public.%s to authenticated', f);

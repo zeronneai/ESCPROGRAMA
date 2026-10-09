@@ -155,7 +155,7 @@ begin
 
     new.submitted_at := now();
     if new.due_at is null
-       or new.due_at < now() + make_interval(hours => v_sla)
+       or new.due_at < now() + make_interval(hours => v_sla) - interval '5 minutes'
        or new.due_at > now() + make_interval(hours => v_sla) + interval '30 days' then
       raise exception 'Fecha de vencimiento fuera del rango permitido';
     end if;
@@ -312,13 +312,21 @@ create trigger item_costs_guard before insert on public.item_costs
 
 create or replace function public.item_quotes_guard() returns trigger
 language plpgsql security definer set search_path = public as $$
-declare k public.item_costs; i public.quote_items;
+declare k public.item_costs; i public.quote_items; v_max smallint;
 begin
   select * into i from public.quote_items where id = new.item_id;
-  if i.estado not in ('pendiente', 'no_encontrada') then
+  select coalesce(max(version), 0) into v_max from public.item_quotes where item_id = new.item_id;
+  if new.version <> v_max + 1 then
+    raise exception 'Version de cotizacion invalida (esperada %)', v_max + 1;
+  end if;
+  if new.version = 1 and i.estado not in ('pendiente', 'no_encontrada') then
     raise exception 'La partida ya esta cotizada';
   end if;
-  select * into k from public.item_costs where item_id = new.item_id;
+  -- Las versiones 2+ (revisiones) solo existen sobre partidas ya cotizadas.
+  if new.version > 1 and i.estado not in ('cotizada', 'enviada_cliente') then
+    raise exception 'Una revision requiere una partida cotizada';
+  end if;
+  select * into k from public.item_costs where item_id = new.item_id and version = new.version;
   if not found then raise exception 'Falta el costo de la partida'; end if;
   if new.price_1 <> round(k.base * (k.factors_snapshot ->> 'p1')::numeric, 2)
      or new.price_2 <> round(k.base * (k.factors_snapshot ->> 'p2')::numeric, 2)

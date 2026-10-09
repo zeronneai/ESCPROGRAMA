@@ -1,8 +1,6 @@
 -- ESC Portal de Cotizaciones: esquema base.
 -- Convenciones: nada se borra de verdad (borrado logico o triggers que lo impiden).
 
-create extension if not exists pgcrypto;
-
 -- ---------------------------------------------------------------------------
 -- Tipos
 -- ---------------------------------------------------------------------------
@@ -214,22 +212,27 @@ create index item_references_item_idx on public.item_references (item_id);
 -- ---------------------------------------------------------------------------
 -- Respuesta del comprador
 -- ---------------------------------------------------------------------------
+-- Cada cotizacion es VERSIONADA: la primera es la version 1 y una revision futura
+-- agrega la version 2, 3... (nunca se edita una version existente).
 -- SOLO comprador: costos reales y datos del calculo.
 create table public.item_costs (
-  item_id uuid primary key references public.quote_items (id),
+  item_id uuid not null references public.quote_items (id),
+  version smallint not null default 1 check (version >= 1),
   costo numeric(14, 4) not null check (costo >= 0),
   envio numeric(14, 4) check (envio is null or envio >= 0),
   base numeric(18, 8) not null,
   proveedor text,
   factors_snapshot jsonb not null,
   created_by uuid not null references public.profiles (id),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  primary key (item_id, version)
 );
 create index item_costs_proveedor_idx on public.item_costs (lower(proveedor));
 
 -- Visible al vendedor: precios finales y condiciones.
 create table public.item_quotes (
-  item_id uuid primary key references public.quote_items (id),
+  item_id uuid not null references public.quote_items (id),
+  version smallint not null default 1 check (version >= 1),
   moneda public.currency not null,
   price_1 numeric(14, 2) not null,
   price_2 numeric(14, 2) not null,
@@ -243,18 +246,25 @@ create table public.item_quotes (
   compra_min_unidad text,
   compra_min_monto numeric(14, 2) check (compra_min_monto is null or compra_min_monto > 0),
   nota text,
+  -- Reservado para la vigencia de la cotizacion (fase 4). Hoy queda en null.
+  valid_until timestamptz,
   quoted_at timestamptz not null default now(),
   quoted_by uuid not null references public.profiles (id),
+  primary key (item_id, version),
+  foreign key (item_id, version) references public.item_costs (item_id, version),
   check ((entrega_dias is not null and entrega_tipo is not null) or entrega_fecha is not null)
 );
 
--- Registro de control de lo enviado al cliente.
+-- Registro de control de lo enviado al cliente (por version cotizada).
 create table public.item_dispatch (
-  item_id uuid primary key references public.quote_items (id),
+  item_id uuid not null references public.quote_items (id),
+  quote_version smallint not null,
   precio_elegido smallint not null check (precio_elegido between 1 and 5),
   valor numeric(14, 2) not null,
   user_id uuid not null references public.profiles (id),
-  enviado_at timestamptz not null default now()
+  enviado_at timestamptz not null default now(),
+  primary key (item_id, quote_version),
+  foreign key (item_id, quote_version) references public.item_quotes (item_id, version)
 );
 
 -- ---------------------------------------------------------------------------

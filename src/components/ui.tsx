@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -56,8 +56,8 @@ export function Field({ label, error, children }: { label: string; error?: strin
   );
 }
 
-export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("rounded-lg border border-slate-200 bg-white p-4 shadow-sm", className)}>{children}</div>;
+export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return <div {...props} className={cx("rounded-lg border border-slate-200 bg-white p-4 shadow-sm", className)} />;
 }
 
 export function Alert({ tone = "info", children }: { tone?: "info" | "error" | "success"; children: ReactNode }) {

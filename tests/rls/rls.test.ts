@@ -27,21 +27,34 @@ let requestId: string;
 let itemId: string;
 let item2Id: string;
 
-async function respondQuoted(actor: Actor, item: string, cost: string, shipping: string | null) {
+function quotePayload(cost: string, shipping: string | null, factors = FACTORS, overrides: Record<string, unknown> = {}) {
   const t = calcTabulador(cost, shipping, {
-    noShippingMarkup: FACTORS.no_shipping_markup,
-    p1: FACTORS.p1,
-    p2: FACTORS.p2,
-    p3: FACTORS.p3,
-    p4: FACTORS.p4,
-    p5: FACTORS.p5,
+    noShippingMarkup: factors.no_shipping_markup,
+    p1: factors.p1,
+    p2: factors.p2,
+    p3: factors.p3,
+    p4: factors.p4,
+    p5: factors.p5,
   });
-  return as(actor, (q) =>
-    q(
-      `select public.respond_item_quoted($1,$2,$3,'MXN',$4::jsonb,$5,$6,$7,$8,$9,5,'habiles',null,null,null,null,'ACME','nota',2)`,
-      [item, cost, shipping, JSON.stringify(FACTORS), t.p1, t.p2, t.p3, t.p4, t.p5],
-    ),
-  );
+  return {
+    costo: cost,
+    envio: shipping,
+    moneda: "MXN",
+    factors,
+    prices: { p1: t.p1, p2: t.p2, p3: t.p3, p4: t.p4, p5: t.p5 },
+    entrega: { dias: 5, tipo: "habiles" },
+    proveedor: "ACME",
+    nota: "nota",
+    response_hours: 2,
+    ...overrides,
+  };
+}
+
+const respond = (actor: Actor, item: string, action: string, payload: unknown) =>
+  as(actor, (q) => q("select public.respond_item($1,$2,$3::jsonb)", [item, action, JSON.stringify(payload)]));
+
+async function respondQuoted(actor: Actor, item: string, cost: string, shipping: string | null) {
+  return respond(actor, item, "quote", quotePayload(cost, shipping));
 }
 
 describe.skipIf(!DATABASE_URL)("RLS e integridad (requiere Postgres con migraciones)", () => {
@@ -264,16 +277,16 @@ describe.skipIf(!DATABASE_URL)("RLS e integridad (requiere Postgres con migracio
 
     it("un vendedor no puede responder", async () => {
       expect(
-        await failure(as(S1, (q) => q("select public.respond_item_not_found($1,'no',1)", [itemId]))),
+        await failure(respond(S1, itemId, "not_found", { nota: "no" })),
       ).toMatch(/No autorizado/);
     });
 
     it("No encontrada exige nota y es editable; luego se puede cotizar", async () => {
-      expect(await failure(as(B1, (q) => q("select public.respond_item_not_found($1,'  ',1)", [itemId])))).toMatch(
+      expect(await failure(as(B1, (q) => q(`select public.respond_item($1,'not_found','{"nota":"  "}')`, [itemId])))).toMatch(
         /nota es obligatoria/,
       );
-      await as(B1, (q) => q("select public.respond_item_not_found($1,'sin proveedor',3.5)", [itemId]));
-      await as(B2, (q) => q("select public.respond_item_not_found($1,'sigue sin existir',9)", [itemId]));
+      await respond(B1, itemId, "not_found", { nota: "sin proveedor", response_hours: 3.5 });
+      await respond(B2, itemId, "not_found", { nota: "sigue sin existir", response_hours: 9 });
       const r = await as(S1, (q) =>
         q("select estado, not_found_note, response_business_hours::float h from public.quote_items where id=$1", [itemId]),
       );
@@ -311,21 +324,21 @@ describe.skipIf(!DATABASE_URL)("RLS e integridad (requiere Postgres con migracio
         }
       }
       expect(await failure(respondQuoted(B1, itemId, "50", null))).toMatch(/ya esta cotizada/);
-      expect(await failure(as(B1, (q) => q("select public.respond_item_not_found($1,'x',1)", [itemId])))).toMatch(
+      expect(await failure(respond(B1, itemId, "not_found", { nota: "x" }))).toMatch(
         /ya esta cotizada/,
       );
     });
 
     it("la BD rechaza precios que no cuadran con el tabulador o factores falsos", async () => {
-      const bad = (price5: string, factors = FACTORS) =>
-        as(B1, (q) =>
-          q(
-            `select public.respond_item_quoted($1,100,null,'MXN',$2::jsonb,160.16,148.72,140.40,131.04,$3,5,'habiles',null,null,null,null,null,null,1)`,
-            [item2Id, JSON.stringify(factors), price5],
-          ),
-        );
-      expect(await failure(bad("999.99"))).toMatch(/no coinciden con el tabulador/);
-      expect(await failure(bad("121.68", { ...FACTORS, p5: 1 }))).toMatch(/factores no coinciden/);
+      const base = quotePayload("100", null);
+      const wrong = { ...base, prices: { ...base.prices, p5: "999.99" } };
+      expect(await failure(respond(B1, item2Id, "quote", wrong))).toMatch(/no coinciden con el tabulador/);
+      const fake = quotePayload("100", null, { ...FACTORS, p5: 1 });
+      expect(await failure(respond(B1, item2Id, "quote", fake))).toMatch(/factores no coinciden/);
+      expect(await failure(respond(B1, item2Id, "inventada", {}))).toMatch(/Accion invalida/);
+      // Una falla no deja filas a medias.
+      const left = await as("postgres", (q) => q("select count(*)::int n from public.item_costs where item_id=$1", [item2Id]));
+      expect(left.rows[0].n).toBe(0);
     });
 
     it("el vendedor elige un precio y marca Enviado al cliente", async () => {
@@ -402,6 +415,86 @@ describe.skipIf(!DATABASE_URL)("RLS e integridad (requiere Postgres con migracio
       await as("postgres", (q) => q("alter table public.pricing_config disable trigger pricing_config_immutable"));
       await as("postgres", (q) => q("delete from public.pricing_config where id = (select max(id) from public.pricing_config)"));
       await as("postgres", (q) => q("alter table public.pricing_config enable trigger pricing_config_immutable"));
+    });
+  });
+
+  describe("save_draft y versiones de cotizacion", () => {
+    const rid = randomUUID();
+    const i1 = randomUUID();
+    const i2 = randomUUID();
+    const ref1 = randomUUID();
+    const draft = (items: unknown[], extra: Record<string, unknown> = {}) =>
+      JSON.stringify({ request_id: rid, customer_id: customerId, notas: "n", items, ...extra });
+    const item = (id: string, over: Record<string, unknown> = {}) => ({
+      id, producto: "Taladro", descripcion: "Taladro percutor de 1/2", cantidad: 2, unidad: "pieza", refs: [], ...over,
+    });
+
+    it("guarda un borrador incompleto (permitido) y es idempotente", async () => {
+      const payload = draft([item(i1, { producto: "", descripcion: "", refs: [] }), item(i2, { refs: [{ id: ref1, tipo: "link", url: "https://a.com/x" }] })]);
+      await as(S1, (q) => q("select public.save_draft($1::jsonb)", [payload]));
+      await as(S1, (q) => q("select public.save_draft($1::jsonb)", [payload]));
+      const r = await as(S1, (q) => q("select count(*)::int n from public.quote_items where request_id=$1", [rid]));
+      expect(r.rows[0].n).toBe(2);
+      const refs = await as(S1, (q) => q("select count(*)::int n from public.item_references where item_id=$1", [i2]));
+      expect(refs.rows[0].n).toBe(1);
+    });
+
+    it("quita partidas y referencias que ya no vienen en el payload", async () => {
+      await as(S1, (q) => q("select public.save_draft($1::jsonb)", [draft([item(i2, { refs: [] })])]));
+      const r = await as(S1, (q) => q("select id from public.quote_items where request_id=$1", [rid]));
+      expect(r.rows.map((x) => x.id)).toEqual([i2]);
+      expect((await as(S1, (q) => q("select * from public.item_references where item_id=$1", [i2]))).rowCount).toBe(0);
+    });
+
+    it("otro vendedor no puede escribir sobre ese borrador", async () => {
+      expect(await failure(as(S2, (q) => q("select public.save_draft($1::jsonb)", [draft([item(i2)])])))).toMatch(
+        /row-level security/,
+      );
+      expect((await as(S2, (q) => q("select * from public.quote_requests where id=$1", [rid]))).rowCount).toBe(0);
+    });
+
+    it("un comprador no puede crear borradores", async () => {
+      expect(await failure(as(B1, (q) => q("select public.save_draft($1::jsonb)", [draft([item(randomUUID())]).replace(rid, randomUUID())])))).toMatch(
+        /row-level security/,
+      );
+    });
+
+    it("no se puede guardar sobre una solicitud ya enviada", async () => {
+      await as(S1, (q) => q("select public.save_draft($1::jsonb)", [draft([item(i2, { refs: [{ id: randomUUID(), tipo: "link", url: "https://a.com/y" }] })])]));
+      const due = new Date(Date.now() + 5 * 86400_000).toISOString();
+      await as(S1, (q) => q("update public.quote_requests set estado='enviada', due_at=$2 where id=$1", [rid, due]));
+      expect(await failure(as(S1, (q) => q("select public.save_draft($1::jsonb)", [draft([item(i2)])])))).toMatch(
+        /row-level security|no se puede/,
+      );
+    });
+
+    it("las cotizaciones son versionadas: v1 por respond_item, v2 solo sobre cotizada y en orden", async () => {
+      await respondQuoted(B1, i2, "100", null);
+      const v = await as(S1, (q) => q("select version from public.item_quotes where item_id=$1", [i2]));
+      expect(v.rows).toEqual([{ version: 1 }]);
+      const insertV = (version: number) =>
+        as("postgres", async (q) => {
+          await q("select set_config('request.jwt.claim.role','service_role', true)");
+          await q(
+            `insert into public.item_costs (item_id, version, costo, base, factors_snapshot, created_by)
+             select $1, $2, 200, 0, factors_snapshot, created_by from public.item_costs where item_id=$1 and version=1`,
+            [i2, version],
+          );
+          await q(
+            `insert into public.item_quotes (item_id, version, moneda, price_1, price_2, price_3, price_4, price_5, entrega_dias, entrega_tipo, quoted_by)
+             select $1, $2, 'MXN', 320.32, 297.44, 280.80, 262.08, 243.36, 5, 'habiles', quoted_by from public.item_quotes where item_id=$1 and version=1`,
+            [i2, version],
+          );
+        });
+      expect(await failure(insertV(3))).toMatch(/Version de cotizacion invalida/);
+      await insertV(2);
+      // Cada version queda intacta y bloqueada; el vendedor ve las versiones sin costos.
+      expect((await as(S1, (q) => q("select * from public.item_quotes where item_id=$1", [i2]))).rowCount).toBe(2);
+      expect(await failure(as("postgres", (q) => q("update public.item_quotes set price_1=1 where version=1")))).toMatch(/inmutable/);
+      // El envio al cliente usa la version vigente (2).
+      await as(S1, (q) => q("select public.mark_item_dispatched($1,1)", [i2]));
+      const d = await as(S1, (q) => q("select quote_version, valor::text from public.item_dispatch where item_id=$1", [i2]));
+      expect(d.rows[0]).toEqual({ quote_version: 2, valor: "320.32" });
     });
   });
 

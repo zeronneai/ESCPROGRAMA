@@ -1,0 +1,83 @@
+import { describe, expect, it } from "vitest";
+import { formatProblems, parseNumber, submitProblems, toDraftPayload } from "@/lib/validation/request";
+import { emptyQuoteForm, parseNotFoundNote, parseQuoteForm } from "@/lib/validation/response";
+
+const ref = { tipo: "link", url: "https://a.com/x" };
+const ok = { producto: "Guante", descripcion: "Guante de carnaza", cantidad: "10", unidad: "par", talla: "", refs: [ref] };
+
+describe("submitProblems", () => {
+  it("partida completa sin problemas", () => {
+    expect(submitProblems({ customer_id: "c", items: [ok] })).toEqual([]);
+  });
+  it("sin cliente ni partidas", () => {
+    const p = submitProblems({ customer_id: "", items: [] });
+    expect(p.map((x) => x.field)).toEqual(["customer", "items"]);
+  });
+  it("nombre, descripcion corta, cantidad/talla y referencia son obligatorios", () => {
+    const p = submitProblems({ customer_id: "c", items: [{ producto: " ", descripcion: "corta", cantidad: "", unidad: "", talla: "", refs: [] }] });
+    expect(p.map((x) => x.field)).toEqual(["producto", "descripcion", "cantidad", "referencias"]);
+  });
+  it("talla sola basta; cantidad sin unidad no", () => {
+    expect(submitProblems({ customer_id: "c", items: [{ ...ok, cantidad: "", unidad: "", talla: "M" }] })).toEqual([]);
+    const p = submitProblems({ customer_id: "c", items: [{ ...ok, unidad: "" }] });
+    expect(p[0].message).toMatch(/unidad/);
+  });
+  it("cantidad cero o negativa se rechaza", () => {
+    expect(submitProblems({ customer_id: "c", items: [{ ...ok, cantidad: "0" }] })[0].message).toMatch(/mayor a 0/);
+    expect(submitProblems({ customer_id: "c", items: [{ ...ok, cantidad: "-3" }] })[0].message).toMatch(/mayor a 0/);
+  });
+  it("indica la partida exacta", () => {
+    const p = submitProblems({ customer_id: "c", items: [ok, { ...ok, producto: "" }] });
+    expect(p).toEqual([{ item: 1, field: "producto", message: "Partida 2: falta el nombre del producto" }]);
+  });
+});
+
+describe("formatProblems / toDraftPayload", () => {
+  it("rechaza links que no son http(s) y unidades invalidas", () => {
+    const p = formatProblems({ items: [{ ...ok, refs: [{ id: "x", tipo: "link", url: "javascript:alert(1)" }] as never, unidad: "galon" }] });
+    expect(p.length).toBe(2);
+  });
+  it("payload: cantidad numerica, sin unidad si no hay cantidad", () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    const d = toDraftPayload({
+      request_id: id, customer_id: id, notas: "",
+      items: [{ id, producto: "a", descripcion: "b", cantidad: "1,250.5", unidad: "kg", talla: "", notas: "", refs: [] },
+              { id, producto: "a", descripcion: "b", cantidad: "", unidad: "kg", talla: "M", notas: "", refs: [] }],
+    });
+    expect(d.items[0]).toMatchObject({ cantidad: 1250.5, unidad: "kg" });
+    expect(d.items[1]).toMatchObject({ cantidad: null, unidad: null, talla: "M" });
+  });
+  it("parseNumber", () => {
+    expect(parseNumber("")).toBeUndefined();
+    expect(parseNumber(" 12 ")).toBe(12);
+    expect(parseNumber("abc")).toBeNaN();
+  });
+});
+
+describe("parseQuoteForm", () => {
+  const base = { ...emptyQuoteForm, costo: "100", entregaDias: "5" };
+  it("cotizacion minima valida", () => {
+    const r = parseQuoteForm(base);
+    expect(r).toMatchObject({ ok: true, value: { costo: 100, envio: null, moneda: "MXN", entrega: { dias: 5, tipo: "habiles", fecha: null } } });
+  });
+  it("envio 0 o vacio es sin envio", () => {
+    expect((parseQuoteForm({ ...base, envio: "0" }) as { value: { envio: null } }).value.envio).toBeNull();
+    expect((parseQuoteForm({ ...base, envio: "12.5" }) as { value: { envio: number } }).value.envio).toBe(12.5);
+  });
+  it("costo y entrega obligatorios", () => {
+    const r = parseQuoteForm({ ...emptyQuoteForm });
+    expect(r.ok).toBe(false);
+    expect(!r.ok && Object.keys(r.errors)).toEqual(expect.arrayContaining(["costo", "entregaDias"]));
+  });
+  it("entrega por fecha y compra minima por monto", () => {
+    const r = parseQuoteForm({ ...base, entregaModo: "fecha", entregaFecha: "2026-05-01", minModo: "monto", minMonto: "1500" });
+    expect(r).toMatchObject({ ok: true, value: { entrega: { fecha: "2026-05-01", dias: null }, compra_min: { monto: 1500 } } });
+  });
+  it("compra minima por cantidad exige unidad valida", () => {
+    expect(parseQuoteForm({ ...base, minModo: "cantidad", minCantidad: "10", minUnidad: "x" }).ok).toBe(false);
+  });
+  it("nota de no encontrada es obligatoria", () => {
+    expect(parseNotFoundNote("   ").ok).toBe(false);
+    expect(parseNotFoundNote(" sin proveedor ")).toEqual({ ok: true, value: { nota: "sin proveedor" } });
+  });
+});
