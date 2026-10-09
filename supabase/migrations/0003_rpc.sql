@@ -60,7 +60,7 @@ end $$;
 create or replace function public.complete_password_change() returns void
 language plpgsql security definer set search_path = public as $$
 begin
-  if not public.is_active_user() then raise exception 'No autorizado' using errcode = '42501'; end if;
+  if not public.is_enabled() then raise exception 'No autorizado' using errcode = '42501'; end if;
   update public.profiles set must_change_password = false where id = auth.uid();
   perform public.write_audit('password_changed', 'profiles', auth.uid()::text);
 end $$;
@@ -68,7 +68,7 @@ end $$;
 create or replace function public.touch_login() returns void
 language plpgsql security definer set search_path = public as $$
 begin
-  if not public.is_active_user() then raise exception 'Usuario inactivo' using errcode = '42501'; end if;
+  if not public.is_enabled() then raise exception 'Usuario inactivo' using errcode = '42501'; end if;
   update public.profiles set last_login_at = now() where id = auth.uid();
   perform public.write_audit('login', 'profiles', auth.uid()::text);
 end $$;

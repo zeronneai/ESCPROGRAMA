@@ -45,16 +45,27 @@ create trigger profiles_updated before update on public.profiles
   for each row execute function public.set_updated_at();
 
 -- Helpers de autorizacion (security definer para evitar recursion de RLS).
-create or replace function public.is_active_user() returns boolean
+-- is_enabled: sesion de un usuario activo (aunque deba cambiar su contrasena).
+-- is_active_user / is_buyer / is_seller: ademas ya cambio la contrasena temporal,
+-- asi que con must_change_password = true la API de datos queda bloqueada en la BD.
+create or replace function public.is_enabled() returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from public.profiles where id = auth.uid() and activo);
+$$;
+
+create or replace function public.is_active_user() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and activo and not must_change_password
+  );
 $$;
 
 create or replace function public.is_buyer() returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from public.profiles
-    where id = auth.uid() and activo and rol = 'comprador'
+    where id = auth.uid() and activo and not must_change_password and rol = 'comprador'
   );
 $$;
 
@@ -62,7 +73,7 @@ create or replace function public.is_seller() returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from public.profiles
-    where id = auth.uid() and activo and rol = 'vendedor'
+    where id = auth.uid() and activo and not must_change_password and rol = 'vendedor'
   );
 $$;
 

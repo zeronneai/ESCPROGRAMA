@@ -119,10 +119,16 @@ describe.skipIf(!DATABASE_URL)("RLS e integridad (requiere Postgres con migracio
       await as("postgres", (q) => q("insert into auth.users (id,email) values ($1,'baja@esc.test')", [id]));
       await as(B1, (q) => q("select public.admin_create_profile($1,'Baja','baja@esc.test','vendedor')", [id]));
       const actor: Actor = { id, role: "authenticated" };
+      // Con la contrasena temporal vigente la BD no entrega datos.
+      expect((await as(actor, (q) => q("select * from public.customers"))).rowCount).toBe(0);
+      expect(await failure(as(actor, (q) => q("select public.log_event('logout','profiles','x')")))).toMatch(/No autorizado/);
+      await as(actor, (q) => q("select public.complete_password_change()"));
       expect((await as(actor, (q) => q("select * from public.customers"))).rowCount).toBeGreaterThan(0);
       await as(B1, (q) => q("select public.admin_set_user_active($1,false)", [id]));
       expect((await as(actor, (q) => q("select * from public.customers"))).rowCount).toBe(0);
       expect(await failure(as(actor, (q) => q("select public.touch_login()")))).toMatch(/inactivo/);
+      await as(B1, (q) => q("select public.admin_set_user_active($1,true)", [id]));
+      await as(actor, (q) => q("select public.touch_login()"));
     });
 
     it("no se puede desactivar al ultimo comprador activo ni a uno mismo", async () => {

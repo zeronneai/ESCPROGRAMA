@@ -35,7 +35,7 @@ grant select on public.profiles, public.app_settings, public.pricing_config, pub
   public.customers, public.quote_requests, public.quote_items, public.item_references,
   public.item_costs, public.item_quotes, public.item_dispatch, public.notifications,
   public.audit_log to authenticated;
-grant execute on function public.is_active_user(), public.is_buyer(), public.is_seller(),
+grant execute on function public.is_enabled(), public.is_active_user(), public.is_buyer(), public.is_seller(),
   public.can_read_request(uuid), public.is_own_draft(uuid), public.item_request_id(uuid)
   to authenticated;
 

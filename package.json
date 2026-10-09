@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:rls": "vitest run --config vitest.rls.config.ts"
+    "test:rls": "vitest run --config vitest.rls.config.ts",
+    "bootstrap:admin": "node --env-file=.env.local --experimental-strip-types scripts/create-first-buyer.ts"
   },
   "packageManager": "pnpm@10.28.0",
   "dependencies": {
