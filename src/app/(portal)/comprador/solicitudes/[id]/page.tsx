@@ -6,6 +6,9 @@ import type { ItemRow } from "@/lib/quotes/types";
 import { createClient } from "@/lib/supabase/server";
 import { businessHoursBetween } from "@/lib/time/business-hours";
 import { SemaforoBadge } from "@/components/status";
+import { Card } from "@/components/ui";
+import { Timeline } from "@/components/timeline";
+import { auditActionLabel, buildTimeline } from "@/lib/stats/timeline";
 import { BuyerItemCard, type CostRow, type Factors } from "./buyer-item-card";
 
 export default async function CompradorSolicitud({ params }: { params: Promise<{ id: string }> }) {
@@ -14,7 +17,7 @@ export default async function CompradorSolicitud({ params }: { params: Promise<{
   const supabase = await createClient();
   const { data: req } = await supabase
     .from("quote_requests")
-    .select("id, folio, estado, notas, submitted_at, due_at, customers(nombre, tipo), profiles:vendedor_id(nombre)")
+    .select("id, folio, estado, notas, created_at, submitted_at, due_at, customers(nombre, tipo), profiles:vendedor_id(nombre)")
     .eq("id", id)
     .maybeSingle();
   if (!req || req.estado !== "enviada") notFound();
@@ -41,6 +44,12 @@ export default async function CompradorSolicitud({ params }: { params: Promise<{
   };
   const due = new Date(req.due_at!);
   const remaining = businessHoursBetween(new Date(), due, settings);
+  const ids = [req.id, ...rows.map((r) => r.id)];
+  const [{ data: audit }, { data: people }] = await Promise.all([
+    supabase.from("audit_log").select("id, at, user_id, action, entity, entity_id").in("entity_id", ids).order("id", { ascending: false }).limit(200),
+    supabase.from("profiles").select("id, nombre"),
+  ]);
+  const names = new Map((people ?? []).map((p) => [p.id as string, p.nombre as string]));
   const pend = rows.some((r) => r.estado === "pendiente");
   const customer = req.customers as unknown as { nombre: string; tipo: string } | null;
 
@@ -62,6 +71,20 @@ export default async function CompradorSolicitud({ params }: { params: Promise<{
       {rows.map((item) => (
         <BuyerItemCard key={item.id} item={item} factors={factors} proveedores={proveedores} requestOverdue={remaining <= 0} />
       ))}
+      <Timeline events={buildTimeline({ folio: req.folio, created_at: req.created_at, submitted_at: req.submitted_at, due_at: req.due_at }, rows)} />
+      <Card>
+        <details>
+          <summary className="cursor-pointer text-sm font-medium">Bitacora de auditoria ({(audit ?? []).length})</summary>
+          <ul className="mt-2 space-y-1 text-xs text-slate-700">
+            {(audit ?? []).map((a) => (
+              <li key={a.id}>
+                {new Date(a.at).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "medium" })} - {a.user_id ? (names.get(a.user_id) ?? "usuario") : "sistema"}{" "}
+                {auditActionLabel(a.action)} ({a.entity})
+              </li>
+            ))}
+          </ul>
+        </details>
+      </Card>
     </div>
   );
 }

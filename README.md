@@ -2,7 +2,7 @@
 
 Herramienta interna (con login) para solicitar, cotizar y dar seguimiento a cotizaciones, con trazabilidad para ISO 9001.
 
-Estado: **Fase 2** (solicitudes, respuesta del comprador, envio al cliente). Ver `ROADMAP.md` para lo que sigue.
+Estado: **Fase 3** (dashboards, notificaciones, exportaciones, auditoria, configuracion). Ver `ROADMAP.md` para lo que sigue.
 
 ## Stack
 Next.js 15 (App Router), TypeScript, Tailwind 4, Supabase (Postgres, Auth, Storage, RLS), Zod, React Hook Form, decimal.js, Luxon, Vitest.
@@ -25,7 +25,13 @@ Next.js 15 (App Router), TypeScript, Tailwind 4, Supabase (Postgres, Auth, Stora
 | `SUPABASE_SERVICE_ROLE_KEY` | **Secreta** | Project Settings > API Keys > clave `service_role` / *Secret key* (no la compartas ni la pongas en `NEXT_PUBLIC_`) |
 | `CRON_SECRET` | **Secreta** (fase 3) | No viene de Supabase: inventa una cadena aleatoria de 32+ caracteres |
 
-Si cambias `supabase/migrations`, regenera el instalador con `bash scripts/build-install-sql.sh`.
+`CRON_SECRET` ya se usa: Vercel la envia al cron diario de avisos (`vercel.json`).
+
+### Actualizar la base de datos despues de instalar
+`instalar-todo.sql` esta **congelado** (no se vuelve a pegar). Los cambios nuevos llegan como archivos numerados en `supabase/actualizaciones/`: pegalos en el SQL Editor **en orden**, una vez cada uno. Ver `supabase/actualizaciones/README.md`.
+
+### Datos de demostracion (opcional)
+Con al menos un comprador y un vendedor creados, pega `supabase/seed-demo.sql` en el SQL Editor: carga 8 clientes y 15 solicitudes en distintos estados. Solo para pruebas.
 
 ## Desarrollo local (opcional)
 ```bash
@@ -56,6 +62,11 @@ Sin Docker, `tests/rls/run-local-pg.sh` levanta un Postgres temporal con un shim
 - El vendedor nunca puede leer costos: viven en `item_costs`, con RLS solo para comprador.
 - Una partida cotizada es inmutable por triggers en la base de datos.
 - `audit_log` es solo insercion (triggers); nada se borra de verdad.
+
+## Que incluye
+- **Vendedor:** contadores, filtros por estado, cliente y fecha, alerta de respondidas sin enviar, linea de tiempo por solicitud.
+- **Comprador:** bandeja con semaforo, estadisticas con graficas y filtros (fechas, vendedor, cliente, moneda), exportacion a Excel y CSV, reporte de auditoria exportable, clientes, usuarios y configuracion (factores con historial, plazos, zona horaria, festivos).
+- **Notificaciones:** campana con contador y conteo en el titulo de la pestana (solo dentro del portal).
 
 ## Cron en Vercel
 El plan gratuito (Hobby) solo permite cron **una vez al dia**. "Vencida" se calcula al consultar a partir de `due_at`; el cron diario solo genera avisos dentro del portal.

@@ -4,6 +4,7 @@ Mejoras futuras, sin orden definido:
 
 - **PDF de cotizacion para el cliente.** Requiere datos completos del cliente (`customers` ya tiene columnas nulas preparadas) y el formato oficial de ESC. El formato de la tabla de precios vive en `src/lib/format/price-table.ts`.
 - **WhatsApp** como canal de notificaciones (la capa de notificaciones esta desacoplada).
+- Aviso de "por vencer" con mayor precision: en el plan Hobby el cron es diario; con plan Pro puede correr cada 15 minutos (basta cambiar `vercel.json`).
 - **Correo automatico** (se descarto por ahora; las notificaciones son solo dentro del portal).
 - Historial de costos por proveedor.
 - Catalogo interno de productos.
