@@ -23,4 +23,6 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 6 | `0011_pdf_y_cliente.sql` | Datos del PDF, precio elegido guardado, atencion y destino. |
 | 7 | `0012_abastecimiento.sql` | "Donde conseguirlo" y vista "Por comprar" (solo comprador). |
 
+El ajuste del costo de envio al cliente y de la nota "Precios sin IVA" **no agrega archivos nuevos**: usa las mismas columnas de `quote_pdf_data` (monto y moneda) y deriva el modo del monto.
+
 Si una ejecucion falla, **no sigas con la siguiente**: copia el mensaje de error y mandamelo.

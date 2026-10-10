@@ -30,5 +30,6 @@ describe("toPriceTableItem", () => {
     expect(JSON.stringify(pti)).not.toMatch(/ACME|"costo"|"base"|"envio"/);
     const { text } = formatPriceTable([pti], { onlySelected: true });
     expect(text).toContain("Precio 3: $140.40 MXN c/u (total $1,404.00 MXN)");
+    expect(text).toContain("Precios sin IVA");
   });
 });

@@ -115,7 +115,7 @@ export function QuoteForm({
       </div>
 
       <div className="rounded-md bg-slate-50 p-3 text-sm">
-        <p className="mb-1 font-medium">Vista previa</p>
+        <p className="mb-1 font-medium">Vista previa <span className="font-normal text-slate-500">(precios sin IVA)</span></p>
         {preview ? (
           <div className="space-y-1">
             <p className="text-slate-600">Base de cálculo: ${preview.base} ({withShipping ? "costo + envío" : "costo + 4%"})</p>

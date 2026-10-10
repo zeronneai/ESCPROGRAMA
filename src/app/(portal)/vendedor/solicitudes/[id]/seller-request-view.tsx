@@ -13,7 +13,9 @@ import { ItemStatusBadge, qtyText, ReferenceList, SemaforoBadge } from "@/compon
 import { copyRich } from "@/lib/clipboard";
 import { formatPriceTable } from "@/lib/format/price-table";
 import { formatDelivery, formatMinPurchase, toPriceTableItem } from "@/lib/format/quote-text";
-import { pdfProblems } from "@/lib/pdf/model";
+import { itemCurrencies, pdfProblems, previewTotals, toPdfQuote } from "@/lib/pdf/model";
+import { parseShippingInput } from "@/lib/pdf/shipping";
+import { parseNumber } from "@/lib/validation/request";
 import { lineTotal } from "@/lib/pricing/tabulador";
 import { isVigenciaVencida, revisionFolio, vigenciaDiasRestantes } from "@/lib/quotes/revisions";
 import {
@@ -27,7 +29,7 @@ interface Props {
   request: { id: string; folio: string; notas: string | null; cliente: string; atencion: string; destino: string; revision: number };
   items: ItemRow[];
   remainingByItem: Record<string, number | null>;
-  pdfDefaults: { destino: string; via: string; condiciones: string; atencion: string; modo: "incluido" | "aparte"; monto: string; moneda: "MXN" | "USD" };
+  pdfDefaults: { destino: string; via: string; condiciones: string; atencion: string; monto: string; moneda: "MXN" | "USD" | "" };
   nowIso: string;
 }
 
@@ -51,11 +53,26 @@ export function SellerRequestView({ request, items, remainingByItem, pdfDefaults
   const [pdf, setPdf] = useState(pdfDefaults);
 
   const quoted = items.filter((i) => latestQuote(i));
-  const pdfIssues = pdfProblems(
-    quoted.map((i) => ({ folio: i.folio ?? "", precioElegido: picked[i.id] ?? null, quote: latestQuote(i)! })),
-    now,
+  // Costo de envio al cliente (opcional) y vista previa del total por moneda.
+  const currencies = itemCurrencies(quoted.map((i) => ({ quote: latestQuote(i) })));
+  const shipParse = parseShippingInput({ monto: pdf.monto, moneda: pdf.moneda }, currencies);
+  const shippingIssue = shipParse.ok ? null : shipParse.error;
+  const preview = previewTotals(
+    quoted.map((i) => ({ cantidad: i.cantidad, precioElegido: picked[i.id] ?? null, quote: toPdfQuote(latestQuote(i)!) })),
+    shipParse.ok ? { monto: shipParse.monto, moneda: shipParse.moneda } : { monto: null, moneda: null },
   );
+  const unpicked = quoted.filter((i) => !picked[i.id]).length;
+  const destinoTxt = pdf.destino.trim();
+  const viaTxt = pdf.via.trim();
+  const pdfIssues = [
+    ...pdfProblems(
+      quoted.map((i) => ({ folio: i.folio ?? "", precioElegido: picked[i.id] ?? null, quote: latestQuote(i)! })),
+      now,
+    ),
+    ...(shippingIssue ? [shippingIssue] : []),
+  ];
   const pdfSaved = JSON.stringify(pdf) === JSON.stringify(pdfDefaults);
+
   const hasPending = items.some((i) => i.estado === "pendiente");
 
   async function copy(list: ItemRow[], scope: "item" | "request" | "selected", entityId: string, onlySelected = false) {
@@ -109,7 +126,7 @@ export function SellerRequestView({ request, items, remainingByItem, pdfDefaults
     start(async () => {
       const saved = await savePdfDataAction({
         requestId: request.id, destino: pdf.destino, via: pdf.via, condiciones: pdf.condiciones, atencion: pdf.atencion,
-        modo: pdf.modo, monto: pdf.monto, moneda: pdf.moneda,
+        monto: pdf.monto, moneda: pdf.moneda,
       });
       if (!saved.ok) {
         setNotice({ tone: "error", text: saved.error });
@@ -180,29 +197,59 @@ export function SellerRequestView({ request, items, remainingByItem, pdfDefaults
               <Input value={pdf.atencion} onChange={(e) => setPdf({ ...pdf, atencion: e.target.value })} />
             </Field>
           </div>
-          <fieldset className="space-y-2">
-            <legend className="text-sm font-medium text-slate-700">Envío al destino del cliente</legend>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="radio" checked={pdf.modo === "incluido"} onChange={() => setPdf({ ...pdf, modo: "incluido" })} /> Incluido en los precios
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="radio" checked={pdf.modo === "aparte"} onChange={() => setPdf({ ...pdf, modo: "aparte" })} /> Se cobra aparte
-            </label>
-            {pdf.modo === "aparte" && (
-              <div className="flex flex-wrap gap-2">
-                <Field label="Monto">
-                  <Input value={pdf.monto} onChange={(e) => setPdf({ ...pdf, monto: e.target.value })} inputMode="decimal" />
-                </Field>
-                <Field label="Moneda">
-                  <Select value={pdf.moneda} onChange={(e) => setPdf({ ...pdf, moneda: e.target.value as "MXN" | "USD" })}>
-                    <option value="MXN">Pesos (MXN)</option>
-                    <option value="USD">Dólares (USD)</option>
-                  </Select>
-                </Field>
-              </div>
+          <div className="space-y-2 rounded-md border border-slate-200 p-3">
+            <p className="text-sm font-medium text-slate-700">Costo de envío al cliente (opcional)</p>
+            <div className="flex flex-wrap items-end gap-2">
+              <Field label="Monto (sin IVA)">
+                <Input value={pdf.monto} onChange={(e) => setPdf({ ...pdf, monto: e.target.value })} inputMode="decimal" placeholder="0 o vacío = sin cargo" className="w-44" />
+              </Field>
+              <Field label="Moneda">
+                <Select value={pdf.moneda} onChange={(e) => setPdf({ ...pdf, moneda: e.target.value as "MXN" | "USD" | "" })} className="w-44">
+                  {currencies.length !== 1 && <option value="">Elige la moneda...</option>}
+                  <option value="MXN">Pesos (MXN)</option>
+                  <option value="USD">Dólares (USD)</option>
+                </Select>
+              </Field>
+            </div>
+            <p className="text-xs text-slate-500">
+              Es el flete de ESC hacia el destino del cliente. No es el costo de envío del proveedor, que el vendedor no ve.
+              {currencies.length > 1 && " Esta solicitud mezcla pesos y dólares: elige la moneda del cargo."}
+            </p>
+            {(parseNumber(pdf.monto) ?? 0) > 0 ? (
+              <p className="text-xs text-slate-600">
+                El PDF agregará el renglón "Shipping{destinoTxt ? ` to ${destinoTxt}` : ""}{viaTxt ? ` via ${viaTxt}` : ""}" y lo sumará al total de esa moneda.
+              </p>
+            ) : destinoTxt ? (
+              <p className="text-xs text-slate-600">
+                Sin cargo de envío, el pie del PDF dirá: "Prices include shipping charges to your plant in {destinoTxt}{viaTxt ? `, via ${viaTxt}` : ""}".
+              </p>
+            ) : (
+              <p className="text-xs text-slate-600">Sin cargo de envío y sin destino: el PDF no lleva leyenda de envío.</p>
             )}
-            <p className="text-xs text-slate-500">Este cargo es para el cliente y no tiene relación con el costo de envío del proveedor.</p>
-          </fieldset>
+          </div>
+
+          <div className="space-y-1 rounded-md bg-slate-50 p-3">
+            <p className="text-sm font-medium text-slate-700">Vista previa del total (precios sin IVA)</p>
+            {preview.perCurrency.length === 0 ? (
+              <p className="text-xs text-slate-500">Elige el precio de las partidas para ver el total.</p>
+            ) : (
+              <table className="w-full max-w-md text-sm">
+                <tbody>
+                  {preview.perCurrency.map((c) => (
+                    <tr key={c.currency} className="align-top">
+                      <td className="py-1 pr-3 font-medium">{c.currency}</td>
+                      <td className="py-1 text-right tabular-nums">
+                        <div>Subtotal {c.subtotal}</div>
+                        {c.shipping && <div>Envío al cliente {c.shipping}</div>}
+                        <div className="font-semibold">Total con envío {c.total}</div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+            {unpicked > 0 && <p className="text-xs text-amber-800">Faltan {unpicked} partida(s) por elegir precio; no están en este total.</p>}
+          </div>
           {pdfIssues.length > 0 && (
             <Alert tone="info">
               <ul className="list-disc pl-5">{pdfIssues.map((m) => <li key={m}>{m}</li>)}</ul>
@@ -319,6 +366,7 @@ function ItemCard(props: {
               })}
             </tbody>
           </table>
+          <p className="text-xs font-medium text-slate-600">Precios sin IVA</p>
           {d && <p className="text-xs text-slate-500">El precio ya se envió al cliente y quedó fijo para esta versión.</p>}
 
           <div className="flex flex-wrap items-center gap-2">
