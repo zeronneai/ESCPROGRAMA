@@ -1,4 +1,5 @@
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { PDF_FONT } from "./fonts";
 import { COLUMN_HEADERS, type PdfModel } from "./model";
 
 /**
@@ -9,28 +10,28 @@ import { COLUMN_HEADERS, type PdfModel } from "./model";
 const W = { te: "17%", name: "33%", cant: "11%", cur: "12%", up: "13.5%", price: "13.5%" } as const;
 
 const s = StyleSheet.create({
-  page: { paddingTop: 36, paddingBottom: 60, paddingHorizontal: 36, fontSize: 9, fontFamily: "Helvetica", color: "#111" },
+  page: { paddingTop: 36, paddingBottom: 60, paddingHorizontal: 36, fontSize: 9, fontFamily: PDF_FONT.regular, color: "#111" },
   head: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
   headLeft: { width: "46%", flexDirection: "row", alignItems: "center", gap: 8 },
   logo: { width: 105, height: 30 },
-  brand: { fontSize: 11, fontFamily: "Helvetica-Bold" },
+  brand: { fontSize: 11, fontFamily: PDF_FONT.bold },
   small: { fontSize: 8, color: "#333" },
   headRight: { width: "50%", textAlign: "right", fontSize: 8, lineHeight: 1.35 },
-  title: { textAlign: "center", fontSize: 16, fontFamily: "Helvetica-Bold", marginVertical: 8 },
+  title: { textAlign: "center", fontSize: 16, fontFamily: PDF_FONT.bold, marginVertical: 8 },
   box: { flexDirection: "row", borderWidth: 1, borderColor: "#999", marginBottom: 8 },
   boxCol: { flex: 1, padding: 5, borderRightWidth: 1, borderRightColor: "#999" },
   boxColLast: { flex: 1, padding: 5 },
-  label: { fontSize: 7, color: "#555", fontFamily: "Helvetica-Bold" },
+  label: { fontSize: 7, color: "#555", fontFamily: PDF_FONT.bold },
   value: { fontSize: 9, marginTop: 1 },
   to: { marginBottom: 10 },
-  th: { flexDirection: "row", backgroundColor: "#e5e7eb", borderWidth: 1, borderColor: "#999", fontFamily: "Helvetica-Bold" },
+  th: { flexDirection: "row", backgroundColor: "#e5e7eb", borderWidth: 1, borderColor: "#999", fontFamily: PDF_FONT.bold },
   tr: { flexDirection: "row", borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: "#bbb" },
   cell: { padding: 4 },
   right: { textAlign: "right" },
   desc: { fontSize: 8, color: "#444", marginTop: 1 },
   totals: { marginTop: 6, alignItems: "flex-end" },
-  totalRow: { flexDirection: "row", gap: 14, fontFamily: "Helvetica-Bold", fontSize: 10, marginTop: 2 },
-  band: { backgroundColor: "#fde047", padding: 5, marginTop: 8, fontFamily: "Helvetica-Bold" },
+  totalRow: { flexDirection: "row", gap: 14, fontFamily: PDF_FONT.bold, fontSize: 10, marginTop: 2 },
+  band: { backgroundColor: "#fde047", padding: 5, marginTop: 8, fontFamily: PDF_FONT.bold },
   footer: { marginTop: 10, lineHeight: 1.5, fontSize: 8.5 },
   pageNo: { position: "absolute", bottom: 24, left: 0, right: 36, textAlign: "right", fontSize: 8, color: "#666" },
 });
@@ -71,8 +72,8 @@ export function QuoteDocument({ model, logoSrc }: { model: PdfModel; logoSrc?: s
         </View>
 
         <View style={s.to}>
-          <Text><Text style={{ fontFamily: "Helvetica-Bold" }}>Empresa: </Text>{model.empresa}</Text>
-          {model.atencion ? <Text><Text style={{ fontFamily: "Helvetica-Bold" }}>Atención: </Text>{model.atencion}</Text> : null}
+          <Text><Text style={{ fontFamily: PDF_FONT.bold }}>Empresa: </Text>{model.empresa}</Text>
+          {model.atencion ? <Text><Text style={{ fontFamily: PDF_FONT.bold }}>Atención: </Text>{model.atencion}</Text> : null}
         </View>
 
         {/* Encabezado de tabla fijo: se repite en cada pagina. */}
@@ -88,7 +89,7 @@ export function QuoteDocument({ model, logoSrc }: { model: PdfModel; logoSrc?: s
           <View key={i} style={s.tr} wrap={false}>
             <Cell w={W.te}>{r.te}</Cell>
             <Cell w={W.name}>
-              <Text style={{ fontFamily: "Helvetica-Bold" }}>{r.nombre}</Text>
+              <Text style={{ fontFamily: PDF_FONT.bold }}>{r.nombre}</Text>
               {r.descripcion ? <Text style={s.desc}>{r.descripcion}</Text> : null}
             </Cell>
             <Cell w={W.cant}>{r.cant}</Cell>

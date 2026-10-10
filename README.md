@@ -72,6 +72,9 @@ Sin Docker, `tests/rls/run-local-pg.sh` levanta un Postgres temporal con un shim
 - **Abastecimiento** (solo comprador): "Donde conseguirlo (interno)" por partida y vista **Por comprar** con las cotizaciones ganadas.
 - Pruebas manuales sugeridas: `docs/pruebas-manuales-fase-4.md`.
 
+## PDF en Vercel (archivos de fuentes)
+`@react-pdf/renderer` usa `pdfkit`, que carga sus fuentes estandar con un import map (`#standard-fonts/Helvetica`); el trazado de archivos de Next no lo detecta, asi que `next.config.ts` los incluye con `outputFileTracingIncludes` para `/api/pdf/[requestId]` (con pnpm viven en `node_modules/.pnpm/pdfkit@*/...`). `pnpm build` ejecuta `scripts/verify-pdf-trace.mjs`: comprueba que `Helvetica.cjs` y `HelveticaBold.cjs` esten en el trazado y genera un PDF usando solo los archivos trazados; si algo falta, el despliegue falla antes de llegar a produccion. La prueba `tests/unit/pdf-fonts.test.ts` cubre lo mismo en local. Si cambias la tipografia de la plantilla, edita `src/lib/pdf/fonts.ts`.
+
 ## Que incluye
 - **Vendedor:** contadores, filtros por estado, cliente y fecha, alerta de respondidas sin enviar, linea de tiempo por solicitud.
 - **Comprador:** bandeja con semaforo, estadisticas con graficas y filtros (fechas, vendedor, cliente, moneda), exportacion a Excel y CSV, reporte de auditoria exportable, clientes, usuarios y configuracion (factores con historial, plazos, zona horaria, festivos).

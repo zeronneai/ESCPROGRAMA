@@ -4,13 +4,14 @@
   "description": "Portal interno de cotizaciones de ESC Representaciones",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/verify-pdf-trace.mjs",
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:rls": "vitest run --config vitest.rls.config.ts",
-    "bootstrap:admin": "node --env-file=.env.local --experimental-strip-types scripts/create-first-buyer.ts"
+    "bootstrap:admin": "node --env-file=.env.local --experimental-strip-types scripts/create-first-buyer.ts",
+    "verify:pdf-trace": "node scripts/verify-pdf-trace.mjs"
   },
   "packageManager": "pnpm@10.28.0",
   "dependencies": {
