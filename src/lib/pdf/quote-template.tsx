@@ -28,7 +28,6 @@ const s = StyleSheet.create({
   tr: { flexDirection: "row", borderLeftWidth: 1, borderRightWidth: 1, borderBottomWidth: 1, borderColor: "#bbb" },
   cell: { padding: 4 },
   right: { textAlign: "right" },
-  desc: { fontSize: 8, color: "#444", marginTop: 1 },
   totals: { marginTop: 6, alignItems: "flex-end" },
   totalRow: { flexDirection: "row", gap: 14, fontFamily: PDF_FONT.bold, fontSize: 10, marginTop: 2 },
   band: { backgroundColor: "#fde047", padding: 5, marginTop: 8, fontFamily: PDF_FONT.bold },
@@ -90,7 +89,6 @@ export function QuoteDocument({ model, logoSrc }: { model: PdfModel; logoSrc?: s
             <Cell w={W.te}>{r.te}</Cell>
             <Cell w={W.name}>
               <Text style={{ fontFamily: PDF_FONT.bold }}>{r.nombre}</Text>
-              {r.descripcion ? <Text style={s.desc}>{r.descripcion}</Text> : null}
             </Cell>
             <Cell w={W.cant}>{r.cant}</Cell>
             <Cell w={W.cur}>{r.currency}</Cell>

@@ -13,6 +13,7 @@ interface ItemRowDb {
   id: string;
   folio: string | null;
   producto: string;
+  descripcion: string;
   estado: ItemStatus;
   quote_requests: {
     id: string;
@@ -51,7 +52,7 @@ export default async function VendedorHome({ searchParams }: { searchParams: Pro
 
   let q = supabase
     .from("quote_items")
-    .select("id, folio, producto, estado, quote_requests!inner(id, folio, estado, submitted_at, due_at, customer_id, vendedor_id, customers(nombre))")
+    .select("id, folio, producto, descripcion, estado, quote_requests!inner(id, folio, estado, submitted_at, due_at, customer_id, vendedor_id, customers(nombre))")
     .eq("quote_requests.estado", "enviada")
     .eq("quote_requests.vendedor_id", user.id)
     .order("folio", { ascending: false })
@@ -59,6 +60,9 @@ export default async function VendedorHome({ searchParams }: { searchParams: Pro
   if (sp.desde) q = q.gte("quote_requests.submitted_at", DateTime.fromISO(sp.desde, { zone: cfg.timezone }).startOf("day").toUTC().toISO()!);
   if (sp.hasta) q = q.lte("quote_requests.submitted_at", DateTime.fromISO(sp.hasta, { zone: cfg.timezone }).endOf("day").toUTC().toISO()!);
   if (sp.cliente) q = q.eq("quote_requests.customer_id", sp.cliente);
+  // Busca en el nombre y tambien en la descripcion/uso (interno), para encontrar equivalencias.
+  const texto = (sp.buscar ?? "").replace(/[,()%*\\]/g, " ").trim().slice(0, 80);
+  if (texto) q = q.or(`producto.ilike.%${texto}%,descripcion.ilike.%${texto}%`);
 
   const [{ data }, { data: drafts }, { data: clientes }] = await Promise.all([
     q,
@@ -123,7 +127,7 @@ export default async function VendedorHome({ searchParams }: { searchParams: Pro
         </Card>
       )}
 
-      <form method="get" className="grid items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-5">
+      <form method="get" className="grid items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-6">
         <Field label="Estado">
           <Select name="estado" defaultValue={sp.estado ?? ""}>
             <option value="">Todos</option>
@@ -133,6 +137,9 @@ export default async function VendedorHome({ searchParams }: { searchParams: Pro
               </option>
             ))}
           </Select>
+        </Field>
+        <Field label="Buscar (nombre, uso o descripción)">
+          <Input name="buscar" defaultValue={sp.buscar ?? ""} />
         </Field>
         <Field label="Cliente">
           <Select name="cliente" defaultValue={sp.cliente ?? ""}>
@@ -186,7 +193,7 @@ export default async function VendedorHome({ searchParams }: { searchParams: Pro
                       {i.folio}
                     </Link>
                   </td>
-                  <td className="px-3 py-2">{i.producto}</td>
+                  <td className="px-3 py-2">{i.producto}<div className="max-w-md truncate text-xs text-slate-500">{i.descripcion}</div></td>
                   <td className="px-3 py-2">{i.quote_requests.customers?.nombre}</td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {new Date(i.quote_requests.submitted_at).toLocaleDateString("es-MX", { dateStyle: "medium" })}

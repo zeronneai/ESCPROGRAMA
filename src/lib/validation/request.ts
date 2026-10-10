@@ -78,7 +78,7 @@ export function submitProblems(req: {
     const n = i + 1;
     if (!it.producto?.trim()) out.push({ item: i, field: "producto", message: `Partida ${n}: falta el nombre del producto` });
     if ((it.descripcion ?? "").trim().length < 10) {
-      out.push({ item: i, field: "descripcion", message: `Partida ${n}: la descripcion necesita al menos 10 caracteres` });
+      out.push({ item: i, field: "descripcion", message: `Partida ${n}: la descripcion o uso (interno) necesita al menos 10 caracteres` });
     }
     const qty = parseNumber(it.cantidad);
     const hasQty = qty !== undefined;

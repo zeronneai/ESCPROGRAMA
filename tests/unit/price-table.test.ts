@@ -4,7 +4,6 @@ import { formatPriceTable, NOTA_SIN_IVA, type PriceTableItem } from "@/lib/forma
 const item: PriceTableItem = {
   folio: "COT-2026-0001-01",
   producto: "Guante de carnaza",
-  descripcion: "Guante para soldador <largo>",
   cantidad: 10,
   unidad: "par",
   moneda: "MXN",
@@ -42,7 +41,7 @@ describe("formatPriceTable", () => {
   });
 
   it("escapa html", () => {
-    const { html } = formatPriceTable([item]);
+    const { html } = formatPriceTable([{ ...item, producto: "Guante <largo>" }]);
     expect(html).toContain("&lt;largo&gt;");
     expect(html).not.toContain("<largo>");
   });
@@ -73,3 +72,17 @@ describe("formatPriceTable", () => {
     }
   });
 });
+
+describe("la descripcion y el uso son internos", () => {
+  it("no salen en el texto ni en el HTML copiado (partida, solicitud completa y solo precio elegido)", () => {
+    const dirty = { ...item, producto: "Guante C/100 PARES", descripcion: "guante para hacer tamales", uso: "para hacer tamales" } as PriceTableItem;
+    for (const onlySelected of [false, true]) {
+      const { text, html } = formatPriceTable([dirty, { ...dirty, folio: "COT-2026-0001-02" }], { onlySelected });
+      for (const out of [text, html]) {
+        expect(out).toContain("Guante C/100 PARES");
+        expect(out).not.toMatch(/tamales|Descripcion|descripcion/);
+      }
+    }
+  });
+});
+

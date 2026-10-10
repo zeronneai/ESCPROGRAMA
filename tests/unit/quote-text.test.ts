@@ -24,12 +24,15 @@ describe("formatDelivery / formatMinPurchase", () => {
 
 describe("toPriceTableItem", () => {
   it("construye la tabla del vendedor sin campos sensibles", () => {
-    const item = { folio: "COT-2026-0001-01", producto: "Guante", descripcion: "Guante de carnaza", cantidad: "10.000", unidad: "par", talla: null };
+    const item = { folio: "COT-2026-0001-01", producto: "Guante", descripcion: "guante para hacer tamales", cantidad: "10.000", unidad: "par", talla: null };
     const dirty = { ...quote, costo: "100", envio: "10", proveedor: "ACME", base: "104" };
     const pti = toPriceTableItem(item, dirty, 3);
     expect(JSON.stringify(pti)).not.toMatch(/ACME|"costo"|"base"|"envio"/);
     const { text } = formatPriceTable([pti], { onlySelected: true });
     expect(text).toContain("Precio 3: $140.40 MXN c/u (total $1,404.00 MXN)");
     expect(text).toContain("Precios sin IVA");
+    // La descripcion/uso (interno) no pasa a lo que se copia, aunque venga en la partida.
+    expect(JSON.stringify(pti)).not.toMatch(/tamales|descripcion/);
+    expect(text).not.toContain("tamales");
   });
 });

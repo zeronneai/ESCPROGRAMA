@@ -47,6 +47,10 @@ function formFromVersion(q: QuoteRow, c: CostRow | undefined): QuoteFormValues {
     minMonto: q.compra_min_monto ? String(Number(q.compra_min_monto)) : "",
     proveedor: c?.proveedor ?? "",
     nota: "",
+    precioDe: q.alt_nombre ? "alternativo" : "solicitado",
+    altNombre: q.alt_nombre ?? "",
+    altDescripcion: q.alt_descripcion ?? "",
+    altMotivo: q.alt_motivo ?? "",
   };
 }
 
@@ -149,7 +153,7 @@ export function BuyerItemCard({
         <div>
           <p className="text-xs text-slate-500">{folio}</p>
           <h2 className="font-medium">{item.producto}</h2>
-          <p className="text-sm text-slate-600">{item.descripcion}</p>
+          <p className="text-sm text-slate-600"><span className="text-xs text-slate-400">Uso / descripción (interno): </span>{item.descripcion}</p>
           <p className="mt-1 text-sm">{qtyText(item.cantidad, item.unidad, item.talla)}</p>
           {item.notas && <p className="text-xs text-slate-500">Notas del vendedor: {item.notas}</p>}
         </div>
@@ -179,6 +183,12 @@ export function BuyerItemCard({
             Entrega: {formatDelivery(q)} · Compra mínima: {formatMinPurchase(q) ?? "sin mínimo"} · Vigencia hasta {q.valid_until ? fmtDate(q.valid_until) : "-"}
             {vencida ? " (vencida)" : ""}
           </p>
+          {q.alt_nombre && (
+            <p>
+              Precio del producto alternativo: <span className="font-medium">{q.alt_nombre}</span>
+              {q.alt_descripcion ? ` (${q.alt_descripcion})` : ""}. Por qué sirve: {q.alt_motivo}
+            </p>
+          )}
           {q.nota && <p>Nota: {q.nota}</p>}
           {d && <p className="text-slate-600">El vendedor lo envió al cliente con el Precio {d.precio_elegido}.</p>}
           {outcome && outcome.resultado !== "sin_respuesta" && (

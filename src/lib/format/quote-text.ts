@@ -17,8 +17,8 @@ export interface QuoteForText {
 
 export interface ItemForText {
   folio: string;
+  /** Nombre para el cliente (el mismo que el PDF). */
   producto: string;
-  descripcion: string;
   cantidad: string | number | null;
   unidad: string | null;
   talla: string | null;
@@ -62,7 +62,6 @@ export function toPriceTableItem(
   return {
     folio: item.folio,
     producto: item.producto,
-    descripcion: item.descripcion,
     cantidad: item.cantidad === null ? null : Number(item.cantidad),
     unidad: item.unidad,
     talla: item.talla,

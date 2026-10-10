@@ -5,6 +5,7 @@ import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import { buildPdfModel, COLUMN_HEADERS, computeOrder, pdfFileName, pdfProblems, PdfNotReadyError, type PdfInput, type PdfItemInput } from "@/lib/pdf/model";
 import { NO_SHIPPING, type ShippingPlan } from "@/lib/pricing/shipping-allocation";
+import { defaultPdfName, resolvePdfName } from "@/lib/pdf/names";
 import { QuoteDocument } from "@/lib/pdf/quote-template";
 
 const company = {
@@ -21,7 +22,7 @@ const quote = (over: Partial<PdfItemInput["quote"]> = {}): PdfItemInput["quote"]
 });
 
 const item = (over: Partial<PdfItemInput> = {}): PdfItemInput => ({
-  id: over.folio ?? "i1", folio: "COT-2026-0001-01", producto: "Guante de carnaza", descripcion: "Para soldador, largo", cantidad: 10, unidad: "par", talla: null,
+  id: over.folio ?? "i1", folio: "COT-2026-0001-01", nombre: "Guante de carnaza", cantidad: 10, unidad: "par", talla: null,
   quote: quote(), precioElegido: 3, ...over,
 });
 
@@ -172,7 +173,7 @@ describe("modelo del PDF", () => {
     expect(buildPdfModel(base({ items: [item({ quote: quote({ compra_min_cantidad: 10, compra_min_unidad: "caja" }) })] })).minimumPurchase).toBe("10 caja");
     const varias = buildPdfModel(base({ items: [
       item({ quote: quote({ compra_min_monto: 1500 }) }),
-      item({ folio: "x2", producto: "Casco", quote: quote({ compra_min_cantidad: 5, compra_min_unidad: "pieza" }) }),
+      item({ folio: "x2", nombre: "Casco", quote: quote({ compra_min_cantidad: 5, compra_min_unidad: "pieza" }) }),
     ] }));
     expect(varias.minimumPurchase).toBe("Guante de carnaza: $1,500.00 MXN; Casco: 5 pieza");
   });
@@ -255,11 +256,37 @@ describe("PDF generado: contenido real y PRIVACIDAD", () => {
     expect(text).toContain("$2,322.22");
   });
 
+  it("la descripcion y el uso del producto (internos) no salen en el modelo ni en el PDF; solo el nombre para el cliente", async () => {
+    const dirty = base({ items: [item({ nombre: "Guante C/100 PARES" })] });
+    (dirty.items[0] as unknown as Record<string, unknown>).descripcion = "guante para hacer tamales";
+    (dirty.items[0] as unknown as Record<string, unknown>).uso = "para hacer tamales";
+    (dirty.items[0] as unknown as Record<string, unknown>).producto = "Guante solicitado interno";
+    const model = buildPdfModel(dirty);
+    expect(JSON.stringify(model)).not.toMatch(/tamales|descripcion|interno/);
+    expect(model.rows[0].nombre).toBe("Guante C/100 PARES");
+    const [text] = await pdfPages(model);
+    expect(text).toContain("Guante C/100 PARES");
+    expect(text).not.toMatch(/tamales|interno/);
+  });
+
   it("con muchas partidas el encabezado de la tabla se repite en cada pagina", async () => {
-    const many = Array.from({ length: 45 }, (_, i) => item({ folio: `F${i}`, producto: `Producto ${i}`, descripcion: "Descripcion de prueba " + "x".repeat(40) }));
+    const many = Array.from({ length: 45 }, (_, i) => item({ folio: `F${i}`, nombre: `Producto ${i}` }));
     const pages = await pdfPages(buildPdfModel(base({ items: many })));
     expect(pages.length).toBeGreaterThan(1);
     for (const p of pages) expect(p).toContain("U. Price");
     expect(pages[0].split("U. Price").length - 1).toBe(1); // en la primera pagina aparece una sola vez
   });
 });
+
+describe("nombre en el PDF", () => {
+  it("por defecto el producto solicitado; con alternativo cotizado, el del alternativo; el nombre editado manda", () => {
+    expect(defaultPdfName(null, "Guante de carnaza")).toBe("Guante de carnaza");
+    expect(defaultPdfName("  ", "Guante de carnaza")).toBe("Guante de carnaza");
+    expect(defaultPdfName("Guante de nylon", "Guante de carnaza")).toBe("Guante de nylon");
+    expect(resolvePdfName(null, null, "Guante de carnaza")).toBe("Guante de carnaza");
+    expect(resolvePdfName(null, "Guante de nylon", "Guante de carnaza")).toBe("Guante de nylon");
+    expect(resolvePdfName("Guante de nylon C/100 SOBRES", "Guante de nylon", "Guante de carnaza")).toBe("Guante de nylon C/100 SOBRES");
+    expect(resolvePdfName("   ", null, "Guante de carnaza")).toBe("Guante de carnaza");
+  });
+});
+

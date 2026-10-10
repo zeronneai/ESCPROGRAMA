@@ -48,7 +48,11 @@ export function SimilarQuotes({
             {rows.map((r) => (
               <tr key={`${r.item_id}-${r.version}`} className="border-t border-slate-100">
                 <td className="px-2 py-1 whitespace-nowrap">{new Date(r.quoted_at).toLocaleDateString("es-MX", { dateStyle: "short" })}</td>
-                <td className="px-2 py-1">{r.producto}<div className="text-slate-400">{r.cliente}</div></td>
+                <td className="px-2 py-1">
+                  {r.alt_nombre ? <>Solicitado: {r.producto}<div className="font-medium text-amber-800">Cotizado: {r.alt_nombre}</div></> : r.producto}
+                  <div className="max-w-xs truncate text-slate-500" title={r.descripcion}>{r.descripcion}</div>
+                  <div className="text-slate-400">{r.cliente}</div>
+                </td>
                 <td className="px-2 py-1 tabular-nums">${Number(r.costo).toFixed(2)} {r.moneda}</td>
                 <td className="px-2 py-1 tabular-nums">{r.envio ? `$${Number(r.envio).toFixed(2)}` : "-"}</td>
                 <td className="px-2 py-1">{r.proveedor ?? "-"}</td>

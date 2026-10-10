@@ -56,3 +56,13 @@ alter table public.item_quotes disable trigger item_quotes_locked;
 update public.item_quotes set valid_until = now() - interval '1 day' where item_id = '00000000-0000-0000-0000-000000000000';
 alter table public.item_quotes enable trigger item_quotes_locked;
 ```
+
+## Descripción interna, nombre en el PDF y producto alternativo (migración 0014)
+
+30. **V:** crea una solicitud con producto "Guante de nylon" y uso "guante para hacer tamales". **Esperado:** vendedor y comprador ven la etiqueta "Para qué se usa / descripción (interno)" en el detalle.
+31. **C:** cotiza eligiendo "El precio corresponde a: Producto alternativo" sin nombre o sin nota. **Esperado:** no deja guardar. Con nombre y "por qué sirve" sí guarda y la cotización queda bloqueada.
+32. **V:** abre la partida. **Esperado:** bloque "Producto alternativo sugerido" con nombre, presentación y nota; el botón "Usar este nombre en el PDF" solo llena el campo "Nombre en el PDF". No aparece proveedor, link ni costos.
+33. **V:** edita "Nombre en el PDF" (ej. agrega "C/100 SOBRES") y descarga el PDF y "Copiar tabla de precios". **Esperado:** ambos usan ese nombre y NO traen el uso ni la descripción ("tamales").
+34. **C:** en Historial busca "tamales". **Esperado:** encuentra la cotización; si tuvo alternativo muestra "Solicitado: ... Cotizado: ...". **V:** en "Mis solicitudes" busca "tamales" y encuentra la partida.
+35. **C:** marca otra partida como "No encontrada" mencionando un sustituto en la nota. **Esperado:** el vendedor ve esa nota en la partida.
+

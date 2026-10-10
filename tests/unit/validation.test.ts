@@ -81,3 +81,32 @@ describe("parseQuoteForm", () => {
     expect(parseNotFoundNote(" sin proveedor ")).toEqual({ ok: true, value: { nota: "sin proveedor" } });
   });
 });
+
+describe("producto alternativo en la respuesta del comprador", () => {
+  const form = { ...emptyQuoteForm, costo: "100", entregaDias: "5" };
+
+  it("por defecto el precio es del producto solicitado (sin alternativo)", () => {
+    const r = parseQuoteForm(form) as { ok: true; value: { alternativo: unknown } };
+    expect(r.ok).toBe(true);
+    expect(r.value.alternativo).toBeNull();
+  });
+
+  it("alternativo: nombre y nota de por que sirve son obligatorios; presentacion opcional", () => {
+    const sin = parseQuoteForm({ ...form, precioDe: "alternativo" });
+    expect(sin.ok).toBe(false);
+    expect((sin as { errors: Record<string, string> }).errors).toMatchObject({ altNombre: expect.any(String), altMotivo: expect.any(String) });
+    const ok = parseQuoteForm({ ...form, precioDe: "alternativo", altNombre: " Guante de nylon ", altMotivo: " Mismo uso ", altDescripcion: "" }) as { ok: true; value: { alternativo: unknown } };
+    expect(ok.value.alternativo).toEqual({ nombre: "Guante de nylon", descripcion: null, motivo: "Mismo uso" });
+  });
+
+  it("limites de longitud", () => {
+    const largo = parseQuoteForm({ ...form, precioDe: "alternativo", altNombre: "x".repeat(201), altMotivo: "ok" });
+    expect((largo as { errors: Record<string, string> }).errors.altNombre).toMatch(/200/);
+  });
+
+  it("si vuelve a producto solicitado, los datos del alternativo se descartan", () => {
+    const r = parseQuoteForm({ ...form, precioDe: "solicitado", altNombre: "Guante", altMotivo: "x" }) as { ok: true; value: { alternativo: unknown } };
+    expect(r.value.alternativo).toBeNull();
+  });
+});
+

@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Field, Input, Select } from "@/components/ui";
 import { calcTabulador, lineTotal, type PricingFactors } from "@/lib/pricing/tabulador";
 import { UNIDADES } from "@/lib/validation/request";
-import type { QuoteFormValues } from "@/lib/validation/response";
+import { ALT_DESCRIPCION_MAX, ALT_MOTIVO_MAX, ALT_NOMBRE_MAX, type QuoteFormValues } from "@/lib/validation/response";
 
 export type Factors = PricingFactors & { noShippingMarkup: string };
 
@@ -112,6 +112,33 @@ export function QuoteForm({
         <Field label="Nota (opcional, la ve el vendedor)">
           <Input value={form.nota} onChange={(e) => set("nota", e.target.value)} />
         </Field>
+      </div>
+
+      <div className="space-y-2 rounded-md border border-slate-200 p-3">
+        <Field label="El precio corresponde a:">
+          <Select value={form.precioDe} onChange={(e) => set("precioDe", e.target.value as QuoteFormValues["precioDe"])} className="w-64">
+            <option value="solicitado">Producto solicitado</option>
+            <option value="alternativo">Producto alternativo</option>
+          </Select>
+        </Field>
+        {form.precioDe === "alternativo" && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Nombre del alternativo" error={errors.altNombre}>
+              <Input value={form.altNombre} maxLength={ALT_NOMBRE_MAX} onChange={(e) => set("altNombre", e.target.value)} />
+            </Field>
+            <Field label="Presentación o descripción corta (opcional)" error={errors.altDescripcion}>
+              <Input value={form.altDescripcion} maxLength={ALT_DESCRIPCION_MAX} onChange={(e) => set("altDescripcion", e.target.value)} />
+            </Field>
+            <div className="sm:col-span-2">
+              <Field label="Por qué sirve para lo mismo (lo ve el vendedor)" error={errors.altMotivo}>
+                <Input value={form.altMotivo} maxLength={ALT_MOTIVO_MAX} onChange={(e) => set("altMotivo", e.target.value)} />
+              </Field>
+            </div>
+            <p className="text-xs text-slate-500 sm:col-span-2">
+              El proveedor o el link de compra del alternativo se capturan en "Dónde conseguirlo" y siguen ocultos para el vendedor.
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="rounded-md bg-slate-50 p-3 text-sm">

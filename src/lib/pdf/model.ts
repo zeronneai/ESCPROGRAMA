@@ -30,8 +30,8 @@ export interface PdfItemInput {
   /** Id de la partida (para el envio por partida). */
   id: string;
   folio: string;
-  producto: string;
-  descripcion: string;
+  /** Nombre para el cliente (el editado por el vendedor). La descripcion y el uso del producto son internos: no entran al PDF. */
+  nombre: string;
   cantidad: number | string | null;
   unidad: string | null;
   talla: string | null;
@@ -90,7 +90,6 @@ export type PdfCurrency = "PESOS" | "DOLARES";
 export interface PdfRow {
   te: string;
   nombre: string;
-  descripcion: string;
   cant: string;
   currency: PdfCurrency;
   uPrice: string;
@@ -221,8 +220,7 @@ export function buildPdfModel(input: PdfInput): PdfModel {
     const cant = [qty ? `${qty.toString()}${i.unidad ? ` ${i.unidad}` : ""}` : "", i.talla ? `Talla ${i.talla}` : ""].filter(Boolean).join(" / ");
     return {
       te: pdfDelivery(i.quote),
-      nombre: i.producto,
-      descripcion: i.descripcion,
+      nombre: i.nombre,
       cant: cant || "1",
       currency: CURRENCY[i.quote.moneda],
       // El envio ya va dentro del precio unitario: el PDF solo muestra el costo final.
@@ -235,7 +233,7 @@ export function buildPdfModel(input: PdfInput): PdfModel {
   const via = d.via_envio?.trim() || null;
 
   const mins = items
-    .map((i) => ({ producto: i.producto, value: formatMinPurchase({ ...i.quote, moneda: i.quote.moneda }) }))
+    .map((i) => ({ producto: i.nombre, value: formatMinPurchase({ ...i.quote, moneda: i.quote.moneda }) }))
     .filter((m): m is { producto: string; value: string } => !!m.value);
   const distinct = [...new Set(mins.map((m) => m.value))];
   const minimumPurchase = mins.length === 0 ? null : distinct.length === 1 ? distinct[0] : mins.map((m) => `${m.producto}: ${m.value}`).join("; ");

@@ -17,6 +17,21 @@ export interface QuoteFormValues {
   minMonto: string;
   proveedor: string;
   nota: string;
+  /** "El precio corresponde a": producto solicitado (default) o alternativo. */
+  precioDe: "solicitado" | "alternativo";
+  altNombre: string;
+  altDescripcion: string;
+  altMotivo: string;
+}
+
+export const ALT_NOMBRE_MAX = 200;
+export const ALT_DESCRIPCION_MAX = 500;
+export const ALT_MOTIVO_MAX = 1000;
+
+export interface AlternativeInput {
+  nombre: string;
+  descripcion: string | null;
+  motivo: string;
 }
 
 export interface QuoteInput {
@@ -27,6 +42,8 @@ export interface QuoteInput {
   compra_min: { cantidad: number | null; unidad: string | null; monto: number | null };
   proveedor: string | null;
   nota: string | null;
+  /** null = el precio es del producto solicitado. */
+  alternativo: AlternativeInput | null;
 }
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; errors: Record<string, string> };
@@ -45,6 +62,10 @@ export const emptyQuoteForm: QuoteFormValues = {
   minMonto: "",
   proveedor: "",
   nota: "",
+  precioDe: "solicitado",
+  altNombre: "",
+  altDescripcion: "",
+  altMotivo: "",
 };
 
 export function parseQuoteForm(v: QuoteFormValues): Parsed<QuoteInput> {
@@ -84,6 +105,19 @@ export function parseQuoteForm(v: QuoteFormValues): Parsed<QuoteInput> {
     else min.monto = m;
   }
 
+  let alternativo: AlternativeInput | null = null;
+  if (v.precioDe === "alternativo") {
+    const nombre = v.altNombre.trim();
+    const motivo = v.altMotivo.trim();
+    const descripcion = v.altDescripcion.trim();
+    if (!nombre) errors.altNombre = "Captura el nombre del producto alternativo";
+    else if (nombre.length > ALT_NOMBRE_MAX) errors.altNombre = `El nombre no puede pasar de ${ALT_NOMBRE_MAX} caracteres`;
+    if (!motivo) errors.altMotivo = "Explica por que sirve para lo mismo";
+    else if (motivo.length > ALT_MOTIVO_MAX) errors.altMotivo = `La nota no puede pasar de ${ALT_MOTIVO_MAX} caracteres`;
+    if (descripcion.length > ALT_DESCRIPCION_MAX) errors.altDescripcion = `La presentacion no puede pasar de ${ALT_DESCRIPCION_MAX} caracteres`;
+    if (!errors.altNombre && !errors.altMotivo && !errors.altDescripcion) alternativo = { nombre, descripcion: descripcion || null, motivo };
+  }
+
   if (Object.keys(errors).length) return { ok: false, errors };
   return {
     ok: true,
@@ -95,6 +129,7 @@ export function parseQuoteForm(v: QuoteFormValues): Parsed<QuoteInput> {
       compra_min: min,
       proveedor: v.proveedor.trim() || null,
       nota: v.nota.trim() || null,
+      alternativo,
     },
   };
 }
