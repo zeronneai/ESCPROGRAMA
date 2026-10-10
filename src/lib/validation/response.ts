@@ -11,12 +11,28 @@ export interface QuoteFormValues {
   entregaDias: string;
   entregaTipo: string;
   entregaFecha: string;
-  minModo: "ninguna" | "cantidad" | "monto";
+  /** Compra minima OBLIGATORIA: cantidad (>= 1) y unidad. Si no hay minimo, 1. */
   minCantidad: string;
   minUnidad: string;
+  /** Monto minimo adicional (opcional). */
   minMonto: string;
   proveedor: string;
   nota: string;
+  /** "El precio corresponde a": producto solicitado (default) o alternativo. */
+  precioDe: "solicitado" | "alternativo";
+  altNombre: string;
+  altDescripcion: string;
+  altMotivo: string;
+}
+
+export const ALT_NOMBRE_MAX = 200;
+export const ALT_DESCRIPCION_MAX = 500;
+export const ALT_MOTIVO_MAX = 1000;
+
+export interface AlternativeInput {
+  nombre: string;
+  descripcion: string | null;
+  motivo: string;
 }
 
 export interface QuoteInput {
@@ -24,9 +40,11 @@ export interface QuoteInput {
   envio: number | null;
   moneda: "MXN" | "USD";
   entrega: { dias: number | null; tipo: "habiles" | "naturales" | null; fecha: string | null };
-  compra_min: { cantidad: number | null; unidad: string | null; monto: number | null };
+  compra_min: { cantidad: number; unidad: string; monto: number | null };
   proveedor: string | null;
   nota: string | null;
+  /** null = el precio es del producto solicitado. */
+  alternativo: AlternativeInput | null;
 }
 
 export type Parsed<T> = { ok: true; value: T } | { ok: false; errors: Record<string, string> };
@@ -39,12 +57,15 @@ export const emptyQuoteForm: QuoteFormValues = {
   entregaDias: "",
   entregaTipo: "habiles",
   entregaFecha: "",
-  minModo: "ninguna",
-  minCantidad: "",
+  minCantidad: "1",
   minUnidad: "pieza",
   minMonto: "",
   proveedor: "",
   nota: "",
+  precioDe: "solicitado",
+  altNombre: "",
+  altDescripcion: "",
+  altMotivo: "",
 };
 
 export function parseQuoteForm(v: QuoteFormValues): Parsed<QuoteInput> {
@@ -71,17 +92,30 @@ export function parseQuoteForm(v: QuoteFormValues): Parsed<QuoteInput> {
     errors.entregaFecha = "Captura la fecha estimada";
   } else entrega.fecha = v.entregaFecha;
 
-  const min: QuoteInput["compra_min"] = { cantidad: null, unidad: null, monto: null };
-  if (v.minModo === "cantidad") {
-    const c = parseNumber(v.minCantidad);
-    if (c === undefined || Number.isNaN(c) || c <= 0) errors.minCantidad = "Captura la cantidad minima";
-    else min.cantidad = c;
-    if (!(UNIDADES as readonly string[]).includes(v.minUnidad)) errors.minUnidad = "Elige la unidad";
-    else min.unidad = v.minUnidad;
-  } else if (v.minModo === "monto") {
+  const min: QuoteInput["compra_min"] = { cantidad: 1, unidad: "pieza", monto: null };
+  const c = parseNumber(v.minCantidad);
+  if (c === undefined) errors.minCantidad = "Captura la compra minima (si no hay minimo, deja 1)";
+  else if (Number.isNaN(c) || c < 1) errors.minCantidad = "La compra minima debe ser 1 o mayor";
+  else min.cantidad = c;
+  if (!(UNIDADES as readonly string[]).includes(v.minUnidad)) errors.minUnidad = "Elige la unidad";
+  else min.unidad = v.minUnidad;
+  if (v.minMonto.trim()) {
     const m = parseNumber(v.minMonto);
-    if (m === undefined || Number.isNaN(m) || m <= 0) errors.minMonto = "Captura el monto minimo";
+    if (m === undefined || Number.isNaN(m) || m <= 0) errors.minMonto = "El monto minimo debe ser mayor a 0";
     else min.monto = m;
+  }
+
+  let alternativo: AlternativeInput | null = null;
+  if (v.precioDe === "alternativo") {
+    const nombre = v.altNombre.trim();
+    const motivo = v.altMotivo.trim();
+    const descripcion = v.altDescripcion.trim();
+    if (!nombre) errors.altNombre = "Captura el nombre del producto alternativo";
+    else if (nombre.length > ALT_NOMBRE_MAX) errors.altNombre = `El nombre no puede pasar de ${ALT_NOMBRE_MAX} caracteres`;
+    if (!motivo) errors.altMotivo = "Explica por que sirve para lo mismo";
+    else if (motivo.length > ALT_MOTIVO_MAX) errors.altMotivo = `La nota no puede pasar de ${ALT_MOTIVO_MAX} caracteres`;
+    if (descripcion.length > ALT_DESCRIPCION_MAX) errors.altDescripcion = `La presentacion no puede pasar de ${ALT_DESCRIPCION_MAX} caracteres`;
+    if (!errors.altNombre && !errors.altMotivo && !errors.altDescripcion) alternativo = { nombre, descripcion: descripcion || null, motivo };
   }
 
   if (Object.keys(errors).length) return { ok: false, errors };
@@ -95,6 +129,7 @@ export function parseQuoteForm(v: QuoteFormValues): Parsed<QuoteInput> {
       compra_min: min,
       proveedor: v.proveedor.trim() || null,
       nota: v.nota.trim() || null,
+      alternativo,
     },
   };
 }

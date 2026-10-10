@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
 import { parseShippingPlan } from "@/lib/pdf/shipping";
+import { PDF_NAME_MAX } from "@/lib/pdf/names";
 import { friendlyError } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Result } from "./requests";
@@ -35,6 +36,10 @@ const pdfSchema = z.object({
   envioModo: z.enum(["incluido", "por_unidad", "por_pedido", "por_partida"]),
   monto: z.string().max(30).optional(),
   moneda: z.enum(["MXN", "USD", ""]).optional(),
+  /** "Nombre en el PDF" por partida; vacio = usar el nombre por defecto. */
+  nombres: z.array(z.object({ itemId: z.string().uuid(), nombre: z.string().trim().max(PDF_NAME_MAX, "El nombre en el PDF no puede pasar de 200 caracteres") })).max(200).optional(),
+  /** Decision por partida cuando la cantidad pedida es menor al minimo. */
+  minimos: z.array(z.object({ itemId: z.string().uuid(), decision: z.enum(["cotizar_minimo", "mantener_pedida"]) })).max(200).optional(),
   partidas: z
     .array(z.object({ itemId: z.string().uuid(), monto: z.string().max(30), tipo: z.enum(["unidad", "total"]) }))
     .max(200)
@@ -80,6 +85,20 @@ export async function savePdfDataAction(input: PdfDataInput): Promise<Result> {
     p_items: ship.db.partidas,
   });
   if (error) return { ok: false, error: friendlyError(error.message) };
+  if (v.nombres?.length) {
+    const { error: nameError } = await supabase.rpc("save_pdf_names", {
+      p_request: v.requestId,
+      p_names: v.nombres.map((n) => ({ item_id: n.itemId, nombre: n.nombre })),
+    });
+    if (nameError) return { ok: false, error: friendlyError(nameError.message) };
+  }
+  if (v.minimos?.length) {
+    const { error: minError } = await supabase.rpc("save_pdf_minimos", {
+      p_request: v.requestId,
+      p_items: v.minimos.map((m) => ({ item_id: m.itemId, decision: m.decision })),
+    });
+    if (minError) return { ok: false, error: friendlyError(minError.message) };
+  }
   revalidatePath(`/vendedor/solicitudes/${v.requestId}`);
   return { ok: true };
 }

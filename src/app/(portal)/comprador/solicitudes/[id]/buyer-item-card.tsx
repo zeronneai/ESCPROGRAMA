@@ -12,7 +12,8 @@ import { SimilarQuotes } from "@/components/similar-quotes";
 import { emptySourcing, SourcingPanel } from "@/components/sourcing-panel";
 import { ItemStatusBadge, qtyText, ReferenceList, SemaforoBadge } from "@/components/status";
 import { Alert, Button, Card, Field } from "@/components/ui";
-import { formatDelivery, formatMinPurchase } from "@/lib/format/quote-text";
+import { formatDelivery } from "@/lib/format/quote-text";
+import { defaultMinUnit, describeMin, effectiveMin } from "@/lib/quotes/min-purchase";
 import { isVigenciaVencida, revisionFolio } from "@/lib/quotes/revisions";
 import { latestOutcome, latestQuote, LOSS_REASON_LABEL, openPause, openUpdateRequest, type ItemRow, type QuoteRow } from "@/lib/quotes/types";
 import { emptyQuoteForm, parseQuoteForm, type QuoteFormValues } from "@/lib/validation/response";
@@ -32,7 +33,8 @@ export type BuyerItem = ItemRow & {
 };
 
 /** Formulario precargado con la version anterior (para "Actualizar costo"). */
-function formFromVersion(q: QuoteRow, c: CostRow | undefined): QuoteFormValues {
+function formFromVersion(q: QuoteRow, c: CostRow | undefined, unidadPartida: string | null): QuoteFormValues {
+  const min = effectiveMin(q, unidadPartida);
   return {
     costo: c ? String(Number(c.costo)) : "",
     envio: c?.envio ? String(Number(c.envio)) : "",
@@ -41,12 +43,15 @@ function formFromVersion(q: QuoteRow, c: CostRow | undefined): QuoteFormValues {
     entregaDias: q.entrega_dias === null ? "" : String(q.entrega_dias),
     entregaTipo: q.entrega_tipo ?? "habiles",
     entregaFecha: q.entrega_fecha ?? "",
-    minModo: q.compra_min_cantidad ? "cantidad" : q.compra_min_monto ? "monto" : "ninguna",
-    minCantidad: q.compra_min_cantidad ? String(Number(q.compra_min_cantidad)) : "",
-    minUnidad: q.compra_min_unidad ?? "pieza",
-    minMonto: q.compra_min_monto ? String(Number(q.compra_min_monto)) : "",
+    minCantidad: String(min.cantidad),
+    minUnidad: min.unidad,
+    minMonto: min.monto ? String(min.monto) : "",
     proveedor: c?.proveedor ?? "",
     nota: "",
+    precioDe: q.alt_nombre ? "alternativo" : "solicitado",
+    altNombre: q.alt_nombre ?? "",
+    altDescripcion: q.alt_descripcion ?? "",
+    altMotivo: q.alt_motivo ?? "",
   };
 }
 
@@ -79,7 +84,7 @@ export function BuyerItemCard({
 
   const [mode, setMode] = useState<"quote" | "not_found">(item.estado === "no_encontrada" ? "not_found" : "quote");
   const [editing, setEditing] = useState(item.estado === "pendiente");
-  const [form, setForm] = useState<QuoteFormValues>(emptyQuoteForm);
+  const [form, setForm] = useState<QuoteFormValues>(() => ({ ...emptyQuoteForm, minUnidad: defaultMinUnit(item.unidad) }));
   const [nota, setNota] = useState(item.not_found_note ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<{ tone: "error" | "success"; text: string } | null>(null);
@@ -92,7 +97,7 @@ export function BuyerItemCard({
     notas_compra: item.item_sourcing?.notas_compra ?? "",
   }));
   const [updateMode, setUpdateMode] = useState<"confirm" | "update_cost" | null>(null);
-  const [updateForm, setUpdateForm] = useState<QuoteFormValues>(() => (q ? formFromVersion(q, cost) : emptyQuoteForm));
+  const [updateForm, setUpdateForm] = useState<QuoteFormValues>(() => (q ? formFromVersion(q, cost, item.unidad) : emptyQuoteForm));
   const [confirmNota, setConfirmNota] = useState("");
   const [clar, setClar] = useState("");
   const [showClar, setShowClar] = useState(false);
@@ -149,7 +154,7 @@ export function BuyerItemCard({
         <div>
           <p className="text-xs text-slate-500">{folio}</p>
           <h2 className="font-medium">{item.producto}</h2>
-          <p className="text-sm text-slate-600">{item.descripcion}</p>
+          <p className="text-sm text-slate-600"><span className="text-xs text-slate-400">Uso / descripción (interno): </span>{item.descripcion}</p>
           <p className="mt-1 text-sm">{qtyText(item.cantidad, item.unidad, item.talla)}</p>
           {item.notas && <p className="text-xs text-slate-500">Notas del vendedor: {item.notas}</p>}
         </div>
@@ -176,9 +181,15 @@ export function BuyerItemCard({
           )}
           <p>Precios ({q.moneda}, sin IVA): {[q.price_1, q.price_2, q.price_3, q.price_4, q.price_5].map((p, i) => `P${i + 1} $${Number(p).toFixed(2)}`).join(" · ")}</p>
           <p>
-            Entrega: {formatDelivery(q)} · Compra mínima: {formatMinPurchase(q) ?? "sin mínimo"} · Vigencia hasta {q.valid_until ? fmtDate(q.valid_until) : "-"}
+            Entrega: {formatDelivery(q)} · Compra mínima: {describeMin(q, item.unidad)} · Vigencia hasta {q.valid_until ? fmtDate(q.valid_until) : "-"}
             {vencida ? " (vencida)" : ""}
           </p>
+          {q.alt_nombre && (
+            <p>
+              Precio del producto alternativo: <span className="font-medium">{q.alt_nombre}</span>
+              {q.alt_descripcion ? ` (${q.alt_descripcion})` : ""}. Por qué sirve: {q.alt_motivo}
+            </p>
+          )}
           {q.nota && <p>Nota: {q.nota}</p>}
           {d && <p className="text-slate-600">El vendedor lo envió al cliente con el Precio {d.precio_elegido}.</p>}
           {outcome && outcome.resultado !== "sin_respuesta" && (

@@ -20,7 +20,7 @@ export default async function Historial({ searchParams }: { searchParams: Promis
     supabase.from("suppliers").select("nombre").order("nombre"),
   ]);
   const list = (rows ?? []) as Array<{
-    item_id: string; version: number; folio: string | null; producto: string; cliente: string; quoted_at: string; costo: number; envio: number | null;
+    item_id: string; version: number; folio: string | null; producto: string; cliente: string; quoted_at: string; costo: number; envio: number | null; descripcion: string; alt_nombre: string | null;
     moneda: "MXN" | "USD"; proveedor: string | null; precio_elegido: number | null; valor_elegido: number | null; resultado: keyof typeof RESULT | null;
   }>;
   const points = ((hist ?? []) as Array<{ quoted_at: string; costo: number; moneda: "MXN" | "USD"; proveedor: string | null; producto: string; version: number }>).map((p) => ({
@@ -37,7 +37,7 @@ export default async function Historial({ searchParams }: { searchParams: Promis
       <h1 className="text-lg font-semibold">Historial de precios</h1>
       <p className="text-sm text-slate-600">Solo el comprador ve esta información (costos y proveedores).</p>
       <form method="get" className="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
-        <Field label="Producto (por similitud de nombre)">
+        <Field label="Producto (por similitud de nombre, uso o descripción)">
           <Input name="producto" defaultValue={producto} className="w-72" />
         </Field>
         <Field label="Proveedor">
@@ -64,7 +64,11 @@ export default async function Historial({ searchParams }: { searchParams: Promis
               {list.map((r) => (
                 <tr key={`${r.item_id}-${r.version}`} className="border-t border-slate-100">
                   <td className="px-3 py-1.5 whitespace-nowrap">{new Date(r.quoted_at).toLocaleDateString("es-MX", { dateStyle: "short" })}</td>
-                  <td className="px-3 py-1.5">{r.producto} <span className="text-slate-400">{r.folio}{r.version > 1 ? ` v${r.version}` : ""}</span></td>
+                  <td className="px-3 py-1.5">
+                    {r.alt_nombre ? <>Solicitado: {r.producto}<div className="font-medium text-amber-800">Cotizado: {r.alt_nombre}</div></> : r.producto}{" "}
+                    <span className="text-slate-400">{r.folio}{r.version > 1 ? ` v${r.version}` : ""}</span>
+                    <div className="max-w-xs truncate text-slate-500" title={r.descripcion}>{r.descripcion}</div>
+                  </td>
                   <td className="px-3 py-1.5">{r.cliente}</td>
                   <td className="px-3 py-1.5 tabular-nums">${Number(r.costo).toFixed(2)} {r.moneda}</td>
                   <td className="px-3 py-1.5 tabular-nums">{r.envio ? `$${Number(r.envio).toFixed(2)}` : "-"}</td>

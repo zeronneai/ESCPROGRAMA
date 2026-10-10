@@ -71,6 +71,9 @@ export interface SimilarQuote {
   valor_elegido: number | null;
   resultado: "sin_respuesta" | "ganada" | "perdida" | null;
   similitud: number;
+  descripcion: string;
+  alt_nombre: string | null;
+  alt_descripcion: string | null;
 }
 
 /** Cotizaciones anteriores parecidas (solo comprador). */

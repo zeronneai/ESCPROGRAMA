@@ -88,6 +88,8 @@ export async function respondRevisionAction(
       compra_min: q.compra_min,
       proveedor: q.proveedor,
       nota: q.nota,
+      // Siempre se manda: el formulario parte de la version anterior, asi que "solicitado" quita el alternativo.
+      alternativo: q.alternativo,
       response_hours: rh.hours,
     };
   }

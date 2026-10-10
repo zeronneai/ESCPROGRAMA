@@ -1,3 +1,4 @@
+import { minCondition } from "@/lib/quotes/min-purchase";
 import type { PriceTableItem } from "./price-table";
 
 export interface QuoteForText {
@@ -17,8 +18,8 @@ export interface QuoteForText {
 
 export interface ItemForText {
   folio: string;
+  /** Nombre para el cliente (el mismo que el PDF). */
   producto: string;
-  descripcion: string;
   cantidad: string | number | null;
   unidad: string | null;
   talla: string | null;
@@ -38,16 +39,15 @@ export function formatDelivery(q: Pick<QuoteForText, "entrega_dias" | "entrega_t
   return "Por confirmar";
 }
 
+/**
+ * Condicion de compra minima que ve el cliente: solo cuando es mayor a 1 (o hay monto minimo adicional).
+ * Con minimo 1 devuelve null (se puede comprar desde 1 pieza).
+ */
 export function formatMinPurchase(
   q: Pick<QuoteForText, "compra_min_cantidad" | "compra_min_unidad" | "compra_min_monto" | "moneda">,
+  unidadPartida?: string | null,
 ): string | null {
-  if (q.compra_min_cantidad !== null && q.compra_min_cantidad !== undefined && Number(q.compra_min_cantidad) > 0) {
-    return `${Number(q.compra_min_cantidad)} ${q.compra_min_unidad ?? ""}`.trim();
-  }
-  if (q.compra_min_monto !== null && q.compra_min_monto !== undefined && Number(q.compra_min_monto) > 0) {
-    return `$${Number(q.compra_min_monto).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${q.moneda}`;
-  }
-  return null;
+  return minCondition(q, unidadPartida);
 }
 
 /**
@@ -62,13 +62,12 @@ export function toPriceTableItem(
   return {
     folio: item.folio,
     producto: item.producto,
-    descripcion: item.descripcion,
     cantidad: item.cantidad === null ? null : Number(item.cantidad),
     unidad: item.unidad,
     talla: item.talla,
     moneda: quote.moneda,
     entrega: formatDelivery(quote),
-    compraMinima: formatMinPurchase(quote),
+    compraMinima: formatMinPurchase(quote, item.unidad),
     precios: [n(quote.price_1), n(quote.price_2), n(quote.price_3), n(quote.price_4), n(quote.price_5)],
     precioElegido: precioElegido ?? null,
   };

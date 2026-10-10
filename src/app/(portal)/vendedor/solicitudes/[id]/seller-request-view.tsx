@@ -12,7 +12,8 @@ import { ItemChat } from "@/components/item-chat";
 import { ItemStatusBadge, qtyText, ReferenceList, SemaforoBadge } from "@/components/status";
 import { copyRich } from "@/lib/clipboard";
 import { formatPriceTable } from "@/lib/format/price-table";
-import { formatDelivery, formatMinPurchase, toPriceTableItem } from "@/lib/format/quote-text";
+import { formatDelivery, toPriceTableItem } from "@/lib/format/quote-text";
+import { describeMin, MIN_DECISION_LABEL, minAlert, type MinDecision } from "@/lib/quotes/min-purchase";
 import { computeOrder, itemCurrencies, pdfProblems, toPdfQuote } from "@/lib/pdf/model";
 import { parseShippingPlan, SHIPPING_MODE_LABEL, type ShippingMode } from "@/lib/pdf/shipping";
 import { lineTotal } from "@/lib/pricing/tabulador";
@@ -33,6 +34,10 @@ interface PdfPanel {
   monto: string;
   moneda: "MXN" | "USD" | "";
   partidas: Record<string, { monto: string; tipo: "unidad" | "total" }>;
+  /** "Nombre en el PDF" por partida (precargado con el guardado, el alternativo o el producto). */
+  nombres: Record<string, string>;
+  /** Decision por partida con cantidad pedida menor al minimo (por revision). */
+  minimos: Record<string, MinDecision>;
 }
 
 /** Forma comparable del panel (sin montos vacios y con las partidas en orden) para saber si ya esta guardado. */
@@ -42,6 +47,7 @@ const panelKey = (p: PdfPanel) =>
     partidas: Object.entries(p.partidas)
       .filter(([, v]) => v.monto.trim() !== "")
       .sort(([a], [b]) => a.localeCompare(b)),
+    minimos: Object.entries(p.minimos).sort(([a], [b]) => a.localeCompare(b)),
   });
 
 interface Props {
@@ -49,13 +55,15 @@ interface Props {
   items: ItemRow[];
   remainingByItem: Record<string, number | null>;
   pdfDefaults: PdfPanel;
+  /** Nombre por defecto de cada partida cotizada: alternativo cotizado o producto solicitado. */
+  nombreDefecto: Record<string, string>;
   nowIso: string;
 }
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("es-MX", { dateStyle: "medium" });
 const prices = (q: QuoteRow) => [q.price_1, q.price_2, q.price_3, q.price_4, q.price_5] as const;
 
-export function SellerRequestView({ request, items, remainingByItem, pdfDefaults, nowIso }: Props) {
+export function SellerRequestView({ request, items, remainingByItem, pdfDefaults, nombreDefecto, nowIso }: Props) {
   const router = useRouter();
   const now = new Date(nowIso);
   const [pending, start] = useTransition();
@@ -70,6 +78,8 @@ export function SellerRequestView({ request, items, remainingByItem, pdfDefaults
     return init;
   });
   const [pdf, setPdf] = useState(pdfDefaults);
+  // Nombre que ve el cliente (PDF y tabla copiada): nunca la descripcion ni el uso.
+  const nombrePdf = (i: ItemRow) => pdf.nombres[i.id]?.trim() || nombreDefecto[i.id] || i.producto;
 
   const quoted = items.filter((i) => latestQuote(i));
   // Envio al cliente (opcional): va dentro del precio unitario; la vista previa usa el mismo calculo que el PDF.
@@ -83,15 +93,17 @@ export function SellerRequestView({ request, items, remainingByItem, pdfDefaults
   );
   const shippingIssue = shipParse.ok ? null : shipParse.error;
   const preview = computeOrder(
-    quoted.map((i) => ({ id: i.id, cantidad: i.cantidad, precioElegido: picked[i.id] ?? null, quote: toPdfQuote(latestQuote(i)!) })),
+    quoted.map((i) => ({ id: i.id, cantidad: i.cantidad, unidad: i.unidad, precioElegido: picked[i.id] ?? null, quote: toPdfQuote(latestQuote(i)!), decisionMin: pdf.minimos[i.id] })),
     shipParse.ok ? shipParse.plan : undefined,
   );
   const setPartida = (id: string, patch: Partial<{ monto: string; tipo: "unidad" | "total" }>) =>
     setPdf({ ...pdf, partidas: { ...pdf.partidas, [id]: { ...(pdf.partidas[id] ?? { monto: "", tipo: "total" as const }), ...patch } } });
+  // Partidas cuya cantidad pedida es menor al minimo: el vendedor debe decidir como cotizarlas.
+  const alertItems = quoted.filter((i) => minAlert(i, latestQuote(i)!));
   const unpicked = quoted.filter((i) => !picked[i.id]).length;
   const pdfIssues = [
     ...pdfProblems(
-      quoted.map((i) => ({ folio: i.folio ?? "", precioElegido: picked[i.id] ?? null, quote: latestQuote(i)! })),
+      quoted.map((i) => ({ folio: i.folio ?? "", precioElegido: picked[i.id] ?? null, quote: latestQuote(i)!, cantidad: i.cantidad, unidad: i.unidad, decisionMin: pdf.minimos[i.id] })),
       now,
     ),
     ...(shippingIssue ? [shippingIssue] : []),
@@ -104,7 +116,7 @@ export function SellerRequestView({ request, items, remainingByItem, pdfDefaults
     const tableItems = list.map((i) => {
       const q = latestQuote(i)!;
       return toPriceTableItem(
-        { folio: revisionFolio(i.folio!, q.version), producto: i.producto, descripcion: i.descripcion, cantidad: i.cantidad, unidad: i.unidad, talla: i.talla },
+        { folio: revisionFolio(i.folio!, q.version), producto: nombrePdf(i), cantidad: i.cantidad, unidad: i.unidad, talla: i.talla },
         q,
         picked[i.id] ?? null,
       );
@@ -153,6 +165,12 @@ export function SellerRequestView({ request, items, remainingByItem, pdfDefaults
         requestId: request.id, destino: pdf.destino, via: pdf.via, condiciones: pdf.condiciones, atencion: pdf.atencion,
         envioModo: pdf.envioModo, monto: pdf.monto, moneda: pdf.moneda,
         partidas: Object.entries(pdf.partidas).map(([itemId, v]) => ({ itemId, monto: v.monto, tipo: v.tipo })),
+        // Solo se guardan los nombres editados; igual al nombre por defecto (o vacio) = volver al default.
+        minimos: alertItems.flatMap((i) => (pdf.minimos[i.id] ? [{ itemId: i.id, decision: pdf.minimos[i.id] }] : [])),
+        nombres: quoted.map((i) => {
+          const n = (pdf.nombres[i.id] ?? "").trim();
+          return { itemId: i.id, nombre: n && n !== nombreDefecto[i.id] ? n : "" };
+        }),
       });
       if (!saved.ok) {
         setNotice({ tone: "error", text: saved.error });
@@ -194,6 +212,7 @@ export function SellerRequestView({ request, items, remainingByItem, pdfDefaults
           onCopy={(scope, onlySelected) => copy([item], scope, item.id, onlySelected)}
           onNotice={setNotice}
           onRefresh={() => router.refresh()}
+          onUseAltName={(name) => setPdf((p) => ({ ...p, nombres: { ...p.nombres, [item.id]: name } }))}
         />
       ))}
 
@@ -219,10 +238,45 @@ export function SellerRequestView({ request, items, remainingByItem, pdfDefaults
                 <option value="Contado" />
               </datalist>
             </Field>
-            <Field label="Atención">
+            <Field label="Atención (persona de contacto)">
               <Input value={pdf.atencion} onChange={(e) => setPdf({ ...pdf, atencion: e.target.value })} />
             </Field>
           </div>
+          {alertItems.length > 0 && (
+            <div className="space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3">
+              <p className="text-sm font-medium text-amber-900">Cantidad pedida menor a la compra mínima</p>
+              {alertItems.map((i) => (
+                <div key={i.id} className="space-y-1 text-sm">
+                  <p>{i.folio} {i.producto}: {minAlert(i, latestQuote(i)!)!.text}</p>
+                  <div className="flex flex-wrap gap-4">
+                    {(Object.keys(MIN_DECISION_LABEL) as MinDecision[]).map((d) => (
+                      <label key={d} className="flex items-center gap-1">
+                        <input type="radio" name={`min-${i.id}`} checked={pdf.minimos[i.id] === d} onChange={() => setPdf({ ...pdf, minimos: { ...pdf.minimos, [i.id]: d } })} />
+                        {MIN_DECISION_LABEL[d]}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <p className="text-xs text-slate-600">Sin esta elección no se puede descargar el PDF.</p>
+            </div>
+          )}
+
+          <div className="space-y-2 rounded-md border border-slate-200 p-3">
+            <p className="text-sm font-medium text-slate-700">Nombre en el PDF</p>
+            <p className="text-xs text-slate-500">Es lo único que ve el cliente en "Product Name". La descripción y el uso son internos y no salen en el PDF ni en la tabla copiada.</p>
+            {quoted.map((i) => (
+              <Field key={i.id} label={`${i.folio} (solicitado: ${i.producto})`}>
+                <Input
+                  value={pdf.nombres[i.id] ?? ""}
+                  maxLength={200}
+                  placeholder={nombreDefecto[i.id] ?? i.producto}
+                  onChange={(e) => setPdf({ ...pdf, nombres: { ...pdf.nombres, [i.id]: e.target.value } })}
+                />
+              </Field>
+            ))}
+          </div>
+
           <div className="space-y-3 rounded-md border border-slate-200 p-3">
             <p className="text-sm font-medium text-slate-700">Envío al cliente (opcional)</p>
             <Field label="Cómo se reparte">
@@ -339,6 +393,7 @@ function ItemCard(props: {
   onCopy: (scope: "item" | "selected", onlySelected: boolean) => void;
   onNotice: (n: { tone: "success" | "error"; text: string }) => void;
   onRefresh: () => void;
+  onUseAltName: (name: string) => void;
 }) {
   const { item, now, picked: sel } = props;
   const q = latestQuote(item);
@@ -363,8 +418,9 @@ function ItemCard(props: {
         <div>
           <p className="text-xs text-slate-500">{folio}</p>
           <h2 className="font-medium">{item.producto}</h2>
-          <p className="text-sm text-slate-600">{item.descripcion}</p>
+          <p className="text-sm text-slate-600"><span className="text-xs text-slate-400">Para qué se usa / descripción (interno): </span>{item.descripcion}</p>
           <p className="mt-1 text-sm">{qtyText(item.cantidad, item.unidad, item.talla)}</p>
+          {q && minAlert(item, q) && <p className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">{minAlert(item, q)!.text}</p>}
           {item.notas && <p className="text-xs text-slate-500">Notas: {item.notas}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -393,12 +449,21 @@ function ItemCard(props: {
           <div className="grid gap-1 text-sm sm:grid-cols-4">
             <p><span className="text-slate-500">Moneda:</span> {q.moneda}</p>
             <p><span className="text-slate-500">Entrega:</span> {formatDelivery(q)}</p>
-            <p><span className="text-slate-500">Compra mínima:</span> {formatMinPurchase(q) ?? "Sin mínimo"}</p>
+            <p><span className="text-slate-500">Compra mínima:</span> {describeMin(q, item.unidad)}</p>
             <p>
               <span className="text-slate-500">Vigencia:</span>{" "}
               {q.valid_until ? (vencida ? <span className="font-medium text-red-700">vencida el {fmtDate(q.valid_until)}</span> : `hasta ${fmtDate(q.valid_until)} (${vigenciaDiasRestantes(q, now)} días)`) : "-"}
             </p>
           </div>
+          {q.alt_nombre && (
+            <div className="space-y-1 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+              <p className="font-medium text-amber-900">Producto alternativo sugerido</p>
+              <p>{q.alt_nombre}{q.alt_descripcion ? <span className="text-slate-600"> ({q.alt_descripcion})</span> : null}</p>
+              <p className="text-slate-700">Por qué sirve para lo mismo: {q.alt_motivo}</p>
+              <p className="text-xs text-slate-600">Los precios de abajo corresponden a este producto.</p>
+              <Button variant="secondary" className="px-2 py-1 text-xs" onClick={() => props.onUseAltName(q.alt_nombre!)}>Usar este nombre en el PDF</Button>
+            </div>
+          )}
           {q.nota && <p className="text-sm text-slate-600">Nota del comprador: {q.nota}</p>}
 
           <table className="w-full max-w-xl text-left text-sm">

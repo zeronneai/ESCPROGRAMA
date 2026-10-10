@@ -42,7 +42,7 @@ export function quotePayload(cost: string, shipping: string | null, factors: typ
   return {
     costo: cost, envio: shipping, moneda: "MXN", factors,
     prices: { p1: t.p1, p2: t.p2, p3: t.p3, p4: t.p4, p5: t.p5 },
-    entrega: { dias: 5, tipo: "habiles" }, proveedor: "ACME", nota: "nota", response_hours: 2, ...extra,
+    entrega: { dias: 5, tipo: "habiles" }, compra_min: { cantidad: 1, unidad: "pieza" }, proveedor: "ACME", nota: "nota", response_hours: 2, ...extra,
   };
 }
 

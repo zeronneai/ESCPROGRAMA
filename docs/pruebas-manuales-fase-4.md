@@ -56,3 +56,21 @@ alter table public.item_quotes disable trigger item_quotes_locked;
 update public.item_quotes set valid_until = now() - interval '1 day' where item_id = '00000000-0000-0000-0000-000000000000';
 alter table public.item_quotes enable trigger item_quotes_locked;
 ```
+
+## Descripción interna, nombre en el PDF y producto alternativo (migración 0014)
+
+30. **V:** crea una solicitud con producto "Guante de nylon" y uso "guante para hacer tamales". **Esperado:** vendedor y comprador ven la etiqueta "Para qué se usa / descripción (interno)" en el detalle.
+31. **C:** cotiza eligiendo "El precio corresponde a: Producto alternativo" sin nombre o sin nota. **Esperado:** no deja guardar. Con nombre y "por qué sirve" sí guarda y la cotización queda bloqueada.
+32. **V:** abre la partida. **Esperado:** bloque "Producto alternativo sugerido" con nombre, presentación y nota; el botón "Usar este nombre en el PDF" solo llena el campo "Nombre en el PDF". No aparece proveedor, link ni costos.
+33. **V:** edita "Nombre en el PDF" (ej. agrega "C/100 SOBRES") y descarga el PDF y "Copiar tabla de precios". **Esperado:** ambos usan ese nombre y NO traen el uso ni la descripción ("tamales").
+34. **C:** en Historial busca "tamales". **Esperado:** encuentra la cotización; si tuvo alternativo muestra "Solicitado: ... Cotizado: ...". **V:** en "Mis solicitudes" busca "tamales" y encuentra la partida.
+35. **C:** marca otra partida como "No encontrada" mencionando un sustituto en la nota. **Esperado:** el vendedor ve esa nota en la partida.
+
+## Compra mínima y Atención (migración 0015)
+
+36. **C:** cotiza una partida. **Esperado:** el formulario trae "Compra mínima: cantidad" en 1 y la unidad de la partida, con la ayuda "Si no hay mínimo, deja 1". Con 0, vacío o 0.5 no deja guardar.
+37. **V:** abre la partida cotizada con mínimo 10 caja y cantidad pedida 4 caja. **Esperado:** ve "Compra mínima: 10 caja" junto a los precios y la etiqueta "Cantidad pedida (4 caja) menor al mínimo (10 caja)" en la partida y en la lista.
+38. **V:** en "Datos del PDF" aparece el aviso para esa partida. Sin elegir, **Descargar PDF** queda bloqueado y dice por qué. Elige "Cotizar a la cantidad mínima": el PDF muestra CANT 10 caja y el total sobre 10. Elige "Mantener la cantidad pedida": CANT 4 caja, total sobre 4 y la franja amarilla con "Minimum purchase: 10 caja (nombre)".
+39. **V:** si todas las partidas tienen mínimo 1, el PDF no lleva franja amarilla. "Copiar tabla de precios" incluye "Compra minima" solo cuando es mayor a 1.
+40. **V:** captura "Atención" al crear la solicitud (campo opcional) y descarga el PDF: aparece "Atención: ..." debajo de "Empresa". En una solicitud sin Atención, complétala en "Datos del PDF" antes de descargar; si queda vacía, la fila no sale.
+

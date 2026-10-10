@@ -69,15 +69,53 @@ describe("parseQuoteForm", () => {
     expect(r.ok).toBe(false);
     expect(!r.ok && Object.keys(r.errors)).toEqual(expect.arrayContaining(["costo", "entregaDias"]));
   });
-  it("entrega por fecha y compra minima por monto", () => {
-    const r = parseQuoteForm({ ...base, entregaModo: "fecha", entregaFecha: "2026-05-01", minModo: "monto", minMonto: "1500" });
-    expect(r).toMatchObject({ ok: true, value: { entrega: { fecha: "2026-05-01", dias: null }, compra_min: { monto: 1500 } } });
+  it("entrega por fecha y monto minimo adicional opcional", () => {
+    const r = parseQuoteForm({ ...base, entregaModo: "fecha", entregaFecha: "2026-05-01", minMonto: "1500" });
+    expect(r).toMatchObject({ ok: true, value: { entrega: { fecha: "2026-05-01", dias: null }, compra_min: { cantidad: 1, unidad: "pieza", monto: 1500 } } });
   });
-  it("compra minima por cantidad exige unidad valida", () => {
-    expect(parseQuoteForm({ ...base, minModo: "cantidad", minCantidad: "10", minUnidad: "x" }).ok).toBe(false);
+  it("compra minima OBLIGATORIA: por defecto 1 pieza; vacia, menor a 1 o con unidad invalida no pasa", () => {
+    expect(emptyQuoteForm.minCantidad).toBe("1");
+    expect(parseQuoteForm(base)).toMatchObject({ ok: true, value: { compra_min: { cantidad: 1, unidad: "pieza", monto: null } } });
+    expect(parseQuoteForm({ ...base, minCantidad: "10", minUnidad: "caja" })).toMatchObject({ ok: true, value: { compra_min: { cantidad: 10, unidad: "caja" } } });
+    for (const minCantidad of ["", "0", "0.5", "-2", "abc"]) {
+      const r = parseQuoteForm({ ...base, minCantidad });
+      expect(r.ok, minCantidad).toBe(false);
+      expect(!r.ok && r.errors.minCantidad).toBeTruthy();
+    }
+    expect(parseQuoteForm({ ...base, minCantidad: "10", minUnidad: "x" }).ok).toBe(false);
+    expect(parseQuoteForm({ ...base, minMonto: "0" }).ok).toBe(false);
   });
   it("nota de no encontrada es obligatoria", () => {
     expect(parseNotFoundNote("   ").ok).toBe(false);
     expect(parseNotFoundNote(" sin proveedor ")).toEqual({ ok: true, value: { nota: "sin proveedor" } });
   });
 });
+
+describe("producto alternativo en la respuesta del comprador", () => {
+  const form = { ...emptyQuoteForm, costo: "100", entregaDias: "5" };
+
+  it("por defecto el precio es del producto solicitado (sin alternativo)", () => {
+    const r = parseQuoteForm(form) as { ok: true; value: { alternativo: unknown } };
+    expect(r.ok).toBe(true);
+    expect(r.value.alternativo).toBeNull();
+  });
+
+  it("alternativo: nombre y nota de por que sirve son obligatorios; presentacion opcional", () => {
+    const sin = parseQuoteForm({ ...form, precioDe: "alternativo" });
+    expect(sin.ok).toBe(false);
+    expect((sin as { errors: Record<string, string> }).errors).toMatchObject({ altNombre: expect.any(String), altMotivo: expect.any(String) });
+    const ok = parseQuoteForm({ ...form, precioDe: "alternativo", altNombre: " Guante de nylon ", altMotivo: " Mismo uso ", altDescripcion: "" }) as { ok: true; value: { alternativo: unknown } };
+    expect(ok.value.alternativo).toEqual({ nombre: "Guante de nylon", descripcion: null, motivo: "Mismo uso" });
+  });
+
+  it("limites de longitud", () => {
+    const largo = parseQuoteForm({ ...form, precioDe: "alternativo", altNombre: "x".repeat(201), altMotivo: "ok" });
+    expect((largo as { errors: Record<string, string> }).errors.altNombre).toMatch(/200/);
+  });
+
+  it("si vuelve a producto solicitado, los datos del alternativo se descartan", () => {
+    const r = parseQuoteForm({ ...form, precioDe: "solicitado", altNombre: "Guante", altMotivo: "x" }) as { ok: true; value: { alternativo: unknown } };
+    expect(r.value.alternativo).toBeNull();
+  });
+});
+

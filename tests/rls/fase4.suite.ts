@@ -269,6 +269,157 @@ export function fase4Suite() {
     });
   });
 
+  describe("producto alternativo, nombre en el PDF y busqueda por descripcion", () => {
+    const ALT = { nombre: "Guante de nylon", descripcion: "Presentacion C/12 pares", motivo: "Mismo uso, recubrimiento de nitrilo" };
+
+    /** Partida con descripcion/uso propios (interno) para probar busquedas. */
+    async function itemWithUse(producto: string, uso: string) {
+      const due = new Date(Date.now() + 5 * 86400_000).toISOString();
+      return as(w.seller1, async (q) => {
+        const r = await q("insert into public.quote_requests (id, vendedor_id, customer_id) values (gen_random_uuid(), $1, $2) returning id", [w.ids.s1, w.customerId]);
+        const i = await q("insert into public.quote_items (request_id, producto, descripcion, cantidad, unidad) values ($1,$2,$3,4,'pieza') returning id", [r.rows[0].id, producto, uso]);
+        await q("insert into public.item_references (item_id,tipo,url) values ($1,'link','https://a.com')", [i.rows[0].id]);
+        await q("update public.quote_requests set estado='enviada', due_at=$2 where id=$1", [r.rows[0].id, due]);
+        return { request: r.rows[0].id as string, item: i.rows[0].id as string };
+      });
+    }
+
+    it("el alternativo se guarda en la version cotizada; nombre y motivo son obligatorios; el vendedor lo ve", async () => {
+      const { item } = await newPendingItem(w, "Guante solicitado");
+      const f = await currentFactors();
+      expect(await failure(respond(w.buyer1, item, "quote", quotePayload("100", null, f, { alternativo: { ...ALT, nombre: "  " } })))).toMatch(/nombre del producto alternativo es obligatorio/);
+      expect(await failure(respond(w.buyer1, item, "quote", quotePayload("100", null, f, { alternativo: { ...ALT, motivo: "" } })))).toMatch(/sirve para lo mismo/);
+      expect(await failure(respond(w.buyer1, item, "quote", quotePayload("100", null, f, { alternativo: { ...ALT, nombre: "x".repeat(201) } })))).toMatch(/200 caracteres/);
+      await respond(w.buyer1, item, "quote", quotePayload("100", null, f, { alternativo: ALT }));
+      const seen = (await rpc(w.seller1, "select alt_nombre, alt_descripcion, alt_motivo from public.item_quotes where item_id=$1", [item])).rows;
+      expect(seen).toEqual([{ alt_nombre: ALT.nombre, alt_descripcion: ALT.descripcion, alt_motivo: ALT.motivo }]);
+      // El vendedor ve el alternativo pero NO el abastecimiento ni los costos.
+      expect((await rpc(w.seller1, "select * from public.item_sourcing")).rowCount).toBe(0);
+      expect((await rpc(w.seller1, "select * from public.item_costs where item_id=$1", [item])).rowCount).toBe(0);
+    });
+
+    it("sin alternativo, el precio es del producto solicitado (columnas nulas)", async () => {
+      const { item } = await newQuotedItem(w, "Producto normal");
+      const q = (await as("postgres", (qq) => qq("select alt_nombre, alt_motivo from public.item_quotes where item_id=$1", [item]))).rows;
+      expect(q).toEqual([{ alt_nombre: null, alt_motivo: null }]);
+    });
+
+    it("el alternativo queda BLOQUEADO tras cotizar (nadie lo edita ni lo borra) y se conserva por version", async () => {
+      const { item } = await newPendingItem(w, "Guante bloqueo alt");
+      const f = await currentFactors();
+      await respond(w.buyer1, item, "quote", quotePayload("100", null, f, { alternativo: ALT }));
+      for (const actor of [w.buyer1, w.seller1, "postgres" as const]) {
+        expect(await failure(rpc(actor, "update public.item_quotes set alt_nombre='Otro' where item_id=$1", [item]))).toMatch(/bloquea|inmutable|permission denied|no se permite|locked|modific/i);
+      }
+      expect((await rpc("postgres", "select alt_nombre from public.item_quotes where item_id=$1", [item])).rows[0].alt_nombre).toBe(ALT.nombre);
+      // Revision: confirm hereda; update_cost sin clave hereda; con alternativo null lo quita. Las versiones anteriores no cambian.
+      await expireQuote(item, 1);
+      await rpc(w.seller1, "select public.request_item_update($1,null,$2)", [item, dueIn48()]);
+      await respond(w.buyer1, item, "confirm", {});
+      await expireQuote(item, 2);
+      await rpc(w.seller1, "select public.request_item_update($1,null,$2)", [item, dueIn48()]);
+      await respond(w.buyer1, item, "update_cost", quotePayload("120", null, await currentFactors(), { entrega: undefined, moneda: undefined, alternativo: null }));
+      const v = (await as("postgres", (qq) => qq("select version, alt_nombre from public.item_quotes where item_id=$1 order by version", [item]))).rows;
+      expect(v).toEqual([{ version: 1, alt_nombre: ALT.nombre }, { version: 2, alt_nombre: ALT.nombre }, { version: 3, alt_nombre: null }]);
+    });
+
+    it("save_pdf_names: solo el vendedor dueno; por version; 200 caracteres; vacio vuelve al nombre por defecto; con bitacora", async () => {
+      const { request, item } = await newQuotedItem(w, "Guante nombre pdf");
+      const other = await newQuotedItem(w, "Otra solicitud");
+      const save = (who: typeof w.seller1, names: unknown) => rpc(who, "select public.save_pdf_names($1,$2::jsonb) as n", [request, JSON.stringify(names)]);
+      expect((await save(w.seller1, [{ item_id: item, nombre: "  Guante C/100 SOBRES " }])).rows[0].n).toBe(1);
+      let r = (await rpc(w.seller1, "select quote_version, nombre from public.item_pdf_names where item_id=$1", [item])).rows;
+      expect(r).toEqual([{ quote_version: 1, nombre: "Guante C/100 SOBRES" }]);
+      expect(await failure(save(w.seller1, [{ item_id: item, nombre: "x".repeat(201) }]))).toMatch(/200 caracteres/);
+      expect(await failure(save(w.seller1, [{ item_id: other.item, nombre: "ajeno" }]))).toMatch(/no pertenece/);
+      expect(await failure(save(w.seller2, [{ item_id: item, nombre: "x" }]))).toMatch(/No autorizado/);
+      expect(await failure(save(w.buyer1, [{ item_id: item, nombre: "x" }]))).toMatch(/No autorizado/);
+      // Sin escritura directa y sin borrado.
+      expect(await failure(rpc(w.seller1, "update public.item_pdf_names set nombre='x' where item_id=$1", [item]))).toMatch(/permission denied/);
+      expect(await failure(rpc("postgres", "delete from public.item_pdf_names where item_id=$1", [item]))).toMatch(/inmutable|no se permite|DELETE/i);
+      // Vacio = usar el nombre por defecto (no borra la fila).
+      await save(w.seller1, [{ item_id: item, nombre: "" }]);
+      r = (await rpc(w.seller1, "select nombre from public.item_pdf_names where item_id=$1", [item])).rows;
+      expect(r).toEqual([{ nombre: null }]);
+      // El comprador puede leer; la bitacora registra los cambios.
+      expect((await rpc(w.buyer1, "select 1 from public.item_pdf_names where item_id=$1", [item])).rowCount).toBe(1);
+      const log = (await as("postgres", (qq) => qq("select count(*)::int n from public.audit_log where entity='item_pdf_names'"))).rows[0];
+      expect(log.n).toBeGreaterThanOrEqual(2);
+    });
+
+    it("similar_quotes y product_cost_history tambien buscan en la descripcion/uso y en el alternativo, y devuelven el alternativo", async () => {
+      const a = await itemWithUse("Guante de punto largo", "Para hacer tamales en cocina industrial");
+      await respond(w.buyer1, a.item, "quote", quotePayload("50", null, await currentFactors(), { alternativo: { nombre: "Manopla termica", motivo: "Sirve igual" } }));
+      const byUse = (await rpc(w.buyer1, "select * from public.similar_quotes('tamales')")).rows.find((x) => x.item_id === a.item);
+      expect(byUse).toMatchObject({ producto: "Guante de punto largo", alt_nombre: "Manopla termica", descripcion: "Para hacer tamales en cocina industrial" });
+      const byAlt = (await rpc(w.buyer1, "select * from public.similar_quotes('manopla')")).rows.find((x) => x.item_id === a.item);
+      expect(byAlt).toBeTruthy();
+      expect((await rpc(w.buyer1, "select * from public.product_cost_history('tamales')")).rows.some((x) => x.item_id === a.item)).toBe(true);
+      // Solo el comprador usa la busqueda.
+      expect(await failure(rpc(w.seller1, "select * from public.similar_quotes('tamales')"))).toMatch(/No autorizado/);
+    });
+  });
+
+  describe("compra minima obligatoria y decision del vendedor", () => {
+    it("quote y update_cost exigen compra minima (cantidad >= 1 y unidad); confirm la hereda", async () => {
+      const { item } = await newPendingItem(w, "Producto minimo");
+      const f = await currentFactors();
+      const sin = quotePayload("100", null, f);
+      delete (sin as Record<string, unknown>).compra_min;
+      expect(await failure(respond(w.buyer1, item, "quote", sin))).toMatch(/compra minima es obligatoria/);
+      expect(await failure(respond(w.buyer1, item, "quote", quotePayload("100", null, f, { compra_min: { cantidad: 0.5, unidad: "pieza" } })))).toMatch(/compra minima es obligatoria/);
+      expect(await failure(respond(w.buyer1, item, "quote", quotePayload("100", null, f, { compra_min: { cantidad: 5, unidad: " " } })))).toMatch(/compra minima es obligatoria/);
+      expect(await failure(respond(w.buyer1, item, "quote", quotePayload("100", null, f, { compra_min: null })))).toMatch(/compra minima es obligatoria/);
+      await respond(w.buyer1, item, "quote", quotePayload("100", null, f, { compra_min: { cantidad: 10, unidad: "caja", monto: 1500 } }));
+      const v1 = (await rpc(w.seller1, "select compra_min_cantidad::float c, compra_min_unidad u, compra_min_monto::float m from public.item_quotes where item_id=$1", [item])).rows[0];
+      expect(v1).toEqual({ c: 10, u: "caja", m: 1500 });
+
+      // Revisiones: confirm hereda; update_cost exige el minimo valido y se conserva por version.
+      await expireQuote(item, 1);
+      await rpc(w.seller1, "select public.request_item_update($1,null,$2)", [item, dueIn48()]);
+      await respond(w.buyer1, item, "confirm", {});
+      await expireQuote(item, 2);
+      await rpc(w.seller1, "select public.request_item_update($1,null,$2)", [item, dueIn48()]);
+      expect(await failure(respond(w.buyer1, item, "update_cost", quotePayload("120", null, await currentFactors(), { entrega: undefined, moneda: undefined, compra_min: { cantidad: 0, unidad: "caja" } })))).toMatch(/compra minima es obligatoria/);
+      await respond(w.buyer1, item, "update_cost", quotePayload("120", null, await currentFactors(), { entrega: undefined, moneda: undefined, compra_min: { cantidad: 1, unidad: "caja" } }));
+      const v = (await as("postgres", (qq) => qq("select version, compra_min_cantidad::float c from public.item_quotes where item_id=$1 order by version", [item]))).rows;
+      expect(v).toEqual([{ version: 1, c: 10 }, { version: 2, c: 10 }, { version: 3, c: 1 }]);
+    });
+
+    it("el minimo queda BLOQUEADO tras cotizar (nadie lo edita) y el vendedor no lee costos", async () => {
+      const { item } = await newQuotedItem(w, "Producto minimo bloqueado", "100", { compra_min: { cantidad: 6, unidad: "pieza" } });
+      for (const actor of [w.buyer1, w.seller1, "postgres" as const]) {
+        expect(await failure(rpc(actor, "update public.item_quotes set compra_min_cantidad=1 where item_id=$1", [item]))).toMatch(/bloquea|inmutable|permission denied|no se permite|locked|modific/i);
+      }
+      expect((await rpc(w.seller1, "select compra_min_cantidad::float c from public.item_quotes where item_id=$1", [item])).rows[0].c).toBe(6);
+      expect((await rpc(w.seller1, "select * from public.item_costs where item_id=$1", [item])).rowCount).toBe(0);
+    });
+
+    it("las cotizaciones anteriores sin cantidad siguen siendo validas (la regla solo aplica a filas nuevas)", async () => {
+      const r = await as("postgres", (qq) => qq("select convalidated from pg_constraint where conname='item_quotes_compra_min_cantidad_ge1_check'"));
+      expect(r.rows[0].convalidated).toBe(false);
+    });
+
+    it("save_pdf_minimos: solo el vendedor dueno; decisiones validas; por revision y con bitacora", async () => {
+      const { request, item } = await newQuotedItem(w, "Producto decision");
+      const other = await newQuotedItem(w, "Otra solicitud min");
+      const save = (who: typeof w.seller1, items: unknown) => rpc(who, "select public.save_pdf_minimos($1,$2::jsonb) as n", [request, JSON.stringify(items)]);
+      expect((await save(w.seller1, [{ item_id: item, decision: "cotizar_minimo" }])).rows[0].n).toBe(1);
+      expect(await failure(save(w.seller1, [{ item_id: item, decision: "otra" }]))).toMatch(/Elige cotizar/);
+      expect(await failure(save(w.seller1, [{ item_id: item }]))).toMatch(/Elige cotizar/);
+      expect(await failure(save(w.seller1, [{ item_id: other.item, decision: "mantener_pedida" }]))).toMatch(/no pertenece/);
+      expect(await failure(save(w.seller2, [{ item_id: item, decision: "mantener_pedida" }]))).toMatch(/No autorizado/);
+      expect(await failure(save(w.buyer1, [{ item_id: item, decision: "mantener_pedida" }]))).toMatch(/No autorizado/);
+      await save(w.seller1, [{ item_id: item, decision: "mantener_pedida" }]);
+      const rows = (await rpc(w.seller1, "select revision, decision from public.quote_pdf_min_choices where request_id=$1", [request])).rows;
+      expect(rows).toEqual([{ revision: 1, decision: "mantener_pedida" }]);
+      expect(await failure(rpc(w.seller1, "insert into public.quote_pdf_min_choices (request_id, revision, item_id, decision, updated_by) values ($1,1,$2,'cotizar_minimo',$3)", [request, item, w.ids.s1]))).toMatch(/permission denied|row-level security/);
+      expect((await rpc(w.buyer1, "select 1 from public.quote_pdf_min_choices where request_id=$1", [request])).rowCount).toBe(1);
+      const log = (await as("postgres", (qq) => qq("select count(*)::int n from public.audit_log where entity='quote_pdf_min_choices'"))).rows[0];
+      expect(log.n).toBeGreaterThanOrEqual(2);
+    });
+  });
+
   describe("PDF y datos del cliente", () => {
     it("save_draft guarda atencion y destino_entrega", async () => {
       const rid = randomUUID(); const iid = randomUUID();

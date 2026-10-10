@@ -32,6 +32,10 @@ export interface QuoteRow {
   compra_min_unidad: string | null;
   compra_min_monto: number | string | null;
   nota: string | null;
+  /** Producto alternativo sugerido por el comprador (parte de la version cotizada). */
+  alt_nombre: string | null;
+  alt_descripcion: string | null;
+  alt_motivo: string | null;
   quoted_at: string;
   valid_until: string | null;
 }

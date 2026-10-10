@@ -11,8 +11,8 @@ import Decimal from "decimal.js";
 
 export interface PriceTableItem {
   folio: string;
+  /** Nombre para el cliente (el mismo que el PDF). Nunca la descripcion ni el uso, que son internos. */
   producto: string;
-  descripcion: string;
   cantidad?: number | string | null;
   unidad?: string | null;
   talla?: string | null;
@@ -92,7 +92,6 @@ function rows(i: PriceTableItem, opts: FormatOptions): Row[] {
 function itemText(i: PriceTableItem, opts: FormatOptions): string {
   const lines: string[] = [];
   lines.push(`${i.folio} - ${i.producto}`);
-  lines.push(i.descripcion);
   const c = cantidadTexto(i);
   if (c) lines.push(`Cantidad: ${c}`);
   lines.push(`Moneda: ${i.moneda}`);
@@ -112,7 +111,6 @@ function itemHtml(i: PriceTableItem, opts: FormatOptions): string {
   const cell = "border:1px solid #999;padding:4px 8px;";
   const head = `${cell}background:#eee;text-align:left;`;
   const info = [
-    ["Descripcion", i.descripcion],
     ...(cantidadTexto(i) ? [["Cantidad", cantidadTexto(i)]] : []),
     ["Moneda", i.moneda],
     ["Tiempo de entrega", i.entrega],

@@ -76,6 +76,7 @@ export async function respondQuoteAction(itemId: string, values: QuoteFormValues
       compra_min: q.compra_min,
       proveedor: q.proveedor,
       nota: q.nota,
+      alternativo: q.alternativo,
       response_hours: rh?.hours ?? null,
     },
   });

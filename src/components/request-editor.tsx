@@ -334,7 +334,7 @@ function ItemCard(props: {
           <Input {...register(`items.${i}.talla`)} placeholder="M, L, 9, 42..." />
         </Field>
         <div className="sm:col-span-2">
-          <Field label={`Descripcion breve y/o uso * (${props.descLength}/10 minimo)`}>
+          <Field label={`Para qué se usa / descripción (interno) * (${props.descLength}/10 mínimo)`}>
             <textarea {...register(`items.${i}.descripcion`)} rows={2} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
           </Field>
         </div>

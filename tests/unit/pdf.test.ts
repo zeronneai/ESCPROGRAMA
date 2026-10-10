@@ -5,6 +5,7 @@ import { createElement } from "react";
 import { describe, expect, it } from "vitest";
 import { buildPdfModel, COLUMN_HEADERS, computeOrder, pdfFileName, pdfProblems, PdfNotReadyError, type PdfInput, type PdfItemInput } from "@/lib/pdf/model";
 import { NO_SHIPPING, type ShippingPlan } from "@/lib/pricing/shipping-allocation";
+import { defaultPdfName, resolvePdfName } from "@/lib/pdf/names";
 import { QuoteDocument } from "@/lib/pdf/quote-template";
 
 const company = {
@@ -21,7 +22,7 @@ const quote = (over: Partial<PdfItemInput["quote"]> = {}): PdfItemInput["quote"]
 });
 
 const item = (over: Partial<PdfItemInput> = {}): PdfItemInput => ({
-  id: over.folio ?? "i1", folio: "COT-2026-0001-01", producto: "Guante de carnaza", descripcion: "Para soldador, largo", cantidad: 10, unidad: "par", talla: null,
+  id: over.folio ?? "i1", folio: "COT-2026-0001-01", nombre: "Guante de carnaza", cantidad: 10, unidad: "par", talla: null,
   quote: quote(), precioElegido: 3, ...over,
 });
 
@@ -167,14 +168,73 @@ describe("modelo del PDF", () => {
     expect(custom.footer.at(-1)).toBe("Delivered to Cd. Juarez, planta Pegatron by Parcel");
   });
 
-  it("compra minima: franja solo si alguna partida la tiene", () => {
-    expect(buildPdfModel(base()).minimumPurchase).toBeNull();
-    expect(buildPdfModel(base({ items: [item({ quote: quote({ compra_min_cantidad: 10, compra_min_unidad: "caja" }) })] })).minimumPurchase).toBe("10 caja");
-    const varias = buildPdfModel(base({ items: [
-      item({ quote: quote({ compra_min_monto: 1500 }) }),
-      item({ folio: "x2", producto: "Casco", quote: quote({ compra_min_cantidad: 5, compra_min_unidad: "pieza" }) }),
-    ] }));
-    expect(varias.minimumPurchase).toBe("Guante de carnaza: $1,500.00 MXN; Casco: 5 pieza");
+  describe("compra minima", () => {
+    it("franja amarilla: una linea por partida con minimo mayor a 1, con el producto; sin franja si todo es 1", () => {
+      expect(buildPdfModel(base()).minimumPurchases).toEqual([]);
+      const unos = buildPdfModel(base({ items: [item({ quote: quote({ compra_min_cantidad: 1, compra_min_unidad: "par" }) }), item({ folio: "x2", quote: quote({ compra_min_cantidad: "1.000", compra_min_unidad: "par" }) })] }));
+      expect(unos.minimumPurchases).toEqual([]);
+      const varias = buildPdfModel(base({ items: [
+        item({ folio: "x1", nombre: "Guante C/100", quote: quote({ compra_min_cantidad: 10, compra_min_unidad: "caja" }) }),
+        item({ folio: "x2", nombre: "Casco", quote: quote({ compra_min_cantidad: 5, compra_min_unidad: "pieza" }) }),
+        item({ folio: "x3", nombre: "Lentes", quote: quote({ compra_min_cantidad: 1, compra_min_unidad: "pieza" }) }),
+        item({ folio: "x4", nombre: "Botas", quote: quote({ compra_min_monto: 1500 }) }),
+      ] }));
+      expect(varias.minimumPurchases).toEqual([
+        "Minimum purchase: 10 caja (Guante C/100)",
+        "Minimum purchase: 5 pieza (Casco)",
+        "Minimum purchase: $1,500.00 MXN (Botas)",
+      ]);
+    });
+
+    // Pedido: 2 pares con minimo de 10 pares (3,333.33 por par).
+    const bajo = (decisionMin?: "cotizar_minimo" | "mantener_pedida") =>
+      base({ items: [item({ cantidad: 2, unidad: "par", decisionMin, quote: quote({ compra_min_cantidad: 10, compra_min_unidad: "par" }) })] });
+
+    it("cantidad pedida menor al minimo: sin elegir no se puede generar el PDF y dice por que", () => {
+      expect(() => buildPdfModel(bajo())).toThrow(PdfNotReadyError);
+      expect(() => buildPdfModel(bajo())).toThrow(/Cantidad pedida \(2 par\) menor al mínimo \(10 par\)/);
+    });
+    it("cotizar a la cantidad minima: CANT = minimo y el total va sobre el minimo; el precio sigue por unidad", () => {
+      const m = buildPdfModel(bajo("cotizar_minimo"));
+      expect(m.rows[0]).toMatchObject({ cant: "10 par", uPrice: "$3,333.33", price: "$33,333.30" });
+      expect(m.totals).toEqual([{ currency: "PESOS", amount: "$33,333.30" }]);
+      expect(m.minimumPurchases).toEqual(["Minimum purchase: 10 par (Guante de carnaza)"]);
+    });
+    it("mantener la cantidad pedida: CANT = pedida, total sobre lo pedido y la condicion visible en la franja", () => {
+      const m = buildPdfModel(bajo("mantener_pedida"));
+      expect(m.rows[0]).toMatchObject({ cant: "2 par", uPrice: "$3,333.33", price: "$6,666.66" });
+      expect(m.minimumPurchases).toEqual(["Minimum purchase: 10 par (Guante de carnaza)"]);
+    });
+    it("el envio se reparte sobre la cantidad con la que se cotiza", () => {
+      const plan = { modo: "por_pedido", monto: 100, moneda: "MXN" } as const;
+      const min = buildPdfModel({ ...bajo("cotizar_minimo"), data: { ...base().data, envio: plan } });
+      expect(min.rows[0]).toMatchObject({ uPrice: "$3,343.33", price: "$33,433.30" }); // 100 / 10 por par
+      const ped = buildPdfModel({ ...bajo("mantener_pedida"), data: { ...base().data, envio: plan } });
+      expect(ped.rows[0]).toMatchObject({ uPrice: "$3,383.33", price: "$6,766.66" }); // 100 / 2 por par
+    });
+    it("sin alerta si la unidad es distinta o la cantidad alcanza el minimo", () => {
+      expect(buildPdfModel(base({ items: [item({ cantidad: 2, unidad: "par", quote: quote({ compra_min_cantidad: 10, compra_min_unidad: "caja" }) })] })).rows).toHaveLength(1);
+      expect(buildPdfModel(base({ items: [item({ cantidad: 10, unidad: "par", quote: quote({ compra_min_cantidad: 10, compra_min_unidad: "par" }) })] })).rows).toHaveLength(1);
+    });
+    it("pdfProblems lista cada partida con alerta sin decision", () => {
+      const q = { valid_until: null, compra_min_cantidad: 10, compra_min_unidad: "par", compra_min_monto: null };
+      const p = pdfProblems([{ folio: "A-1", precioElegido: 1, quote: q, cantidad: 2, unidad: "par" }], new Date());
+      expect(p).toEqual([expect.stringContaining("A-1")]);
+      expect(pdfProblems([{ folio: "A-1", precioElegido: 1, quote: q, cantidad: 2, unidad: "par", decisionMin: "mantener_pedida" }], new Date())).toEqual([]);
+    });
+  });
+
+  describe("Atencion", () => {
+    it("la fila Atencion sale cuando tiene valor y se omite si esta vacia", async () => {
+      const con = await pdfPages(buildPdfModel(base()));
+      expect(con[0]).toContain("Atención:");
+      expect(con[0]).toContain("Ing. Perez");
+      for (const atencion of [null, "", "   "]) {
+        const [text] = await pdfPages(buildPdfModel(base({ data: { ...base().data, atencion } })));
+        expect(text).not.toContain("Atención");
+        expect(text).toContain("Empresa:");
+      }
+    });
   });
 
   it("folio con revision si alguna partida va en version 2 o mas", () => {
@@ -219,14 +279,14 @@ describe("PDF generado: contenido real y PRIVACIDAD", () => {
 
   it("PDF con envio: solo el costo final; ni renglon Shipping, ni monto del envio, ni los 5 precios o costos", async () => {
     const dirty = base({
-      items: [item({ cantidad: 2, unidad: "caja", quote: quote({ compra_min_cantidad: 10, compra_min_unidad: "caja" }) })],
+      items: [item({ cantidad: 2, unidad: "caja", decisionMin: "mantener_pedida", quote: quote({ compra_min_cantidad: 10, compra_min_unidad: "caja" }) })],
       data: { ...base().data, envio: { modo: "por_pedido", monto: 100, moneda: "MXN" } },
     });
     (dirty.items[0] as unknown as Record<string, unknown>).proveedor = "PROVEEDOR SECRETO";
     (dirty.items[0] as unknown as Record<string, unknown>).costo = 4321.09;
     (dirty.items[0] as unknown as Record<string, unknown>).envio_proveedor = 88888.88;
     const [text] = await pdfPages(buildPdfModel(dirty));
-    expect(text).toContain("Minimum purchase: 10 caja");
+    expect(text).toContain("Minimum purchase: 10 caja (Guante de carnaza)");
     expect(text).toContain("$3,383.33"); // U. Price con envio
     expect(text).toContain("$6,766.66"); // Price de la partida
     expect(text).toContain("TOTAL PESOS");
@@ -255,11 +315,37 @@ describe("PDF generado: contenido real y PRIVACIDAD", () => {
     expect(text).toContain("$2,322.22");
   });
 
+  it("la descripcion y el uso del producto (internos) no salen en el modelo ni en el PDF; solo el nombre para el cliente", async () => {
+    const dirty = base({ items: [item({ nombre: "Guante C/100 PARES" })] });
+    (dirty.items[0] as unknown as Record<string, unknown>).descripcion = "guante para hacer tamales";
+    (dirty.items[0] as unknown as Record<string, unknown>).uso = "para hacer tamales";
+    (dirty.items[0] as unknown as Record<string, unknown>).producto = "Guante solicitado interno";
+    const model = buildPdfModel(dirty);
+    expect(JSON.stringify(model)).not.toMatch(/tamales|descripcion|interno/);
+    expect(model.rows[0].nombre).toBe("Guante C/100 PARES");
+    const [text] = await pdfPages(model);
+    expect(text).toContain("Guante C/100 PARES");
+    expect(text).not.toMatch(/tamales|interno/);
+  });
+
   it("con muchas partidas el encabezado de la tabla se repite en cada pagina", async () => {
-    const many = Array.from({ length: 45 }, (_, i) => item({ folio: `F${i}`, producto: `Producto ${i}`, descripcion: "Descripcion de prueba " + "x".repeat(40) }));
+    const many = Array.from({ length: 45 }, (_, i) => item({ folio: `F${i}`, nombre: `Producto ${i}` }));
     const pages = await pdfPages(buildPdfModel(base({ items: many })));
     expect(pages.length).toBeGreaterThan(1);
     for (const p of pages) expect(p).toContain("U. Price");
     expect(pages[0].split("U. Price").length - 1).toBe(1); // en la primera pagina aparece una sola vez
   });
 });
+
+describe("nombre en el PDF", () => {
+  it("por defecto el producto solicitado; con alternativo cotizado, el del alternativo; el nombre editado manda", () => {
+    expect(defaultPdfName(null, "Guante de carnaza")).toBe("Guante de carnaza");
+    expect(defaultPdfName("  ", "Guante de carnaza")).toBe("Guante de carnaza");
+    expect(defaultPdfName("Guante de nylon", "Guante de carnaza")).toBe("Guante de nylon");
+    expect(resolvePdfName(null, null, "Guante de carnaza")).toBe("Guante de carnaza");
+    expect(resolvePdfName(null, "Guante de nylon", "Guante de carnaza")).toBe("Guante de nylon");
+    expect(resolvePdfName("Guante de nylon C/100 SOBRES", "Guante de nylon", "Guante de carnaza")).toBe("Guante de nylon C/100 SOBRES");
+    expect(resolvePdfName("   ", null, "Guante de carnaza")).toBe("Guante de carnaza");
+  });
+});
+
