@@ -12,8 +12,8 @@ Para probar la vigencia vencida sin esperar 15 dias, el comprador puede poner la
 4. **V:** abre la solicitud. **Esperado:** ve los 5 precios, la vigencia (hasta dentro de 15 dias) y **no** ve costo, proveedor ni "Donde conseguirlo".
 5. **V:** elige el Precio 2, recarga la pagina, cambia al Precio 3. **Esperado:** la eleccion se conserva y se puede cambiar.
 6. **V:** descarga el PDF antes de elegir precio en una segunda partida. **Esperado:** el boton esta deshabilitado y dice "Elige el precio de la partida ...".
-7. **V:** con todos los precios elegidos, captura Destino, Via (Parcel) y presiona **Descargar PDF**. **Esperado:** archivo `COT-AAAA-NNNN_<cliente>.pdf` con encabezado de ESC, tabla TE / Product Name / CANT / Currency / U. Price / Price, SOLO el precio elegido, franja amarilla "Minimum purchase: 10 caja" y la leyenda "Prices include shipping charges to your plant in <destino>, via Parcel".
-8. **V:** cambia a "Se cobra aparte" con 350 MXN y descarga otra vez. **Esperado:** renglon "Shipping to <destino> via Parcel" y el total en pesos incluye los 350; ya no sale la leyenda de envio incluido.
+7. **V:** con todos los precios elegidos, captura Destino y Via (Parcel), deja vacio el "Costo de envio al cliente" y revisa la vista previa del total (precios sin IVA). Presiona **Descargar PDF**. **Esperado:** archivo `COT-AAAA-NNNN_<cliente>.pdf` con encabezado de ESC, tabla TE / Product Name / CANT / Currency / U. Price / Price, SOLO el precio elegido, franja amarilla "Minimum purchase: 10 caja" y en el pie "Prices include shipping charges to your plant in <destino>, via Parcel". Sin destino capturado, esa linea no sale.
+8. **V:** captura "Costo de envio al cliente" 350 (moneda MXN) y mira la vista previa. **Esperado:** el panel muestra Subtotal, Envio al cliente 350 y Total con envio en pesos. Descarga otra vez: el PDF agrega el renglon "Shipping to <destino> via Parcel" por 350, el total en pesos lo incluye y ya no sale la leyenda "Prices include shipping". Con una solicitud en pesos y dolares el panel exige elegir la moneda del envio y el cargo solo se suma a esa moneda.
 9. **V:** presiona **Enviado al cliente**. **Esperado:** el precio queda fijo (los botones de eleccion se desactivan). **C:** en Auditoria aparecen la eleccion, el envio y el evento `download_pdf`.
 
 ## C. Resultado
@@ -46,7 +46,7 @@ Para probar la vigencia vencida sin esperar 15 dias, el comprador puede poner la
 28. **C:** Historial, busca por producto y luego por proveedor. **Esperado:** tabla y grafica del costo en el tiempo.
 
 ## H. Privacidad (lo mas importante)
-29. **V:** revisa el PDF, la pantalla de la solicitud y "Copiar tabla de precios" (pegala en un editor). **Esperado:** en ninguno aparece costo, envio del proveedor, base, porcentaje, proveedor, link ni notas de compra.
+29. **V:** revisa el PDF, la pantalla de la solicitud y "Copiar tabla de precios" (pegala en un editor; debe terminar con la nota "Precios sin IVA"). **Esperado:** en ninguno aparece costo, envio del proveedor, base, porcentaje, proveedor, link ni notas de compra.
 30. **V:** intenta abrir `/api/admin/export?tipo=por_comprar`. **Esperado:** error 403.
 
 ## Consulta util para probar vigencia vencida (solo en un ambiente de pruebas)

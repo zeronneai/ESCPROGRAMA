@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPriceTable, type PriceTableItem } from "@/lib/format/price-table";
+import { formatPriceTable, NOTA_SIN_IVA, type PriceTableItem } from "@/lib/format/price-table";
 
 const item: PriceTableItem = {
   folio: "COT-2026-0001-01",
@@ -47,9 +47,20 @@ describe("formatPriceTable", () => {
     expect(html).not.toContain("<largo>");
   });
 
+  it("incluye la nota visible 'Precios sin IVA' en texto y HTML (una vez, al final)", () => {
+    const { text, html } = formatPriceTable([item, { ...item, folio: "COT-2026-0001-02" }]);
+    expect(NOTA_SIN_IVA).toBe("Precios sin IVA");
+    expect(text.endsWith("\n\nPrecios sin IVA")).toBe(true);
+    expect(text.match(/Precios sin IVA/g)).toHaveLength(1);
+    expect(html).toContain("Precios sin IVA");
+    expect(html.match(/Precios sin IVA/g)).toHaveLength(1);
+    // tambien al copiar solo el precio elegido
+    expect(formatPriceTable([item], { onlySelected: true }).text).toContain("Precios sin IVA");
+  });
+
   it("varias partidas se separan", () => {
     const { text, html } = formatPriceTable([item, { ...item, folio: "COT-2026-0001-02" }]);
-    expect(text.split("\n\n")).toHaveLength(2);
+    expect(text.replace(/\n\nPrecios sin IVA$/, "").split("\n\n")).toHaveLength(2);
     expect(html.match(/<table/g)).toHaveLength(2);
   });
 

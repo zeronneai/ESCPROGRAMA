@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/auth/guards";
-import { buildPdfModel, PdfNotReadyError, pdfFileName } from "@/lib/pdf/model";
+import { buildPdfModel, PdfNotReadyError, pdfFileName, toPdfQuote } from "@/lib/pdf/model";
 import { renderQuotePdf } from "@/lib/pdf/render";
 import { getBusinessSettings, getCompanyProfile } from "@/lib/quotes/server";
 import { requestRevision } from "@/lib/quotes/revisions";
@@ -42,7 +42,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ req
   const revision = requestRevision(rows);
   const { data: pdfData } = await supabase
     .from("quote_pdf_data")
-    .select("destino_entrega, via_envio, condiciones, atencion, envio_modo, envio_monto, envio_moneda")
+    .select("destino_entrega, via_envio, condiciones, atencion, envio_monto, envio_moneda")
     .eq("request_id", requestId)
     .eq("revision", revision)
     .maybeSingle();
@@ -63,13 +63,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ req
           cantidad: i.cantidad,
           unidad: i.unidad,
           talla: i.talla,
-          quote: {
-            version: q!.version, moneda: q!.moneda,
-            price_1: q!.price_1, price_2: q!.price_2, price_3: q!.price_3, price_4: q!.price_4, price_5: q!.price_5,
-            entrega_dias: q!.entrega_dias, entrega_tipo: q!.entrega_tipo, entrega_fecha: q!.entrega_fecha,
-            compra_min_cantidad: q!.compra_min_cantidad, compra_min_unidad: q!.compra_min_unidad, compra_min_monto: q!.compra_min_monto,
-            valid_until: q!.valid_until,
-          },
+          quote: toPdfQuote(q!),
           precioElegido: i.item_price_choice?.find((c) => c.quote_version === q!.version)?.precio ?? null,
         })),
       data: {
@@ -77,7 +71,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ req
         atencion: pdfData?.atencion ?? req.atencion ?? null,
         destino_entrega: pdfData?.destino_entrega ?? req.destino_entrega ?? null,
         via_envio: pdfData?.via_envio ?? null,
-        envio_modo: (pdfData?.envio_modo as "incluido" | "aparte" | undefined) ?? "incluido",
         envio_monto: pdfData?.envio_monto ?? null,
         envio_moneda: (pdfData?.envio_moneda as "MXN" | "USD" | null | undefined) ?? null,
       },

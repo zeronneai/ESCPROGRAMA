@@ -174,7 +174,7 @@ export function BuyerItemCard({
               Costo ${Number(cost.costo).toFixed(2)} · Envío {cost.envio ? `$${Number(cost.envio).toFixed(2)}` : "sin envío"} · Base ${Number(cost.base).toFixed(2)} · Proveedor {cost.proveedor ?? "sin proveedor"}
             </p>
           )}
-          <p>Precios ({q.moneda}): {[q.price_1, q.price_2, q.price_3, q.price_4, q.price_5].map((p, i) => `P${i + 1} $${Number(p).toFixed(2)}`).join(" · ")}</p>
+          <p>Precios ({q.moneda}, sin IVA): {[q.price_1, q.price_2, q.price_3, q.price_4, q.price_5].map((p, i) => `P${i + 1} $${Number(p).toFixed(2)}`).join(" · ")}</p>
           <p>
             Entrega: {formatDelivery(q)} · Compra mínima: {formatMinPurchase(q) ?? "sin mínimo"} · Vigencia hasta {q.valid_until ? fmtDate(q.valid_until) : "-"}
             {vencida ? " (vencida)" : ""}

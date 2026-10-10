@@ -68,7 +68,7 @@ Sin Docker, `tests/rls/run-local-pg.sh` levanta un Postgres temporal con un shim
 - **Resultado:** despues de "Enviado al cliente" el vendedor marca Ganada, Perdida (con motivo) o Sin respuesta. Indicadores de conversion en las estadisticas.
 - **Historial de precios** (solo comprador): cotizaciones parecidas por nombre, grafica de costo en el tiempo, catalogo de proveedores.
 - **Aclaraciones:** chat por partida con imagen opcional. "Pedir aclaracion" pausa el reloj de 48 horas habiles hasta que el vendedor responda.
-- **PDF de cotizacion** para el cliente: boton "Descargar PDF" por solicitud. Muestra solo el precio elegido por partida, nunca los 5 precios, costos ni proveedor. La plantilla vive en `src/lib/pdf/quote-template.tsx`.
+- **PDF de cotizacion** para el cliente: boton "Descargar PDF" por solicitud. Muestra solo el precio elegido por partida, nunca los 5 precios, costos ni proveedor. Todos los precios son **sin IVA** (el pie lleva la leyenda editable "16% VAT will be added to the invoice"; no se calculan impuestos). El vendedor puede capturar un **costo de envío al cliente** opcional (por solicitud, con su moneda): si es mayor a 0 el PDF agrega el renglón "Shipping to <destino> via <vía>" y lo suma al total de esa moneda; si está vacío y hay destino, el pie dice "Prices include shipping charges to your plant in <destino>, via <vía>". La plantilla vive en `src/lib/pdf/quote-template.tsx`.
 - **Abastecimiento** (solo comprador): "Donde conseguirlo (interno)" por partida y vista **Por comprar** con las cotizaciones ganadas.
 - Pruebas manuales sugeridas: `docs/pruebas-manuales-fase-4.md`.
 

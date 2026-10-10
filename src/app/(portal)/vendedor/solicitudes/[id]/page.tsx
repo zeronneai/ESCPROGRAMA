@@ -4,7 +4,8 @@ import { requireUser } from "@/lib/auth/guards";
 import { requestRevision } from "@/lib/quotes/revisions";
 import { getBusinessSettings, getCompanyProfile, withMessageImageUrls, withSignedUrls } from "@/lib/quotes/server";
 import { effectiveDueAt, remainingWithPauses } from "@/lib/quotes/clock";
-import type { ItemRow } from "@/lib/quotes/types";
+import { latestQuote, type ItemRow } from "@/lib/quotes/types";
+import { itemCurrencies } from "@/lib/pdf/model";
 import { buildTimeline } from "@/lib/stats/timeline";
 import { createClient } from "@/lib/supabase/server";
 import { SellerRequestView } from "./seller-request-view";
@@ -38,11 +39,12 @@ export default async function DetalleSolicitud({ params }: { params: Promise<{ i
   const revision = requestRevision(rows);
   const { data: pdfData } = await supabase
     .from("quote_pdf_data")
-    .select("destino_entrega, via_envio, condiciones, atencion, envio_modo, envio_monto, envio_moneda")
+    .select("destino_entrega, via_envio, condiciones, atencion, envio_monto, envio_moneda")
     .eq("request_id", id)
     .eq("revision", revision)
     .maybeSingle();
 
+  const currencies = itemCurrencies(rows.map((r) => ({ quote: latestQuote(r) })));
   const now = new Date();
   const due = req.due_at ? new Date(req.due_at) : null;
   // Plazo del comprador por partida, con las pausas por aclaracion descontadas.
@@ -71,9 +73,9 @@ export default async function DetalleSolicitud({ params }: { params: Promise<{ i
           via: pdfData?.via_envio ?? "",
           condiciones: pdfData?.condiciones ?? company.condiciones_default,
           atencion: pdfData?.atencion ?? req.atencion ?? "",
-          modo: (pdfData?.envio_modo as "incluido" | "aparte" | undefined) ?? "incluido",
-          monto: pdfData?.envio_monto ? String(pdfData.envio_monto) : "",
-          moneda: (pdfData?.envio_moneda as "MXN" | "USD" | null) ?? "MXN",
+          monto: pdfData?.envio_monto ? String(Number(pdfData.envio_monto)) : "",
+          // Moneda guardada; si no hay, la de las partidas cuando es una sola; si mezcla, el vendedor la elige.
+          moneda: ((pdfData?.envio_moneda as "MXN" | "USD" | null) ?? (currencies.length === 1 ? currencies[0] : "")) as "MXN" | "USD" | "",
         }}
         nowIso={now.toISOString()}
       />

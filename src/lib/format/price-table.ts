@@ -27,6 +27,9 @@ export interface PriceTableItem {
   precioElegido?: 1 | 2 | 3 | 4 | 5 | null;
 }
 
+/** Todos los precios del portal son SIN IVA; la nota va visible en el texto copiado. */
+export const NOTA_SIN_IVA = "Precios sin IVA";
+
 export interface FormattedPriceTable {
   html: string;
   text: string;
@@ -145,8 +148,9 @@ export function formatPriceTable(
   items: PriceTableItem[],
   opts: FormatOptions = {},
 ): FormattedPriceTable {
+  if (items.length === 0) return { text: "", html: "" };
   return {
-    text: items.map((i) => itemText(i, opts)).join("\n\n"),
-    html: items.map((i) => itemHtml(i, opts)).join("\n"),
+    text: `${items.map((i) => itemText(i, opts)).join("\n\n")}\n\n${NOTA_SIN_IVA}`,
+    html: `${items.map((i) => itemHtml(i, opts)).join("\n")}\n<p style="font-family:Arial,sans-serif;font-size:12px;color:#444;margin:0 0 12px;">${NOTA_SIN_IVA}</p>`,
   };
 }
