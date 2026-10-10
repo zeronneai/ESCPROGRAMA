@@ -1,6 +1,7 @@
 import Decimal from "decimal.js";
 import { DateTime } from "luxon";
 import { formatMinPurchase } from "@/lib/format/quote-text";
+import { minAlert, pdfQuantity, type MinDecision } from "@/lib/quotes/min-purchase";
 import { isVigenciaVencida, requestRevision, revisionFolio } from "@/lib/quotes/revisions";
 import { allocateShipping, NO_SHIPPING, totalsByCurrency, type AllocResult, type ShippingPlan } from "@/lib/pricing/shipping-allocation";
 import { renderShippingLegend } from "./shipping";
@@ -54,6 +55,8 @@ export interface PdfItemInput {
   };
   /** Precio elegido por el vendedor (1 a 5) para esa version, o null si aun no elige. */
   precioElegido: number | null;
+  /** Si la cantidad pedida es menor al minimo, lo que eligio el vendedor para esta revision. */
+  decisionMin?: MinDecision | null;
 }
 
 /** Adapta la cotizacion visible al vendedor al formato del PDF (solo campos publicos). */
@@ -107,7 +110,8 @@ export interface PdfModel {
   atencion: string | null;
   rows: PdfRow[];
   totals: { currency: PdfCurrency; amount: string }[];
-  minimumPurchase: string | null;
+  /** Una linea por partida con compra minima mayor a 1 (franja amarilla). Vacio = sin franja. */
+  minimumPurchases: string[];
   footer: string[];
 }
 
@@ -138,13 +142,28 @@ const pick = (q: PdfItemInput["quote"], n: number | null): Decimal | null => {
 };
 
 /** Que falta para poder generar el PDF (lo usa la interfaz y el servidor). */
-export function pdfProblems(items: Array<Pick<PdfItemInput, "folio" | "precioElegido"> & { quote: { valid_until: string | null } | null; estado?: string }>, now: Date): string[] {
+export function pdfProblems(
+  items: Array<
+    Pick<PdfItemInput, "folio" | "precioElegido"> & {
+      quote: (Partial<PdfItemInput["quote"]> & { valid_until: string | null }) | null;
+      estado?: string;
+      cantidad?: number | string | null;
+      unidad?: string | null;
+      decisionMin?: MinDecision | null;
+    }
+  >,
+  now: Date,
+): string[] {
   const out: string[] = [];
   const quoted = items.filter((i) => i.quote);
   if (quoted.length === 0) out.push("Aun no hay partidas cotizadas");
   for (const i of quoted) {
     if (isVigenciaVencida(i.quote, now)) out.push("Vigencia vencida: solicita actualización");
     else if (!i.precioElegido) out.push(`Elige el precio de la partida ${i.folio}`);
+    const alerta = i.quote && i.cantidad !== undefined ? minAlert({ cantidad: i.cantidad, unidad: i.unidad ?? null }, { compra_min_cantidad: null, compra_min_unidad: null, compra_min_monto: null, ...i.quote }) : null;
+    if (alerta && !i.decisionMin) {
+      out.push(`Partida ${i.folio}: ${alerta.text}. Elige "Cotizar a la cantidad mínima" o "Mantener la cantidad pedida"`);
+    }
   }
   return [...new Set(out)];
 }
@@ -188,13 +207,20 @@ const toLine = (r: AllocResult): OrderLinePreview => ({
  * Lo usan el PDF y la vista previa del panel, para que coincidan siempre.
  */
 export function computeOrder(
-  items: Array<{ id: string; cantidad: number | string | null; precioElegido: number | null; quote: PdfItemInput["quote"] | null }>,
+  items: Array<{
+    id: string;
+    cantidad: number | string | null;
+    unidad?: string | null;
+    precioElegido: number | null;
+    quote: PdfItemInput["quote"] | null;
+    decisionMin?: MinDecision | null;
+  }>,
   plan: ShippingPlan = NO_SHIPPING,
 ): OrderPreview {
   const alloc = items.flatMap((i) => {
     if (!i.quote) return [];
     const unit = pick(i.quote, i.precioElegido);
-    return unit ? [{ id: i.id, moneda: i.quote.moneda, cantidad: i.cantidad, precioElegido: unit }] : [];
+    return unit ? [{ id: i.id, moneda: i.quote.moneda, cantidad: pdfQuantity({ cantidad: i.cantidad, unidad: i.unidad ?? null }, i.quote, i.decisionMin), precioElegido: unit }] : [];
   });
   const r = allocateShipping(alloc, plan);
   const totals = totalsByCurrency(r.lines);
@@ -216,7 +242,9 @@ export function buildPdfModel(input: PdfInput): PdfModel {
   const order = computeOrder(items, input.data.envio);
   const rows: PdfRow[] = items.map((i) => {
     const l = order.lines[i.id];
-    const qty = i.cantidad !== null && i.cantidad !== "" && Number(i.cantidad) > 0 ? new Decimal(i.cantidad) : null;
+    // Si el vendedor eligio cotizar a la cantidad minima, CANT muestra el minimo y el total va sobre el minimo.
+    const cantidad = pdfQuantity(i, i.quote, i.decisionMin);
+    const qty = cantidad !== null && cantidad !== "" && Number(cantidad) > 0 ? new Decimal(cantidad) : null;
     const cant = [qty ? `${qty.toString()}${i.unidad ? ` ${i.unidad}` : ""}` : "", i.talla ? `Talla ${i.talla}` : ""].filter(Boolean).join(" / ");
     return {
       te: pdfDelivery(i.quote),
@@ -232,11 +260,11 @@ export function buildPdfModel(input: PdfInput): PdfModel {
   const destino = d.destino_entrega?.trim() || null;
   const via = d.via_envio?.trim() || null;
 
-  const mins = items
-    .map((i) => ({ producto: i.nombre, value: formatMinPurchase({ ...i.quote, moneda: i.quote.moneda }) }))
-    .filter((m): m is { producto: string; value: string } => !!m.value);
-  const distinct = [...new Set(mins.map((m) => m.value))];
-  const minimumPurchase = mins.length === 0 ? null : distinct.length === 1 ? distinct[0] : mins.map((m) => `${m.producto}: ${m.value}`).join("; ");
+  // Franja amarilla: una linea por partida con minimo mayor a 1, indicando de que producto es.
+  const minimumPurchases = items.flatMap((i, n) => {
+    const v = formatMinPurchase(i.quote, i.unidad);
+    return v ? [`Minimum purchase: ${v} (${i.nombre.trim() || `renglón ${n + 1}`})`] : [];
+  });
 
   const footer = [...input.company.pie_lineas];
   // Leyenda de envio (editable en Configuracion): siempre que haya destino capturado.
@@ -264,7 +292,7 @@ export function buildPdfModel(input: PdfInput): PdfModel {
     atencion: d.atencion?.trim() || null,
     rows,
     totals: order.perCurrency.map((t) => ({ currency: t.currency, amount: t.total })),
-    minimumPurchase,
+    minimumPurchases,
     footer,
   };
 }

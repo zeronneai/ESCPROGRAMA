@@ -19,6 +19,18 @@ describe("formatDelivery / formatMinPurchase", () => {
     expect(formatMinPurchase({ ...quote, compra_min_cantidad: "10.000", compra_min_unidad: "caja" })).toBe("10 caja");
     expect(formatMinPurchase({ ...quote, compra_min_monto: "1500" })).toBe("$1,500.00 MXN");
     expect(formatMinPurchase(quote)).toBeNull();
+    // Minimo 1 no es una condicion para el cliente; una cotizacion anterior sin cantidad se asume con minimo 1.
+    expect(formatMinPurchase({ ...quote, compra_min_cantidad: 1, compra_min_unidad: "pieza" })).toBeNull();
+    expect(formatMinPurchase({ ...quote, compra_min_cantidad: 10, compra_min_unidad: "caja", compra_min_monto: 1500 })).toBe("10 caja / $1,500.00 MXN");
+  });
+
+  it("la tabla copiada incluye la compra minima solo cuando es mayor a 1", () => {
+    const item = { folio: "F-1", producto: "Guante", cantidad: 10, unidad: "caja", talla: null };
+    const con = formatPriceTable([toPriceTableItem(item, { ...quote, compra_min_cantidad: 5, compra_min_unidad: "caja" }, 3)], { onlySelected: true });
+    expect(con.text).toContain("Compra minima: 5 caja");
+    expect(con.html).toContain("Compra minima");
+    const uno = formatPriceTable([toPriceTableItem(item, { ...quote, compra_min_cantidad: 1, compra_min_unidad: "caja" }, 3)]);
+    expect(uno.text).not.toContain("Compra minima");
   });
 });
 

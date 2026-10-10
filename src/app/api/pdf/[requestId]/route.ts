@@ -54,6 +54,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ req
     .eq("request_id", requestId)
     .eq("revision", revision);
 
+  const { data: minChoices } = await supabase.from("quote_pdf_min_choices").select("item_id, decision").eq("request_id", requestId).eq("revision", revision);
   // Nombre en el PDF de la version vigente de cada partida (la descripcion y el uso son internos y nunca salen).
   const { data: nameRows } = await supabase.from("item_pdf_names").select("item_id, quote_version, nombre").in("item_id", rows.map((r) => r.id));
   try {
@@ -67,6 +68,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ req
         .filter(({ q }) => !!q)
         .map(({ i, q }) => ({
           id: i.id,
+          decisionMin: (minChoices ?? []).find((c) => c.item_id === i.id)?.decision as "cotizar_minimo" | "mantener_pedida" | undefined,
           folio: i.folio!,
           producto: i.producto,
           nombre: resolvePdfName((nameRows ?? []).find((n) => n.item_id === i.id && n.quote_version === q!.version)?.nombre, q!.alt_nombre, i.producto),

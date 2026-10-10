@@ -106,9 +106,11 @@ export function QuoteDocument({ model, logoSrc }: { model: PdfModel; logoSrc?: s
           ))}
         </View>
 
-        {model.minimumPurchase ? (
+        {model.minimumPurchases.length > 0 ? (
           <View style={s.band} wrap={false}>
-            <Text>Minimum purchase: {model.minimumPurchase}</Text>
+            {model.minimumPurchases.map((line, i) => (
+              <Text key={i}>{line}</Text>
+            ))}
           </View>
         ) : null}
 

@@ -78,30 +78,18 @@ export function QuoteForm({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Compra mínima (opcional)">
-          <Select value={form.minModo} onChange={(e) => set("minModo", e.target.value as QuoteFormValues["minModo"])}>
-            <option value="ninguna">Sin mínimo</option>
-            <option value="cantidad">Por cantidad</option>
-            <option value="monto">Por monto</option>
+        <Field label="Compra mínima: cantidad *" error={errors.minCantidad}>
+          <Input value={form.minCantidad} onChange={(e) => set("minCantidad", e.target.value)} inputMode="decimal" />
+        </Field>
+        <Field label="Unidad *" error={errors.minUnidad}>
+          <Select value={form.minUnidad} onChange={(e) => set("minUnidad", e.target.value)}>
+            {UNIDADES.map((u) => <option key={u} value={u}>{u}</option>)}
           </Select>
         </Field>
-        {form.minModo === "cantidad" && (
-          <>
-            <Field label="Cantidad mínima" error={errors.minCantidad}>
-              <Input value={form.minCantidad} onChange={(e) => set("minCantidad", e.target.value)} inputMode="decimal" />
-            </Field>
-            <Field label="Unidad" error={errors.minUnidad}>
-              <Select value={form.minUnidad} onChange={(e) => set("minUnidad", e.target.value)}>
-                {UNIDADES.map((u) => <option key={u} value={u}>{u}</option>)}
-              </Select>
-            </Field>
-          </>
-        )}
-        {form.minModo === "monto" && (
-          <Field label={`Monto mínimo (${form.moneda})`} error={errors.minMonto}>
-            <Input value={form.minMonto} onChange={(e) => set("minMonto", e.target.value)} inputMode="decimal" />
-          </Field>
-        )}
+        <Field label={`Monto mínimo adicional (${form.moneda}, opcional)`} error={errors.minMonto}>
+          <Input value={form.minMonto} onChange={(e) => set("minMonto", e.target.value)} inputMode="decimal" />
+        </Field>
+        <p className="text-xs text-slate-500 sm:col-span-3">Si no hay mínimo, deja 1. Poner 1 significa que se puede comprar desde 1 pieza a este costo.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">

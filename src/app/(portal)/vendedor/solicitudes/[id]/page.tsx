@@ -52,6 +52,10 @@ export default async function DetalleSolicitud({ params }: { params: Promise<{ i
     ? await supabase.from("quote_pdf_shipping_items").select("item_id, monto, tipo").eq("request_id", id).eq("revision", pdfData.revision)
     : { data: [] };
 
+  const { data: minRows } = await supabase.from("quote_pdf_min_choices").select("item_id, decision").eq("request_id", id).eq("revision", revision);
+  const minimos: Record<string, "cotizar_minimo" | "mantener_pedida"> = {};
+  for (const m of minRows ?? []) minimos[m.item_id] = m.decision as "cotizar_minimo" | "mantener_pedida";
+
   // Nombre en el PDF por partida: el guardado para la version vigente, o el del alternativo cotizado, o el producto.
   const { data: nameRows } = await supabase.from("item_pdf_names").select("item_id, quote_version, nombre").in("item_id", rows.map((r) => r.id));
   const nombreDefecto: Record<string, string> = {};
@@ -94,6 +98,7 @@ export default async function DetalleSolicitud({ params }: { params: Promise<{ i
           atencion: pdfData?.atencion ?? req.atencion ?? "",
           ...shippingDefaults(pdfData, shipRows ?? [], currencies),
           nombres,
+          minimos,
         }}
         nombreDefecto={nombreDefecto}
         nowIso={now.toISOString()}

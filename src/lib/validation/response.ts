@@ -11,9 +11,10 @@ export interface QuoteFormValues {
   entregaDias: string;
   entregaTipo: string;
   entregaFecha: string;
-  minModo: "ninguna" | "cantidad" | "monto";
+  /** Compra minima OBLIGATORIA: cantidad (>= 1) y unidad. Si no hay minimo, 1. */
   minCantidad: string;
   minUnidad: string;
+  /** Monto minimo adicional (opcional). */
   minMonto: string;
   proveedor: string;
   nota: string;
@@ -39,7 +40,7 @@ export interface QuoteInput {
   envio: number | null;
   moneda: "MXN" | "USD";
   entrega: { dias: number | null; tipo: "habiles" | "naturales" | null; fecha: string | null };
-  compra_min: { cantidad: number | null; unidad: string | null; monto: number | null };
+  compra_min: { cantidad: number; unidad: string; monto: number | null };
   proveedor: string | null;
   nota: string | null;
   /** null = el precio es del producto solicitado. */
@@ -56,8 +57,7 @@ export const emptyQuoteForm: QuoteFormValues = {
   entregaDias: "",
   entregaTipo: "habiles",
   entregaFecha: "",
-  minModo: "ninguna",
-  minCantidad: "",
+  minCantidad: "1",
   minUnidad: "pieza",
   minMonto: "",
   proveedor: "",
@@ -92,16 +92,16 @@ export function parseQuoteForm(v: QuoteFormValues): Parsed<QuoteInput> {
     errors.entregaFecha = "Captura la fecha estimada";
   } else entrega.fecha = v.entregaFecha;
 
-  const min: QuoteInput["compra_min"] = { cantidad: null, unidad: null, monto: null };
-  if (v.minModo === "cantidad") {
-    const c = parseNumber(v.minCantidad);
-    if (c === undefined || Number.isNaN(c) || c <= 0) errors.minCantidad = "Captura la cantidad minima";
-    else min.cantidad = c;
-    if (!(UNIDADES as readonly string[]).includes(v.minUnidad)) errors.minUnidad = "Elige la unidad";
-    else min.unidad = v.minUnidad;
-  } else if (v.minModo === "monto") {
+  const min: QuoteInput["compra_min"] = { cantidad: 1, unidad: "pieza", monto: null };
+  const c = parseNumber(v.minCantidad);
+  if (c === undefined) errors.minCantidad = "Captura la compra minima (si no hay minimo, deja 1)";
+  else if (Number.isNaN(c) || c < 1) errors.minCantidad = "La compra minima debe ser 1 o mayor";
+  else min.cantidad = c;
+  if (!(UNIDADES as readonly string[]).includes(v.minUnidad)) errors.minUnidad = "Elige la unidad";
+  else min.unidad = v.minUnidad;
+  if (v.minMonto.trim()) {
     const m = parseNumber(v.minMonto);
-    if (m === undefined || Number.isNaN(m) || m <= 0) errors.minMonto = "Captura el monto minimo";
+    if (m === undefined || Number.isNaN(m) || m <= 0) errors.minMonto = "El monto minimo debe ser mayor a 0";
     else min.monto = m;
   }
 

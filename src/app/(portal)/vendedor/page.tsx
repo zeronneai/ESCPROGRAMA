@@ -1,3 +1,4 @@
+import { minAlert } from "@/lib/quotes/min-purchase";
 import Link from "next/link";
 import { DateTime } from "luxon";
 import { Button, Card, Field, Input, Select } from "@/components/ui";
@@ -14,6 +15,9 @@ interface ItemRowDb {
   folio: string | null;
   producto: string;
   descripcion: string;
+  cantidad: number | string | null;
+  unidad: string | null;
+  item_quotes: { version: number; compra_min_cantidad: number | string | null; compra_min_unidad: string | null; compra_min_monto: number | string | null }[];
   estado: ItemStatus;
   quote_requests: {
     id: string;
@@ -52,7 +56,7 @@ export default async function VendedorHome({ searchParams }: { searchParams: Pro
 
   let q = supabase
     .from("quote_items")
-    .select("id, folio, producto, descripcion, estado, quote_requests!inner(id, folio, estado, submitted_at, due_at, customer_id, vendedor_id, customers(nombre))")
+    .select("id, folio, producto, descripcion, cantidad, unidad, estado, item_quotes(version, compra_min_cantidad, compra_min_unidad, compra_min_monto), quote_requests!inner(id, folio, estado, submitted_at, due_at, customer_id, vendedor_id, customers(nombre))")
     .eq("quote_requests.estado", "enviada")
     .eq("quote_requests.vendedor_id", user.id)
     .order("folio", { ascending: false })
@@ -193,7 +197,13 @@ export default async function VendedorHome({ searchParams }: { searchParams: Pro
                       {i.folio}
                     </Link>
                   </td>
-                  <td className="px-3 py-2">{i.producto}<div className="max-w-md truncate text-xs text-slate-500">{i.descripcion}</div></td>
+                  <td className="px-3 py-2">{i.producto}<div className="max-w-md truncate text-xs text-slate-500">{i.descripcion}</div>
+                    {(() => {
+                      const last = [...(i.item_quotes ?? [])].sort((a, b) => b.version - a.version)[0];
+                      const alerta = last ? minAlert(i, last) : null;
+                      return alerta ? <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">{alerta.text}</span> : null;
+                    })()}
+                  </td>
                   <td className="px-3 py-2">{i.quote_requests.customers?.nombre}</td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {new Date(i.quote_requests.submitted_at).toLocaleDateString("es-MX", { dateStyle: "medium" })}

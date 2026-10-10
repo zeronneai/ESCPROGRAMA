@@ -360,6 +360,66 @@ export function fase4Suite() {
     });
   });
 
+  describe("compra minima obligatoria y decision del vendedor", () => {
+    it("quote y update_cost exigen compra minima (cantidad >= 1 y unidad); confirm la hereda", async () => {
+      const { item } = await newPendingItem(w, "Producto minimo");
+      const f = await currentFactors();
+      const sin = quotePayload("100", null, f);
+      delete (sin as Record<string, unknown>).compra_min;
+      expect(await failure(respond(w.buyer1, item, "quote", sin))).toMatch(/compra minima es obligatoria/);
+      expect(await failure(respond(w.buyer1, item, "quote", quotePayload("100", null, f, { compra_min: { cantidad: 0.5, unidad: "pieza" } })))).toMatch(/compra minima es obligatoria/);
+      expect(await failure(respond(w.buyer1, item, "quote", quotePayload("100", null, f, { compra_min: { cantidad: 5, unidad: " " } })))).toMatch(/compra minima es obligatoria/);
+      expect(await failure(respond(w.buyer1, item, "quote", quotePayload("100", null, f, { compra_min: null })))).toMatch(/compra minima es obligatoria/);
+      await respond(w.buyer1, item, "quote", quotePayload("100", null, f, { compra_min: { cantidad: 10, unidad: "caja", monto: 1500 } }));
+      const v1 = (await rpc(w.seller1, "select compra_min_cantidad::float c, compra_min_unidad u, compra_min_monto::float m from public.item_quotes where item_id=$1", [item])).rows[0];
+      expect(v1).toEqual({ c: 10, u: "caja", m: 1500 });
+
+      // Revisiones: confirm hereda; update_cost exige el minimo valido y se conserva por version.
+      await expireQuote(item, 1);
+      await rpc(w.seller1, "select public.request_item_update($1,null,$2)", [item, dueIn48()]);
+      await respond(w.buyer1, item, "confirm", {});
+      await expireQuote(item, 2);
+      await rpc(w.seller1, "select public.request_item_update($1,null,$2)", [item, dueIn48()]);
+      expect(await failure(respond(w.buyer1, item, "update_cost", quotePayload("120", null, await currentFactors(), { entrega: undefined, moneda: undefined, compra_min: { cantidad: 0, unidad: "caja" } })))).toMatch(/compra minima es obligatoria/);
+      await respond(w.buyer1, item, "update_cost", quotePayload("120", null, await currentFactors(), { entrega: undefined, moneda: undefined, compra_min: { cantidad: 1, unidad: "caja" } }));
+      const v = (await as("postgres", (qq) => qq("select version, compra_min_cantidad::float c from public.item_quotes where item_id=$1 order by version", [item]))).rows;
+      expect(v).toEqual([{ version: 1, c: 10 }, { version: 2, c: 10 }, { version: 3, c: 1 }]);
+    });
+
+    it("el minimo queda BLOQUEADO tras cotizar (nadie lo edita) y el vendedor no lee costos", async () => {
+      const { item } = await newQuotedItem(w, "Producto minimo bloqueado", "100", { compra_min: { cantidad: 6, unidad: "pieza" } });
+      for (const actor of [w.buyer1, w.seller1, "postgres" as const]) {
+        expect(await failure(rpc(actor, "update public.item_quotes set compra_min_cantidad=1 where item_id=$1", [item]))).toMatch(/bloquea|inmutable|permission denied|no se permite|locked|modific/i);
+      }
+      expect((await rpc(w.seller1, "select compra_min_cantidad::float c from public.item_quotes where item_id=$1", [item])).rows[0].c).toBe(6);
+      expect((await rpc(w.seller1, "select * from public.item_costs where item_id=$1", [item])).rowCount).toBe(0);
+    });
+
+    it("las cotizaciones anteriores sin cantidad siguen siendo validas (la regla solo aplica a filas nuevas)", async () => {
+      const r = await as("postgres", (qq) => qq("select convalidated from pg_constraint where conname='item_quotes_compra_min_cantidad_ge1_check'"));
+      expect(r.rows[0].convalidated).toBe(false);
+    });
+
+    it("save_pdf_minimos: solo el vendedor dueno; decisiones validas; por revision y con bitacora", async () => {
+      const { request, item } = await newQuotedItem(w, "Producto decision");
+      const other = await newQuotedItem(w, "Otra solicitud min");
+      const save = (who: typeof w.seller1, items: unknown) => rpc(who, "select public.save_pdf_minimos($1,$2::jsonb) as n", [request, JSON.stringify(items)]);
+      expect((await save(w.seller1, [{ item_id: item, decision: "cotizar_minimo" }])).rows[0].n).toBe(1);
+      expect(await failure(save(w.seller1, [{ item_id: item, decision: "otra" }]))).toMatch(/Elige cotizar/);
+      expect(await failure(save(w.seller1, [{ item_id: item }]))).toMatch(/Elige cotizar/);
+      expect(await failure(save(w.seller1, [{ item_id: other.item, decision: "mantener_pedida" }]))).toMatch(/no pertenece/);
+      expect(await failure(save(w.seller2, [{ item_id: item, decision: "mantener_pedida" }]))).toMatch(/No autorizado/);
+      expect(await failure(save(w.buyer1, [{ item_id: item, decision: "mantener_pedida" }]))).toMatch(/No autorizado/);
+      await save(w.seller1, [{ item_id: item, decision: "mantener_pedida" }]);
+      const rows = (await rpc(w.seller1, "select revision, decision from public.quote_pdf_min_choices where request_id=$1", [request])).rows;
+      expect(rows).toEqual([{ revision: 1, decision: "mantener_pedida" }]);
+      expect(await failure(rpc(w.seller1, "insert into public.quote_pdf_min_choices (request_id, revision, item_id, decision, updated_by) values ($1,1,$2,'cotizar_minimo',$3)", [request, item, w.ids.s1]))).toMatch(/permission denied|row-level security/);
+      expect((await rpc(w.buyer1, "select 1 from public.quote_pdf_min_choices where request_id=$1", [request])).rowCount).toBe(1);
+      const log = (await as("postgres", (qq) => qq("select count(*)::int n from public.audit_log where entity='quote_pdf_min_choices'"))).rows[0];
+      expect(log.n).toBeGreaterThanOrEqual(2);
+    });
+  });
+
   describe("PDF y datos del cliente", () => {
     it("save_draft guarda atencion y destino_entrega", async () => {
       const rid = randomUUID(); const iid = randomUUID();

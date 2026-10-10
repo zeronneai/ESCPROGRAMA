@@ -66,3 +66,11 @@ alter table public.item_quotes enable trigger item_quotes_locked;
 34. **C:** en Historial busca "tamales". **Esperado:** encuentra la cotización; si tuvo alternativo muestra "Solicitado: ... Cotizado: ...". **V:** en "Mis solicitudes" busca "tamales" y encuentra la partida.
 35. **C:** marca otra partida como "No encontrada" mencionando un sustituto en la nota. **Esperado:** el vendedor ve esa nota en la partida.
 
+## Compra mínima y Atención (migración 0015)
+
+36. **C:** cotiza una partida. **Esperado:** el formulario trae "Compra mínima: cantidad" en 1 y la unidad de la partida, con la ayuda "Si no hay mínimo, deja 1". Con 0, vacío o 0.5 no deja guardar.
+37. **V:** abre la partida cotizada con mínimo 10 caja y cantidad pedida 4 caja. **Esperado:** ve "Compra mínima: 10 caja" junto a los precios y la etiqueta "Cantidad pedida (4 caja) menor al mínimo (10 caja)" en la partida y en la lista.
+38. **V:** en "Datos del PDF" aparece el aviso para esa partida. Sin elegir, **Descargar PDF** queda bloqueado y dice por qué. Elige "Cotizar a la cantidad mínima": el PDF muestra CANT 10 caja y el total sobre 10. Elige "Mantener la cantidad pedida": CANT 4 caja, total sobre 4 y la franja amarilla con "Minimum purchase: 10 caja (nombre)".
+39. **V:** si todas las partidas tienen mínimo 1, el PDF no lleva franja amarilla. "Copiar tabla de precios" incluye "Compra minima" solo cuando es mayor a 1.
+40. **V:** captura "Atención" al crear la solicitud (campo opcional) y descarga el PDF: aparece "Atención: ..." debajo de "Empresa". En una solicitud sin Atención, complétala en "Datos del PDF" antes de descargar; si queda vacía, la fila no sale.
+

@@ -69,12 +69,21 @@ describe("parseQuoteForm", () => {
     expect(r.ok).toBe(false);
     expect(!r.ok && Object.keys(r.errors)).toEqual(expect.arrayContaining(["costo", "entregaDias"]));
   });
-  it("entrega por fecha y compra minima por monto", () => {
-    const r = parseQuoteForm({ ...base, entregaModo: "fecha", entregaFecha: "2026-05-01", minModo: "monto", minMonto: "1500" });
-    expect(r).toMatchObject({ ok: true, value: { entrega: { fecha: "2026-05-01", dias: null }, compra_min: { monto: 1500 } } });
+  it("entrega por fecha y monto minimo adicional opcional", () => {
+    const r = parseQuoteForm({ ...base, entregaModo: "fecha", entregaFecha: "2026-05-01", minMonto: "1500" });
+    expect(r).toMatchObject({ ok: true, value: { entrega: { fecha: "2026-05-01", dias: null }, compra_min: { cantidad: 1, unidad: "pieza", monto: 1500 } } });
   });
-  it("compra minima por cantidad exige unidad valida", () => {
-    expect(parseQuoteForm({ ...base, minModo: "cantidad", minCantidad: "10", minUnidad: "x" }).ok).toBe(false);
+  it("compra minima OBLIGATORIA: por defecto 1 pieza; vacia, menor a 1 o con unidad invalida no pasa", () => {
+    expect(emptyQuoteForm.minCantidad).toBe("1");
+    expect(parseQuoteForm(base)).toMatchObject({ ok: true, value: { compra_min: { cantidad: 1, unidad: "pieza", monto: null } } });
+    expect(parseQuoteForm({ ...base, minCantidad: "10", minUnidad: "caja" })).toMatchObject({ ok: true, value: { compra_min: { cantidad: 10, unidad: "caja" } } });
+    for (const minCantidad of ["", "0", "0.5", "-2", "abc"]) {
+      const r = parseQuoteForm({ ...base, minCantidad });
+      expect(r.ok, minCantidad).toBe(false);
+      expect(!r.ok && r.errors.minCantidad).toBeTruthy();
+    }
+    expect(parseQuoteForm({ ...base, minCantidad: "10", minUnidad: "x" }).ok).toBe(false);
+    expect(parseQuoteForm({ ...base, minMonto: "0" }).ok).toBe(false);
   });
   it("nota de no encontrada es obligatoria", () => {
     expect(parseNotFoundNote("   ").ok).toBe(false);
