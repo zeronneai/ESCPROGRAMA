@@ -126,6 +126,7 @@ const companySchema = z.object({
   rfc: z.string().trim().min(1, "Falta el RFC").max(60),
   condiciones_default: z.string().trim().min(1, "Falta la condición por defecto").max(120),
   pie: z.string().max(1000),
+  leyenda_envio: z.string().trim().min(1, "Falta la leyenda de envío").max(300),
 });
 export type CompanyInput = z.infer<typeof companySchema>;
 
@@ -134,12 +135,12 @@ export async function saveCompanyAction(input: CompanyInput): Promise<Result> {
   const u = await requireBuyer();
   const parsed = companySchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const { pie, ...rest } = parsed.data;
+  const { pie, leyenda_envio, ...rest } = parsed.data;
   const lines = pie.split("\n").map((l) => l.trim()).filter(Boolean);
   const supabase = await createClient();
   const { error } = await supabase
     .from("company_profile")
-    .update({ ...rest, pie_lineas: lines, updated_by: u.id, updated_at: new Date().toISOString() })
+    .update({ ...rest, pie_lineas: lines, leyenda_envio, updated_by: u.id, updated_at: new Date().toISOString() })
     .eq("id", true);
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/comprador/configuracion");

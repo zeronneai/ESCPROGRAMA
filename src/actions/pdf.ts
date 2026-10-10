@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
-import { parseShippingInput } from "@/lib/pdf/shipping";
+import { parseShippingPlan } from "@/lib/pdf/shipping";
 import { friendlyError } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Result } from "./requests";
@@ -31,15 +31,20 @@ const pdfSchema = z.object({
   via: z.string().trim().max(120),
   condiciones: z.string().trim().max(120),
   atencion: z.string().trim().max(200),
-  /** Costo de envio AL CLIENTE (opcional). Vacio o 0 = sin cargo. */
+  /** Envio al cliente (opcional): va dentro del precio unitario. */
+  envioModo: z.enum(["incluido", "por_unidad", "por_pedido", "por_partida"]),
   monto: z.string().max(30).optional(),
   moneda: z.enum(["MXN", "USD", ""]).optional(),
+  partidas: z
+    .array(z.object({ itemId: z.string().uuid(), monto: z.string().max(30), tipo: z.enum(["unidad", "total"]) }))
+    .max(200)
+    .optional(),
 });
 export type PdfDataInput = z.infer<typeof pdfSchema>;
 
 /**
- * Datos del PDF: destino, via, condiciones, atencion y costo de envio al cliente (por solicitud y
- * revision, con bitacora). El modo "incluido/aparte" de la base de datos se deriva del monto.
+ * Datos del PDF: destino, via, condiciones, atencion y envio al cliente (modo, monto, moneda y partidas), por
+ * solicitud y revision, con bitacora. El envio no cambia los 5 precios ni las respuestas del comprador.
  */
 export async function savePdfDataAction(input: PdfDataInput): Promise<Result> {
   await requireSeller();
@@ -48,25 +53,31 @@ export async function savePdfDataAction(input: PdfDataInput): Promise<Result> {
   const v = parsed.data;
   const supabase = await createClient();
 
-  // Monedas que usan las partidas cotizadas (para la moneda por defecto del envio).
-  const { data: items } = await supabase.from("quote_items").select("item_quotes(version, moneda)").eq("request_id", v.requestId);
+  // Monedas y partidas de la solicitud (para la moneda por defecto y para validar las partidas).
+  const { data: items } = await supabase.from("quote_items").select("id, item_quotes(version, moneda)").eq("request_id", v.requestId);
   const currencies = new Set<"MXN" | "USD">();
-  for (const i of (items ?? []) as unknown as { item_quotes: { version: number; moneda: "MXN" | "USD" }[] }[]) {
+  const itemIds: string[] = [];
+  for (const i of (items ?? []) as unknown as { id: string; item_quotes: { version: number; moneda: "MXN" | "USD" }[] }[]) {
+    itemIds.push(i.id);
     const last = [...(i.item_quotes ?? [])].sort((a, b) => b.version - a.version)[0];
     if (last) currencies.add(last.moneda);
   }
-  const ship = parseShippingInput({ monto: v.monto, moneda: v.moneda }, (["MXN", "USD"] as const).filter((c) => currencies.has(c)));
+  const ship = parseShippingPlan(
+    { modo: v.envioModo, monto: v.monto, moneda: v.moneda, partidas: v.partidas },
+    { currencies: (["MXN", "USD"] as const).filter((c) => currencies.has(c)), itemIds },
+  );
   if (!ship.ok) return { ok: false, error: ship.error };
 
-  const { error } = await supabase.rpc("save_pdf_data", {
+  const { error } = await supabase.rpc("save_pdf_envio", {
     p_request: v.requestId,
     p_destino: v.destino || null,
     p_via: v.via || null,
     p_condiciones: v.condiciones || null,
     p_atencion: v.atencion || null,
-    p_modo: ship.monto ? "aparte" : "incluido",
-    p_monto: ship.monto,
-    p_moneda: ship.moneda,
+    p_modo: ship.db.modo,
+    p_monto: ship.db.monto,
+    p_moneda: ship.db.moneda,
+    p_items: ship.db.partidas,
   });
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath(`/vendedor/solicitudes/${v.requestId}`);

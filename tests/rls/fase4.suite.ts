@@ -280,7 +280,7 @@ export function fase4Suite() {
       expect(r).toEqual({ atencion: "Ing. Perez", destino_entrega: "Cd. Juarez, planta Pegatron" });
     });
 
-    it("save_pdf_data: modos incluido/aparte, revision = version mas alta, solo el vendedor dueno", async () => {
+    it("save_pdf_data (funcion anterior): aparte equivale a por_pedido, revision = version mas alta, solo el vendedor dueno", async () => {
       const { request } = await newQuotedItem(w, "Producto PDF");
       expect(await failure(rpc(w.seller1, "select public.save_pdf_data($1,'Destino','Parcel','Credito','Ing',$2,null,null)", [request, "aparte"]))).toMatch(/monto y la moneda/);
       const rev = await rpc(w.seller1, "select public.save_pdf_data($1,'Cd. Juarez','Flete','Contado','Ing. Perez','aparte',350,'MXN') as rev", [request]);
@@ -288,10 +288,59 @@ export function fase4Suite() {
       await rpc(w.seller1, "select public.save_pdf_data($1,'Cd. Juarez','Flete','Contado','Ing. Perez','incluido',null,null)", [request]);
       const d = (await rpc(w.seller1, "select envio_modo, envio_monto, condiciones from public.quote_pdf_data where request_id=$1", [request])).rows;
       expect(d).toEqual([{ envio_modo: "incluido", envio_monto: null, condiciones: "Contado" }]);
+      await rpc(w.seller1, "select public.save_pdf_data($1,'Cd. Juarez','Flete','Contado','Ing. Perez','aparte',350,'MXN')", [request]);
+      const conv = (await rpc(w.seller1, "select envio_modo, envio_monto::float m, envio_moneda from public.quote_pdf_data where request_id=$1", [request])).rows;
+      expect(conv).toEqual([{ envio_modo: "por_pedido", m: 350, envio_moneda: "MXN" }]);
+      await rpc(w.seller1, "select public.save_pdf_data($1,'Cd. Juarez','Flete','Contado','Ing. Perez','incluido',null,null)", [request]);
       expect(await failure(rpc(w.seller2, "select public.save_pdf_data($1,'x','x','x','x','incluido',null,null)", [request]))).toMatch(/No autorizado/);
       expect(await failure(rpc(w.buyer1, "select public.save_pdf_data($1,'x','x','x','x','incluido',null,null)", [request]))).toMatch(/No autorizado/);
       const log = (await as("postgres", (q) => q("select count(*)::int n from public.audit_log where entity='quote_pdf_data'"))).rows[0];
       expect(log.n).toBeGreaterThanOrEqual(2);
+    });
+
+    it("save_pdf_envio: modos por unidad, por pedido y por partida; revision y permisos", async () => {
+      const { request, item } = await newQuotedItem(w, "Producto envio");
+      const call = (who: typeof w.seller1, args: unknown[]) =>
+        rpc(who, "select public.save_pdf_envio($1,'Cd. Juarez','Flete','Credito','Ing',$2,$3,$4,$5::jsonb) as rev", [request, ...args]);
+      expect(await failure(call(w.seller1, ["por_pedido", null, null, null]))).toMatch(/monto y la moneda/);
+      expect(await failure(call(w.seller1, ["raro", 1, "MXN", null]))).toMatch(/Modo de envio invalido/);
+      expect(await failure(call(w.seller1, ["por_partida", null, "MXN", "[]"]))).toMatch(/al menos una partida/);
+      expect(await failure(call(w.seller1, ["por_partida", null, "MXN", JSON.stringify([{ item_id: randomUUID(), monto: 5, tipo: "total" }])]))).toMatch(/no pertenece/);
+      expect(await failure(call(w.seller1, ["por_partida", null, "MXN", JSON.stringify([{ item_id: item, monto: 5, tipo: "otro" }])]))).toMatch(/por unidad o total/);
+
+      expect((await call(w.seller1, ["por_unidad", 50, "MXN", null])).rows[0].rev).toBe(1);
+      let d = (await rpc(w.seller1, "select envio_modo, envio_monto::float m, envio_moneda from public.quote_pdf_data where request_id=$1", [request])).rows;
+      expect(d).toEqual([{ envio_modo: "por_unidad", m: 50, envio_moneda: "MXN" }]);
+
+      await call(w.seller1, ["por_pedido", 100, "USD", null]);
+      await call(w.seller1, ["por_partida", null, "MXN", JSON.stringify([{ item_id: item, monto: 120, tipo: "total" }])]);
+      d = (await rpc(w.seller1, "select envio_modo, envio_monto, envio_moneda from public.quote_pdf_data where request_id=$1", [request])).rows;
+      expect(d).toEqual([{ envio_modo: "por_partida", envio_monto: null, envio_moneda: "MXN" }]);
+      const si = (await rpc(w.seller1, "select item_id, monto::float m, tipo from public.quote_pdf_shipping_items where request_id=$1", [request])).rows;
+      expect(si).toEqual([{ item_id: item, m: 120, tipo: "total" }]);
+
+      // Volver a otro modo limpia los montos por partida; sin envio no guarda moneda ni monto.
+      await call(w.seller1, ["incluido", null, null, null]);
+      expect((await rpc(w.seller1, "select 1 from public.quote_pdf_shipping_items where request_id=$1", [request])).rowCount).toBe(0);
+      d = (await rpc(w.seller1, "select envio_modo, envio_monto, envio_moneda from public.quote_pdf_data where request_id=$1", [request])).rows;
+      expect(d).toEqual([{ envio_modo: "incluido", envio_monto: null, envio_moneda: null }]);
+
+      // Otro vendedor o el comprador no pueden guardar; el comprador si puede leer.
+      expect(await failure(call(w.seller2, ["incluido", null, null, null]))).toMatch(/No autorizado/);
+      expect(await failure(call(w.buyer1, ["incluido", null, null, null]))).toMatch(/No autorizado/);
+      expect((await rpc(w.buyer1, "select 1 from public.quote_pdf_data where request_id=$1", [request])).rowCount).toBe(1);
+      // Sin escritura directa a la tabla de montos por partida.
+      expect(await failure(rpc(w.seller1, "insert into public.quote_pdf_shipping_items (request_id, revision, item_id, monto, tipo, updated_by) values ($1,1,$2,1,'total',$3)", [request, item, w.ids.s1]))).toMatch(/permission denied/);
+      // Bitacora de los montos por partida.
+      const log = (await as("postgres", (q) => q("select count(*)::int n from public.audit_log where entity='quote_pdf_shipping_items'"))).rows[0];
+      expect(log.n).toBeGreaterThanOrEqual(2);
+    });
+
+    it("leyenda_envio: valor por defecto y edicion solo del comprador", async () => {
+      const l = (await rpc(w.seller1, "select leyenda_envio from public.company_profile")).rows[0].leyenda_envio;
+      expect(l).toContain("{destino}");
+      expect((await rpc(w.seller1, "update public.company_profile set leyenda_envio='x'")).rowCount).toBe(0);
+      expect((await rpc(w.buyer1, "update public.company_profile set leyenda_envio=$1, updated_by=$2", [l, w.ids.b1])).rowCount).toBe(1);
     });
 
     it("company_profile: lectura para todos, edicion solo del comprador; download_pdf se registra", async () => {

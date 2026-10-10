@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/auth/guards";
 import { buildPdfModel, PdfNotReadyError, pdfFileName, toPdfQuote } from "@/lib/pdf/model";
+import { planFromStored } from "@/lib/pdf/shipping";
 import { renderQuotePdf } from "@/lib/pdf/render";
 import { getBusinessSettings, getCompanyProfile } from "@/lib/quotes/server";
 import { requestRevision } from "@/lib/quotes/revisions";
@@ -42,10 +43,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ req
   const revision = requestRevision(rows);
   const { data: pdfData } = await supabase
     .from("quote_pdf_data")
-    .select("destino_entrega, via_envio, condiciones, atencion, envio_monto, envio_moneda")
+    .select("destino_entrega, via_envio, condiciones, atencion, envio_modo, envio_monto, envio_moneda")
     .eq("request_id", requestId)
     .eq("revision", revision)
     .maybeSingle();
+  const { data: shipItems } = await supabase
+    .from("quote_pdf_shipping_items")
+    .select("item_id, monto, tipo")
+    .eq("request_id", requestId)
+    .eq("revision", revision);
 
   try {
     const model = buildPdfModel({
@@ -57,6 +63,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ req
         .map((i) => ({ i, q: latestQuote(i) }))
         .filter(({ q }) => !!q)
         .map(({ i, q }) => ({
+          id: i.id,
           folio: i.folio!,
           producto: i.producto,
           descripcion: i.descripcion,
@@ -71,8 +78,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ req
         atencion: pdfData?.atencion ?? req.atencion ?? null,
         destino_entrega: pdfData?.destino_entrega ?? req.destino_entrega ?? null,
         via_envio: pdfData?.via_envio ?? null,
-        envio_monto: pdfData?.envio_monto ?? null,
-        envio_moneda: (pdfData?.envio_moneda as "MXN" | "USD" | null | undefined) ?? null,
+        envio: planFromStored(pdfData, shipItems ?? []),
       },
       now: new Date(),
       timezone: cfg.timezone,

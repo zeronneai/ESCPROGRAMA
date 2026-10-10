@@ -2,6 +2,8 @@ import Decimal from "decimal.js";
 import { DateTime } from "luxon";
 import { formatMinPurchase } from "@/lib/format/quote-text";
 import { isVigenciaVencida, requestRevision, revisionFolio } from "@/lib/quotes/revisions";
+import { allocateShipping, NO_SHIPPING, totalsByCurrency, type AllocResult, type ShippingPlan } from "@/lib/pricing/shipping-allocation";
+import { renderShippingLegend } from "./shipping";
 import type { QuoteRow } from "@/lib/quotes/types";
 
 /**
@@ -20,9 +22,13 @@ export interface PdfCompany {
   direccion: string;
   rfc: string;
   pie_lineas: string[];
+  /** Plantilla de la leyenda de envio del pie (usa {destino} y {via}); editable en Configuracion. */
+  leyenda_envio?: string | null;
 }
 
 export interface PdfItemInput {
+  /** Id de la partida (para el envio por partida). */
+  id: string;
   folio: string;
   producto: string;
   descripcion: string;
@@ -72,9 +78,8 @@ export interface PdfInput {
     atencion: string | null;
     destino_entrega: string | null;
     via_envio: string | null;
-    /** Costo de envio AL CLIENTE (flete de ESC al destino). Vacio o 0 = sin cargo. No es el costo del proveedor. */
-    envio_monto: number | string | null;
-    envio_moneda: "MXN" | "USD" | null;
+    /** Envio al cliente DENTRO del precio unitario (nunca se muestra como renglon ni desglose). */
+    envio: ShippingPlan;
   };
   now: Date;
   timezone: string;
@@ -153,55 +158,54 @@ export function itemCurrencies(items: Array<{ quote: { moneda: Cur } | null }>):
   return (["MXN", "USD"] as const).filter((c) => set.has(c));
 }
 
+export interface OrderLinePreview {
+  incremento: string;
+  precioUnitario: string;
+  importe: string;
+  envio: string;
+}
+
+export interface OrderPreview {
+  /** Por id de partida (solo las que ya tienen precio elegido). */
+  lines: Record<string, OrderLinePreview>;
+  /** Total por moneda (suma de los importes). Nunca mezcla pesos y dolares. */
+  perCurrency: { currency: PdfCurrency; total: string; envio: string }[];
+  /** Envio repartido en los precios (sumado de todas las monedas), o null si no hay. */
+  envioIncluido: string | null;
+  /** Monedas con envio repartido (para el texto neutral "Envio incluido en precios"). */
+  envioPorMoneda: { currency: PdfCurrency; amount: string }[];
+}
+
+const toLine = (r: AllocResult): OrderLinePreview => ({
+  incremento: formatMoney(r.incremento),
+  precioUnitario: formatMoney(r.precioUnitario),
+  importe: formatMoney(r.importe),
+  envio: formatMoney(r.envio),
+});
+
 /**
- * Moneda del costo de envio al cliente: la elegida; si no hay y las partidas usan una sola moneda,
- * esa; si la solicitud mezcla pesos y dolares el vendedor debe elegirla.
+ * Importes por partida y total por moneda con el envio ya incluido en el precio unitario.
+ * Solo usa el precio ELEGIDO (nunca los otros 4 precios) y solo cuenta partidas con precio elegido.
+ * Lo usan el PDF y la vista previa del panel, para que coincidan siempre.
  */
-export function resolveShippingCurrency(
-  currencies: Cur[],
-  monto: number | string | null | undefined,
-  moneda: Cur | null | undefined,
-): { moneda: Cur | null; problem: string | null } {
-  const amount = monto === null || monto === undefined || monto === "" ? 0 : Number(monto);
-  if (!(amount > 0)) return { moneda: null, problem: null };
-  if (moneda) return { moneda, problem: null };
-  if (currencies.length === 1) return { moneda: currencies[0], problem: null };
-  return { moneda: null, problem: "Elige la moneda del costo de envío al cliente (la solicitud mezcla pesos y dólares)" };
-}
-
-export interface CurrencyTotal {
-  currency: PdfCurrency;
-  subtotal: string;
-  shipping: string | null;
-  total: string;
-}
-
-/** Subtotal, envio al cliente y total por moneda (nunca mezcla pesos y dolares). Solo cuenta partidas con precio elegido. */
-export function previewTotals(
-  items: Array<{ cantidad: number | string | null; precioElegido: number | null; quote: PdfItemInput["quote"] | null }>,
-  envio: { monto: number | string | null | undefined; moneda: Cur | null | undefined },
-): { perCurrency: CurrencyTotal[]; problem: string | null } {
-  const sub = new Map<PdfCurrency, Decimal>();
-  for (const i of items) {
-    if (!i.quote) continue;
+export function computeOrder(
+  items: Array<{ id: string; cantidad: number | string | null; precioElegido: number | null; quote: PdfItemInput["quote"] | null }>,
+  plan: ShippingPlan = NO_SHIPPING,
+): OrderPreview {
+  const alloc = items.flatMap((i) => {
+    if (!i.quote) return [];
     const unit = pick(i.quote, i.precioElegido);
-    if (!unit) continue;
-    const qty = i.cantidad !== null && i.cantidad !== "" && Number(i.cantidad) > 0 ? new Decimal(i.cantidad) : new Decimal(1);
-    const c = CURRENCY[i.quote.moneda];
-    sub.set(c, (sub.get(c) ?? new Decimal(0)).plus(unit.times(qty).toDecimalPlaces(2, Decimal.ROUND_HALF_UP)));
-  }
-  const { moneda, problem } = resolveShippingCurrency(itemCurrencies(items), envio.monto, envio.moneda);
-  const ship = moneda ? new Decimal(envio.monto as string | number) : null;
-  const shipCur = moneda ? CURRENCY[moneda] : null;
-  if (ship && shipCur && !sub.has(shipCur)) sub.set(shipCur, new Decimal(0));
-  const perCurrency = (["PESOS", "DOLARES"] as const)
-    .filter((c) => sub.has(c))
-    .map((c) => {
-      const subtotal = sub.get(c)!;
-      const shipping = shipCur === c && ship ? ship : null;
-      return { currency: c, subtotal: formatMoney(subtotal), shipping: shipping ? formatMoney(shipping) : null, total: formatMoney(subtotal.plus(shipping ?? 0)) };
-    });
-  return { perCurrency, problem };
+    return unit ? [{ id: i.id, moneda: i.quote.moneda, cantidad: i.cantidad, precioElegido: unit }] : [];
+  });
+  const r = allocateShipping(alloc, plan);
+  const totals = totalsByCurrency(r.lines);
+  const envioPorMoneda = totals.filter((t) => t.envio.greaterThan(0)).map((t) => ({ currency: CURRENCY[t.moneda], amount: formatMoney(t.envio) }));
+  return {
+    lines: Object.fromEntries(r.lines.map((l) => [l.id, toLine(l)])),
+    perCurrency: totals.map((t) => ({ currency: CURRENCY[t.moneda], total: formatMoney(t.total), envio: formatMoney(t.envio) })),
+    envioIncluido: r.repartido.greaterThan(0) ? formatMoney(r.repartido) : null,
+    envioPorMoneda,
+  };
 }
 
 export function buildPdfModel(input: PdfInput): PdfModel {
@@ -210,48 +214,25 @@ export function buildPdfModel(input: PdfInput): PdfModel {
   const problems = pdfProblems(items, input.now);
   if (problems.length) throw new PdfNotReadyError(problems);
 
-  const rows: PdfRow[] = [];
-  const totals = new Map<PdfCurrency, Decimal>();
-  const add = (c: PdfCurrency, v: Decimal) => totals.set(c, (totals.get(c) ?? new Decimal(0)).plus(v));
-
-  for (const i of items) {
-    const unit = pick(i.quote, i.precioElegido)!;
+  const order = computeOrder(items, input.data.envio);
+  const rows: PdfRow[] = items.map((i) => {
+    const l = order.lines[i.id];
     const qty = i.cantidad !== null && i.cantidad !== "" && Number(i.cantidad) > 0 ? new Decimal(i.cantidad) : null;
-    const line = unit.times(qty ?? 1);
-    const currency = CURRENCY[i.quote.moneda];
-    add(currency, line.toDecimalPlaces(2, Decimal.ROUND_HALF_UP));
     const cant = [qty ? `${qty.toString()}${i.unidad ? ` ${i.unidad}` : ""}` : "", i.talla ? `Talla ${i.talla}` : ""].filter(Boolean).join(" / ");
-    rows.push({
+    return {
       te: pdfDelivery(i.quote),
       nombre: i.producto,
       descripcion: i.descripcion,
       cant: cant || "1",
-      currency,
-      uPrice: formatMoney(unit),
-      price: formatMoney(line),
-    });
-  }
-
+      currency: CURRENCY[i.quote.moneda],
+      // El envio ya va dentro del precio unitario: el PDF solo muestra el costo final.
+      uPrice: l.precioUnitario,
+      price: l.importe,
+    };
+  });
   const d = input.data;
   const destino = d.destino_entrega?.trim() || null;
   const via = d.via_envio?.trim() || null;
-  const ship = resolveShippingCurrency(itemCurrencies(items), d.envio_monto, d.envio_moneda);
-  if (ship.problem) throw new PdfNotReadyError([ship.problem]);
-  const hasShippingCharge = !!ship.moneda;
-  if (hasShippingCharge) {
-    const monto = new Decimal(d.envio_monto as string | number);
-    const currency = CURRENCY[ship.moneda!];
-    add(currency, monto);
-    rows.push({
-      te: "",
-      nombre: `Shipping${destino ? ` to ${destino}` : ""}${via ? ` via ${via}` : ""}`,
-      descripcion: "",
-      cant: "1",
-      currency,
-      uPrice: formatMoney(monto),
-      price: formatMoney(monto),
-    });
-  }
 
   const mins = items
     .map((i) => ({ producto: i.producto, value: formatMinPurchase({ ...i.quote, moneda: i.quote.moneda }) }))
@@ -260,9 +241,9 @@ export function buildPdfModel(input: PdfInput): PdfModel {
   const minimumPurchase = mins.length === 0 ? null : distinct.length === 1 ? distinct[0] : mins.map((m) => `${m.producto}: ${m.value}`).join("; ");
 
   const footer = [...input.company.pie_lineas];
-  if (!hasShippingCharge && destino) {
-    footer.push(`Prices include shipping charges to your plant in ${destino}${via ? `, via ${via}` : ""}`);
-  }
+  // Leyenda de envio (editable en Configuracion): siempre que haya destino capturado.
+  const legend = renderShippingLegend(input.company.leyenda_envio, destino, via);
+  if (legend) footer.push(legend);
 
   const valids = items.map((i) => i.quote.valid_until).filter((v): v is string => !!v).sort();
   const rev = requestRevision(items.map((i) => ({ item_quotes: [{ version: i.quote.version }] })));
@@ -284,9 +265,7 @@ export function buildPdfModel(input: PdfInput): PdfModel {
     empresa: input.customerName,
     atencion: d.atencion?.trim() || null,
     rows,
-    totals: (["PESOS", "DOLARES"] as const)
-      .filter((c) => totals.has(c))
-      .map((c) => ({ currency: c, amount: formatMoney(totals.get(c)!) })),
+    totals: order.perCurrency.map((t) => ({ currency: t.currency, amount: t.total })),
     minimumPurchase,
     footer,
   };
