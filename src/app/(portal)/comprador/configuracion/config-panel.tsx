@@ -36,7 +36,7 @@ export function ConfigPanel(props: {
   const [company, setCompany] = useState({
     nombre_comercial: props.company.nombre_comercial, razon_social: props.company.razon_social, telefono: props.company.telefono,
     web: props.company.web, direccion: props.company.direccion, rfc: props.company.rfc,
-    condiciones_default: props.company.condiciones_default, pie: props.company.pie_lineas.join("\n"),
+    condiciones_default: props.company.condiciones_default, pie: props.company.pie_lineas.join("\n"), leyenda_envio: props.company.leyenda_envio,
   });
   const [holiday, setHoliday] = useState({ fecha: "", descripcion: "" });
 
@@ -146,6 +146,9 @@ export function ConfigPanel(props: {
         </div>
         <Field label="Leyendas del pie (una por línea)">
           <textarea value={company.pie} onChange={(e) => setCompany({ ...company, pie: e.target.value })} rows={3} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+        </Field>
+        <Field label="Leyenda de envío del pie (usa {destino} y {via}; solo se imprime si el vendedor captura un destino)">
+          <Input value={company.leyenda_envio} onChange={(e) => setCompany({ ...company, leyenda_envio: e.target.value })} />
         </Field>
         <Button disabled={pending} onClick={() => run(() => saveCompanyAction(company), "Datos de la empresa guardados")}>Guardar datos del PDF</Button>
       </Card>

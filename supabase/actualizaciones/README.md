@@ -22,7 +22,6 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 5 | `0010_aclaraciones.sql` | Mini chat por partida, pausa del reloj y bucket `aclaraciones`. |
 | 6 | `0011_pdf_y_cliente.sql` | Datos del PDF, precio elegido guardado, atencion y destino. |
 | 7 | `0012_abastecimiento.sql` | "Donde conseguirlo" y vista "Por comprar" (solo comprador). |
-
-El ajuste del costo de envio al cliente y de la nota "Precios sin IVA" **no agrega archivos nuevos**: usa las mismas columnas de `quote_pdf_data` (monto y moneda) y deriva el modo del monto.
+| 8 | `0013_envio_modos.sql` | Envio al cliente dentro del precio unitario (por unidad, por pedido, por partida) y leyenda de envio editable. El envio ya guardado pasa a "por todo el pedido". |
 
 Si una ejecucion falla, **no sigas con la siguiente**: copia el mensaje de error y mandamelo.

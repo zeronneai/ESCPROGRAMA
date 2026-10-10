@@ -3,8 +3,8 @@ import path from "node:path";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createElement } from "react";
 import { describe, expect, it } from "vitest";
-import { buildPdfModel, COLUMN_HEADERS, itemCurrencies, pdfFileName, pdfProblems, PdfNotReadyError, previewTotals, resolveShippingCurrency, type PdfInput, type PdfItemInput } from "@/lib/pdf/model";
-import { parseShippingInput } from "@/lib/pdf/shipping";
+import { buildPdfModel, COLUMN_HEADERS, computeOrder, pdfFileName, pdfProblems, PdfNotReadyError, type PdfInput, type PdfItemInput } from "@/lib/pdf/model";
+import { NO_SHIPPING, type ShippingPlan } from "@/lib/pricing/shipping-allocation";
 import { QuoteDocument } from "@/lib/pdf/quote-template";
 
 const company = {
@@ -21,14 +21,14 @@ const quote = (over: Partial<PdfItemInput["quote"]> = {}): PdfItemInput["quote"]
 });
 
 const item = (over: Partial<PdfItemInput> = {}): PdfItemInput => ({
-  folio: "COT-2026-0001-01", producto: "Guante de carnaza", descripcion: "Para soldador, largo", cantidad: 10, unidad: "par", talla: null,
+  id: over.folio ?? "i1", folio: "COT-2026-0001-01", producto: "Guante de carnaza", descripcion: "Para soldador, largo", cantidad: 10, unidad: "par", talla: null,
   quote: quote(), precioElegido: 3, ...over,
 });
 
 const base = (over: Partial<PdfInput> = {}): PdfInput => ({
   company, folio: "COT-2026-0001", customerName: "Pegatron Mexico", vendedorNombre: "Ana Lopez", items: [item()],
   data: { condiciones: "Credito", atencion: "Ing. Perez", destino_entrega: "Cd. Juarez, planta Pegatron", via_envio: "Parcel",
-          envio_monto: null, envio_moneda: null },
+          envio: NO_SHIPPING },
   now: new Date("2026-03-17T18:00:00Z"), timezone: "America/Chihuahua", ...over,
 });
 
@@ -83,71 +83,88 @@ describe("modelo del PDF", () => {
     ]);
   });
 
-  const withShipping = (monto: number | string | null, moneda: "MXN" | "USD" | null, over: Partial<PdfInput["data"]> = {}) =>
-    base({ data: { ...base().data, envio_monto: monto, envio_moneda: moneda, ...over } });
-  const INCLUDE = "Prices include shipping charges to your plant in Cd. Juarez, planta Pegatron, via Parcel";
+  // ---- Envio dentro del precio unitario -------------------------------------------------------------
+  const ship = (envio: ShippingPlan, items: PdfItemInput[], over: Partial<PdfInput["data"]> = {}) =>
+    buildPdfModel(base({ items, data: { ...base().data, envio, ...over } }));
+  const caja = (over: Partial<PdfItemInput> = {}) => item({ cantidad: 2, unidad: "caja", ...over });
 
-  it("envio mayor a 0: renglon Shipping to <destino> via <via>, suma al total de su moneda y SIN leyenda de incluido", () => {
-    const m = buildPdfModel(withShipping(350, "MXN"));
-    expect(m.rows.at(-1)).toMatchObject({ nombre: "Shipping to Cd. Juarez, planta Pegatron via Parcel", cant: "1", uPrice: "$350.00", price: "$350.00", currency: "PESOS", te: "" });
-    expect(m.totals).toEqual([{ currency: "PESOS", amount: "$33,683.30" }]);
-    expect(m.footer).toEqual(["16% VAT will be added to the invoice", "Prices subject to change"]);
-    expect(m.footer.some((l) => l.includes("Prices include shipping"))).toBe(false);
-  });
-
-  it("envio vacio o 0 CON destino: leyenda de incluido en el pie y sin renglon de envio", () => {
-    for (const monto of [null, 0, "", "0"]) {
-      const m = buildPdfModel(withShipping(monto, null));
-      expect(m.rows).toHaveLength(1);
-      expect(m.footer.at(-1)).toBe(INCLUDE);
-      expect(m.totals).toEqual([{ currency: "PESOS", amount: "$33,333.30" }]);
-    }
-  });
-
-  it("envio vacio SIN destino: ninguna linea de envio (ni renglon ni leyenda)", () => {
-    const m = buildPdfModel(withShipping(null, null, { destino_entrega: null }));
+  it("2 cajas con 100 por todo el pedido: cada caja +50 y la partida +100; sin renglon de envio", () => {
+    const m = ship({ modo: "por_pedido", monto: 100, moneda: "MXN" }, [caja()]);
     expect(m.rows).toHaveLength(1);
-    expect(m.footer).toEqual(["16% VAT will be added to the invoice", "Prices subject to change"]);
-    const vacio = buildPdfModel(withShipping(null, null, { destino_entrega: "   " }));
-    expect(vacio.footer).toHaveLength(2);
+    expect(m.rows[0]).toMatchObject({ cant: "2 caja", uPrice: "$3,383.33", price: "$6,766.66" });
+    expect(m.totals).toEqual([{ currency: "PESOS", amount: "$6,766.66" }]);
   });
 
-  it("sin via de envio: el renglon y la leyenda omiten la via", () => {
-    expect(buildPdfModel(withShipping(100, "MXN", { via_envio: null })).rows.at(-1)!.nombre).toBe("Shipping to Cd. Juarez, planta Pegatron");
-    expect(buildPdfModel(withShipping(null, null, { via_envio: null })).footer.at(-1)).toBe("Prices include shipping charges to your plant in Cd. Juarez, planta Pegatron");
-    expect(buildPdfModel(withShipping(100, "MXN", { via_envio: null, destino_entrega: null })).rows.at(-1)!.nombre).toBe("Shipping");
+  it("2 cajas con 50 por unidad: cada caja +50 y la partida +100", () => {
+    const m = ship({ modo: "por_unidad", monto: 50, moneda: "MXN" }, [caja()]);
+    expect(m.rows[0]).toMatchObject({ uPrice: "$3,383.33", price: "$6,766.66" });
   });
 
-  it("moneda del envio: por defecto la de las partidas si es una sola", () => {
-    const m = buildPdfModel(withShipping(40, null)); // partidas en pesos
-    expect(m.rows.at(-1)).toMatchObject({ currency: "PESOS", price: "$40.00" });
-    const usd = buildPdfModel(base({ items: [item({ quote: quote({ moneda: "USD" }) })], data: { ...base().data, envio_monto: 40, envio_moneda: null } }));
-    expect(usd.totals).toEqual([{ currency: "DOLARES", amount: "$33,373.30" }]);
+  it("varias partidas por todo el pedido: reparto proporcional a su importe", () => {
+    // A: 1 x 3,333.33 y B: 2 x 1,111.11 + ... importes 3,333.33 y 2,222.22; 55.55 se reparte 33.33 / 22.22
+    const m = ship({ modo: "por_pedido", monto: 55.55, moneda: "MXN" }, [
+      item({ folio: "A", cantidad: 1, unidad: "pieza" }),
+      item({ folio: "B", cantidad: 2, unidad: "pieza", precioElegido: 1 }),
+    ]);
+    expect(m.rows[0]).toMatchObject({ uPrice: "$3,366.66", price: "$3,366.66" });
+    expect(m.rows[1]).toMatchObject({ uPrice: "$1,122.22", price: "$2,244.44" });
   });
 
-  describe("solicitud con pesos y dolares", () => {
-    const mixed = (monto: number | null, moneda: "MXN" | "USD" | null) =>
-      base({
-        items: [item(), item({ folio: "x2", cantidad: 2, unidad: "pieza", precioElegido: 1, quote: quote({ moneda: "USD" }) })],
-        data: { ...base().data, envio_monto: monto, envio_moneda: moneda },
-      });
+  it("centavos con residuo: 100 entre tres partidas iguales sale 33.34 / 33.33 / 33.33", () => {
+    const m = ship({ modo: "por_pedido", monto: 100, moneda: "MXN" }, ["A", "B", "C"].map((f) => item({ folio: f, cantidad: 1, unidad: "pieza" })));
+    expect(m.rows.map((r) => r.price)).toEqual(["$3,366.67", "$3,366.66", "$3,366.66"]);
+    expect(m.totals).toEqual([{ currency: "PESOS", amount: "$10,099.99" }]);
+  });
 
-    it("sin elegir moneda el cargo de envio bloquea el PDF", () => {
-      expect(() => buildPdfModel(mixed(350, null))).toThrow(/Elige la moneda del costo de envío al cliente/);
-    });
-    it("el cargo se suma SOLO al total de la moneda elegida", () => {
-      expect(buildPdfModel(mixed(350, "USD")).totals).toEqual([
-        { currency: "PESOS", amount: "$33,333.30" },
-        { currency: "DOLARES", amount: "$2,572.22" }, // 2 x 1,111.11 + 350
-      ]);
-      expect(buildPdfModel(mixed(350, "MXN")).totals).toEqual([
-        { currency: "PESOS", amount: "$33,683.30" },
-        { currency: "DOLARES", amount: "$2,222.22" },
-      ]);
-    });
-    it("sin cargo no exige moneda", () => {
-      expect(buildPdfModel(mixed(null, null)).totals).toHaveLength(2);
-    });
+  it("por partida: total de la partida (se divide entre la cantidad) o por unidad", () => {
+    const m = ship({ modo: "por_partida", moneda: "MXN", partidas: { A: { monto: 120, tipo: "total" }, B: { monto: 5, tipo: "unidad" } } }, [
+      item({ folio: "A" }), // 10 par: 12 por par
+      item({ folio: "B", cantidad: 4, unidad: "pieza", precioElegido: 1 }),
+      item({ folio: "C", cantidad: 1, unidad: "pieza", precioElegido: 2 }), // sin envio: no cambia
+    ]);
+    expect(m.rows[0]).toMatchObject({ uPrice: "$3,345.33", price: "$33,453.30" });
+    expect(m.rows[1]).toMatchObject({ uPrice: "$1,116.11", price: "$4,464.44" });
+    expect(m.rows[2]).toMatchObject({ uPrice: "$2,222.22", price: "$2,222.22" });
+  });
+
+  it("solicitud en pesos y dolares: el envio solo afecta las partidas de la moneda elegida", () => {
+    const items = [item({ folio: "A" }), item({ folio: "B", cantidad: 2, unidad: "pieza", precioElegido: 1, quote: quote({ moneda: "USD" }) })];
+    const usd = ship({ modo: "por_pedido", monto: 100, moneda: "USD" }, items);
+    expect(usd.totals).toEqual([{ currency: "PESOS", amount: "$33,333.30" }, { currency: "DOLARES", amount: "$2,322.22" }]);
+    expect(usd.rows[1]).toMatchObject({ uPrice: "$1,161.11", price: "$2,322.22" });
+    const mxn = ship({ modo: "por_unidad", monto: 10, moneda: "MXN" }, items);
+    expect(mxn.totals).toEqual([{ currency: "PESOS", amount: "$33,433.30" }, { currency: "DOLARES", amount: "$2,222.22" }]);
+  });
+
+  it("partida sin cantidad numerica (solo talla): cuenta como 1", () => {
+    const m = ship({ modo: "por_unidad", monto: 50, moneda: "MXN" }, [item({ cantidad: null, unidad: null, talla: "M" })]);
+    expect(m.rows[0]).toMatchObject({ cant: "Talla M", uPrice: "$3,383.33", price: "$3,383.33" });
+  });
+
+  it("envio vacio: el precio no cambia", () => {
+    expect(ship(NO_SHIPPING, [caja()]).rows[0]).toMatchObject({ uPrice: "$3,333.33", price: "$6,666.66" });
+    expect(ship({ modo: "incluido" }, [caja()]).totals).toEqual([{ currency: "PESOS", amount: "$6,666.66" }]);
+  });
+
+  it("el calculo de la vista previa coincide con el del PDF", () => {
+    const plan: ShippingPlan = { modo: "por_pedido", monto: 100, moneda: "MXN" };
+    const input = [caja({ folio: "A" })];
+    const prev = computeOrder(input.map((i) => ({ id: i.id, cantidad: i.cantidad, precioElegido: i.precioElegido, quote: i.quote })), plan);
+    const m = ship(plan, input);
+    expect(prev.lines.A).toMatchObject({ precioUnitario: m.rows[0].uPrice, importe: m.rows[0].price });
+    expect(prev.perCurrency[0].total).toBe(m.totals[0].amount);
+    expect(prev.envioIncluido).toBe("$100.00");
+    expect(computeOrder([], NO_SHIPPING).envioIncluido).toBeNull();
+  });
+
+  it("pie: la leyenda de envio va siempre que haya destino (con o sin cargo), se omite sin destino y es editable", () => {
+    const INCLUDE = "Prices include shipping charges to your plant in Cd. Juarez, planta Pegatron, via Parcel";
+    expect(ship(NO_SHIPPING, [item()]).footer.at(-1)).toBe(INCLUDE);
+    expect(ship({ modo: "por_unidad", monto: 5, moneda: "MXN" }, [item()]).footer.at(-1)).toBe(INCLUDE);
+    expect(ship(NO_SHIPPING, [item()], { destino_entrega: null }).footer).toEqual(["16% VAT will be added to the invoice", "Prices subject to change"]);
+    expect(ship(NO_SHIPPING, [item()], { via_envio: null }).footer.at(-1)).toBe("Prices include shipping charges to your plant in Cd. Juarez, planta Pegatron");
+    const custom = buildPdfModel(base({ company: { ...company, leyenda_envio: "Delivered to {destino} by {via}" } }));
+    expect(custom.footer.at(-1)).toBe("Delivered to Cd. Juarez, planta Pegatron by Parcel");
   });
 
   it("compra minima: franja solo si alguna partida la tiene", () => {
@@ -200,51 +217,42 @@ describe("PDF generado: contenido real y PRIVACIDAD", () => {
     expect(text).not.toContain("Minimum purchase");
   });
 
-  it("envio al cliente > 0, franja amarilla de compra minima y totales por moneda en el PDF", async () => {
-    const m = buildPdfModel(base({
-      items: [item({ quote: quote({ compra_min_cantidad: 10, compra_min_unidad: "caja" }) }), item({ folio: "x2", producto: "Casco", precioElegido: 1, quote: quote({ moneda: "USD" }) })],
-      data: { ...base().data, envio_monto: 350, envio_moneda: "MXN" },
-    }));
-    const [text] = await pdfPages(m);
-    expect(text).toContain("Minimum purchase: 10 caja");
-    expect(text).toContain("Shipping to Cd. Juarez, planta Pegatron via Parcel");
-    expect(text).toContain("TOTAL PESOS");
-    expect(text).toContain("$33,683.30");
-    expect(text).toContain("TOTAL DOLARES");
-    expect(text).toContain("DOLARES");
-    expect(text).not.toContain("Prices include shipping");
-  });
-
-  it("sin cargo de envio y sin destino el PDF no lleva ninguna linea de envio; los 5 precios, costos y proveedor siguen fuera", async () => {
-    const dirty = base({ data: { ...base().data, destino_entrega: null, via_envio: null } });
+  it("PDF con envio: solo el costo final; ni renglon Shipping, ni monto del envio, ni los 5 precios o costos", async () => {
+    const dirty = base({
+      items: [item({ cantidad: 2, unidad: "caja", quote: quote({ compra_min_cantidad: 10, compra_min_unidad: "caja" }) })],
+      data: { ...base().data, envio: { modo: "por_pedido", monto: 100, moneda: "MXN" } },
+    });
     (dirty.items[0] as unknown as Record<string, unknown>).proveedor = "PROVEEDOR SECRETO";
     (dirty.items[0] as unknown as Record<string, unknown>).costo = 4321.09;
+    (dirty.items[0] as unknown as Record<string, unknown>).envio_proveedor = 88888.88;
     const [text] = await pdfPages(buildPdfModel(dirty));
-    expect(text).not.toContain("Shipping");
-    expect(text).not.toContain("Prices include shipping");
-    expect(text).toContain("16% VAT will be added to the invoice");
-    for (const s of ["1,111.11", "2,222.22", "4,444.44", "5,555.55", "PROVEEDOR", "4,321.09", "Precios sin IVA"]) {
+    expect(text).toContain("Minimum purchase: 10 caja");
+    expect(text).toContain("$3,383.33"); // U. Price con envio
+    expect(text).toContain("$6,766.66"); // Price de la partida
+    expect(text).toContain("TOTAL PESOS");
+    expect(text).toContain("Prices include shipping charges to your plant in Cd. Juarez, planta Pegatron, via Parcel");
+    for (const s of ["Shipping to", "$100.00", "$50.00", "3,333.33", "1,111.11", "2,222.22", "4,444.44", "5,555.55", "PROVEEDOR", "4,321.09", "88,888.88", "Precios sin IVA"]) {
       expect(text, `no debe aparecer "${s}"`).not.toContain(s);
     }
+    expect(text.replace("shipping charges", "")).not.toMatch(/shipping/i);
   });
 
-  it("envio vacio con destino: el PDF trae la leyenda de incluido y ningun renglon Shipping", async () => {
-    const [text] = await pdfPages(buildPdfModel(base()));
-    expect(text).toContain("Prices include shipping charges to your plant in Cd. Juarez, planta Pegatron, via Parcel");
-    expect(text).not.toContain("Shipping to");
+  it("sin envio y sin destino el PDF no lleva ninguna linea de envio", async () => {
+    const [text] = await pdfPages(buildPdfModel(base({ data: { ...base().data, destino_entrega: null, via_envio: null } })));
+    expect(text).not.toMatch(/shipping/i);
+    expect(text).toContain("16% VAT will be added to the invoice");
   });
 
-  it("solicitud en pesos y dolares: el PDF muestra un total por moneda con el envio solo en la elegida", async () => {
+  it("solicitud en pesos y dolares: un total por moneda con el envio solo en la elegida", async () => {
     const m = buildPdfModel(base({
-      items: [item(), item({ folio: "x2", cantidad: 2, unidad: "pieza", precioElegido: 1, quote: quote({ moneda: "USD" }) })],
-      data: { ...base().data, envio_monto: 100, envio_moneda: "USD" },
+      items: [item({ folio: "A" }), item({ folio: "B", cantidad: 2, unidad: "pieza", precioElegido: 1, quote: quote({ moneda: "USD" }) })],
+      data: { ...base().data, envio: { modo: "por_pedido", monto: 100, moneda: "USD" } },
     }));
     const [text] = await pdfPages(m);
     expect(text).toContain("TOTAL PESOS");
     expect(text).toContain("$33,333.30");
     expect(text).toContain("TOTAL DOLARES");
     expect(text).toContain("$2,322.22");
-    expect(text).toContain("Shipping to Cd. Juarez, planta Pegatron via Parcel");
   });
 
   it("con muchas partidas el encabezado de la tabla se repite en cada pagina", async () => {
@@ -253,57 +261,5 @@ describe("PDF generado: contenido real y PRIVACIDAD", () => {
     expect(pages.length).toBeGreaterThan(1);
     for (const p of pages) expect(p).toContain("U. Price");
     expect(pages[0].split("U. Price").length - 1).toBe(1); // en la primera pagina aparece una sola vez
-  });
-});
-
-describe("vista previa del total por moneda (panel del vendedor)", () => {
-  const lines = (over: Partial<PdfItemInput> = {}) => [{ cantidad: 10, precioElegido: 3, quote: quote(), ...over }];
-  it("subtotal, envio al cliente y total con envio", () => {
-    const r = previewTotals(lines(), { monto: 350, moneda: "MXN" });
-    expect(r.problem).toBeNull();
-    expect(r.perCurrency).toEqual([{ currency: "PESOS", subtotal: "$33,333.30", shipping: "$350.00", total: "$33,683.30" }]);
-  });
-  it("sin envio: sin renglon de envio y total = subtotal", () => {
-    expect(previewTotals(lines(), { monto: null, moneda: null }).perCurrency).toEqual([{ currency: "PESOS", subtotal: "$33,333.30", shipping: null, total: "$33,333.30" }]);
-    expect(previewTotals(lines(), { monto: 0, moneda: "MXN" }).perCurrency[0].shipping).toBeNull();
-  });
-  it("pesos y dolares por separado; el envio solo a su moneda; avisa si falta elegirla", () => {
-    const mixed = [...lines(), { cantidad: 2, precioElegido: 1, quote: quote({ moneda: "USD" }) }];
-    const r = previewTotals(mixed, { monto: 100, moneda: "USD" });
-    expect(r.perCurrency.map((c) => [c.currency, c.shipping, c.total])).toEqual([["PESOS", null, "$33,333.30"], ["DOLARES", "$100.00", "$2,322.22"]]);
-    expect(previewTotals(mixed, { monto: 100, moneda: null }).problem).toMatch(/Elige la moneda/);
-  });
-  it("las partidas sin precio elegido no cuentan", () => {
-    expect(previewTotals(lines({ precioElegido: null }), { monto: null, moneda: null }).perCurrency).toEqual([]);
-  });
-  it("coincide con el total del PDF", () => {
-    const pre = previewTotals(lines(), { monto: 350, moneda: "MXN" });
-    const pdf = buildPdfModel(base({ data: { ...base().data, envio_monto: 350, envio_moneda: "MXN" } }));
-    expect(pdf.totals).toEqual([{ currency: "PESOS", amount: pre.perCurrency[0].total }]);
-  });
-  it("monedas de las partidas y moneda del envio", () => {
-    expect(itemCurrencies([{ quote: quote() }, { quote: quote({ moneda: "USD" }) }, { quote: null }])).toEqual(["MXN", "USD"]);
-    expect(resolveShippingCurrency(["MXN"], 50, null)).toEqual({ moneda: "MXN", problem: null });
-    expect(resolveShippingCurrency(["MXN", "USD"], 50, "USD")).toEqual({ moneda: "USD", problem: null });
-    expect(resolveShippingCurrency(["MXN", "USD"], 50, null).problem).toMatch(/Elige la moneda/);
-    expect(resolveShippingCurrency(["MXN", "USD"], 0, null)).toEqual({ moneda: null, problem: null });
-  });
-});
-
-describe("parseShippingInput (costo de envio al cliente)", () => {
-  it("vacio o 0 = sin cargo", () => {
-    for (const monto of [undefined, "", "  ", "0", "0.00"]) expect(parseShippingInput({ monto }, ["MXN"])).toEqual({ ok: true, monto: null, moneda: null });
-  });
-  it("mayor a 0 usa la moneda elegida o la unica de las partidas", () => {
-    expect(parseShippingInput({ monto: "1,250.50", moneda: "USD" }, ["MXN"])).toEqual({ ok: true, monto: 1250.5, moneda: "USD" });
-    expect(parseShippingInput({ monto: "350", moneda: "" }, ["MXN"])).toEqual({ ok: true, monto: 350, moneda: "MXN" });
-  });
-  it("si mezcla pesos y dolares exige elegir la moneda", () => {
-    expect(parseShippingInput({ monto: "350", moneda: "" }, ["MXN", "USD"])).toMatchObject({ ok: false });
-    expect(parseShippingInput({ monto: "350", moneda: "MXN" }, ["MXN", "USD"])).toEqual({ ok: true, monto: 350, moneda: "MXN" });
-  });
-  it("rechaza montos invalidos o negativos", () => {
-    expect(parseShippingInput({ monto: "abc" }, ["MXN"])).toMatchObject({ ok: false });
-    expect(parseShippingInput({ monto: "-5" }, ["MXN"])).toMatchObject({ ok: false });
   });
 });

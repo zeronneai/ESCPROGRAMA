@@ -13,9 +13,8 @@ import { ItemStatusBadge, qtyText, ReferenceList, SemaforoBadge } from "@/compon
 import { copyRich } from "@/lib/clipboard";
 import { formatPriceTable } from "@/lib/format/price-table";
 import { formatDelivery, formatMinPurchase, toPriceTableItem } from "@/lib/format/quote-text";
-import { itemCurrencies, pdfProblems, previewTotals, toPdfQuote } from "@/lib/pdf/model";
-import { parseShippingInput } from "@/lib/pdf/shipping";
-import { parseNumber } from "@/lib/validation/request";
+import { computeOrder, itemCurrencies, pdfProblems, toPdfQuote } from "@/lib/pdf/model";
+import { parseShippingPlan, SHIPPING_MODE_LABEL, type ShippingMode } from "@/lib/pdf/shipping";
 import { lineTotal } from "@/lib/pricing/tabulador";
 import { isVigenciaVencida, revisionFolio, vigenciaDiasRestantes } from "@/lib/quotes/revisions";
 import {
@@ -25,11 +24,31 @@ import {
 
 type Pick = 1 | 2 | 3 | 4 | 5;
 
+interface PdfPanel {
+  destino: string;
+  via: string;
+  condiciones: string;
+  atencion: string;
+  envioModo: ShippingMode;
+  monto: string;
+  moneda: "MXN" | "USD" | "";
+  partidas: Record<string, { monto: string; tipo: "unidad" | "total" }>;
+}
+
+/** Forma comparable del panel (sin montos vacios y con las partidas en orden) para saber si ya esta guardado. */
+const panelKey = (p: PdfPanel) =>
+  JSON.stringify({
+    ...p,
+    partidas: Object.entries(p.partidas)
+      .filter(([, v]) => v.monto.trim() !== "")
+      .sort(([a], [b]) => a.localeCompare(b)),
+  });
+
 interface Props {
   request: { id: string; folio: string; notas: string | null; cliente: string; atencion: string; destino: string; revision: number };
   items: ItemRow[];
   remainingByItem: Record<string, number | null>;
-  pdfDefaults: { destino: string; via: string; condiciones: string; atencion: string; monto: string; moneda: "MXN" | "USD" | "" };
+  pdfDefaults: PdfPanel;
   nowIso: string;
 }
 
@@ -53,17 +72,23 @@ export function SellerRequestView({ request, items, remainingByItem, pdfDefaults
   const [pdf, setPdf] = useState(pdfDefaults);
 
   const quoted = items.filter((i) => latestQuote(i));
-  // Costo de envio al cliente (opcional) y vista previa del total por moneda.
+  // Envio al cliente (opcional): va dentro del precio unitario; la vista previa usa el mismo calculo que el PDF.
   const currencies = itemCurrencies(quoted.map((i) => ({ quote: latestQuote(i) })));
-  const shipParse = parseShippingInput({ monto: pdf.monto, moneda: pdf.moneda }, currencies);
-  const shippingIssue = shipParse.ok ? null : shipParse.error;
-  const preview = previewTotals(
-    quoted.map((i) => ({ cantidad: i.cantidad, precioElegido: picked[i.id] ?? null, quote: toPdfQuote(latestQuote(i)!) })),
-    shipParse.ok ? { monto: shipParse.monto, moneda: shipParse.moneda } : { monto: null, moneda: null },
+  const shipParse = parseShippingPlan(
+    {
+      modo: pdf.envioModo, monto: pdf.monto, moneda: pdf.moneda,
+      partidas: Object.entries(pdf.partidas).map(([itemId, v]) => ({ itemId, monto: v.monto, tipo: v.tipo })),
+    },
+    { currencies, itemIds: quoted.map((i) => i.id) },
   );
+  const shippingIssue = shipParse.ok ? null : shipParse.error;
+  const preview = computeOrder(
+    quoted.map((i) => ({ id: i.id, cantidad: i.cantidad, precioElegido: picked[i.id] ?? null, quote: toPdfQuote(latestQuote(i)!) })),
+    shipParse.ok ? shipParse.plan : undefined,
+  );
+  const setPartida = (id: string, patch: Partial<{ monto: string; tipo: "unidad" | "total" }>) =>
+    setPdf({ ...pdf, partidas: { ...pdf.partidas, [id]: { ...(pdf.partidas[id] ?? { monto: "", tipo: "total" as const }), ...patch } } });
   const unpicked = quoted.filter((i) => !picked[i.id]).length;
-  const destinoTxt = pdf.destino.trim();
-  const viaTxt = pdf.via.trim();
   const pdfIssues = [
     ...pdfProblems(
       quoted.map((i) => ({ folio: i.folio ?? "", precioElegido: picked[i.id] ?? null, quote: latestQuote(i)! })),
@@ -71,7 +96,7 @@ export function SellerRequestView({ request, items, remainingByItem, pdfDefaults
     ),
     ...(shippingIssue ? [shippingIssue] : []),
   ];
-  const pdfSaved = JSON.stringify(pdf) === JSON.stringify(pdfDefaults);
+  const pdfSaved = panelKey(pdf) === panelKey(pdfDefaults);
 
   const hasPending = items.some((i) => i.estado === "pendiente");
 
@@ -126,7 +151,8 @@ export function SellerRequestView({ request, items, remainingByItem, pdfDefaults
     start(async () => {
       const saved = await savePdfDataAction({
         requestId: request.id, destino: pdf.destino, via: pdf.via, condiciones: pdf.condiciones, atencion: pdf.atencion,
-        monto: pdf.monto, moneda: pdf.moneda,
+        envioModo: pdf.envioModo, monto: pdf.monto, moneda: pdf.moneda,
+        partidas: Object.entries(pdf.partidas).map(([itemId, v]) => ({ itemId, monto: v.monto, tipo: v.tipo })),
       });
       if (!saved.ok) {
         setNotice({ tone: "error", text: saved.error });
@@ -197,56 +223,90 @@ export function SellerRequestView({ request, items, remainingByItem, pdfDefaults
               <Input value={pdf.atencion} onChange={(e) => setPdf({ ...pdf, atencion: e.target.value })} />
             </Field>
           </div>
-          <div className="space-y-2 rounded-md border border-slate-200 p-3">
-            <p className="text-sm font-medium text-slate-700">Costo de envío al cliente (opcional)</p>
-            <div className="flex flex-wrap items-end gap-2">
-              <Field label="Monto (sin IVA)">
-                <Input value={pdf.monto} onChange={(e) => setPdf({ ...pdf, monto: e.target.value })} inputMode="decimal" placeholder="0 o vacío = sin cargo" className="w-44" />
-              </Field>
-              <Field label="Moneda">
-                <Select value={pdf.moneda} onChange={(e) => setPdf({ ...pdf, moneda: e.target.value as "MXN" | "USD" | "" })} className="w-44">
-                  {currencies.length !== 1 && <option value="">Elige la moneda...</option>}
-                  <option value="MXN">Pesos (MXN)</option>
-                  <option value="USD">Dólares (USD)</option>
-                </Select>
-              </Field>
-            </div>
-            <p className="text-xs text-slate-500">
-              Es el flete de ESC hacia el destino del cliente. No es el costo de envío del proveedor, que el vendedor no ve.
-              {currencies.length > 1 && " Esta solicitud mezcla pesos y dólares: elige la moneda del cargo."}
-            </p>
-            {(parseNumber(pdf.monto) ?? 0) > 0 ? (
-              <p className="text-xs text-slate-600">
-                El PDF agregará el renglón "Shipping{destinoTxt ? ` to ${destinoTxt}` : ""}{viaTxt ? ` via ${viaTxt}` : ""}" y lo sumará al total de esa moneda.
-              </p>
-            ) : destinoTxt ? (
-              <p className="text-xs text-slate-600">
-                Sin cargo de envío, el pie del PDF dirá: "Prices include shipping charges to your plant in {destinoTxt}{viaTxt ? `, via ${viaTxt}` : ""}".
-              </p>
-            ) : (
-              <p className="text-xs text-slate-600">Sin cargo de envío y sin destino: el PDF no lleva leyenda de envío.</p>
+          <div className="space-y-3 rounded-md border border-slate-200 p-3">
+            <p className="text-sm font-medium text-slate-700">Envío al cliente (opcional)</p>
+            <Field label="Cómo se reparte">
+              <Select value={pdf.envioModo} onChange={(e) => setPdf({ ...pdf, envioModo: e.target.value as ShippingMode })} className="w-64">
+                {(Object.keys(SHIPPING_MODE_LABEL) as ShippingMode[]).map((m) => (
+                  <option key={m} value={m}>{SHIPPING_MODE_LABEL[m]}</option>
+                ))}
+              </Select>
+            </Field>
+            {pdf.envioModo !== "incluido" && (
+              <div className="flex flex-wrap items-end gap-2">
+                {pdf.envioModo !== "por_partida" && (
+                  <Field label="Monto (sin IVA)">
+                    <Input value={pdf.monto} onChange={(e) => setPdf({ ...pdf, monto: e.target.value })} inputMode="decimal" placeholder="0 o vacío = sin envío" className="w-44" />
+                  </Field>
+                )}
+                {currencies.length > 1 ? (
+                  <Field label="Moneda del envío">
+                    <Select value={pdf.moneda} onChange={(e) => setPdf({ ...pdf, moneda: e.target.value as "MXN" | "USD" | "" })} className="w-44">
+                      <option value="">Elige la moneda...</option>
+                      <option value="MXN">Pesos (MXN)</option>
+                      <option value="USD">Dólares (USD)</option>
+                    </Select>
+                  </Field>
+                ) : (
+                  <p className="pb-2 text-sm text-slate-600">Moneda: {currencies[0] === "USD" ? "Dólares (USD)" : "Pesos (MXN)"}</p>
+                )}
+              </div>
+            )}
+            {pdf.envioModo !== "incluido" && currencies.length > 1 && (
+              <p className="text-xs text-slate-500">Solo se aplica a las partidas en la moneda elegida.</p>
+            )}
+            {pdf.envioModo === "por_partida" && (
+              <div className="space-y-2">
+                {quoted.map((i) => (
+                  <div key={i.id} className="flex flex-wrap items-end gap-2">
+                    <span className="w-48 pb-2 text-sm">{i.folio} {i.producto}</span>
+                    <Field label="Monto (sin IVA)">
+                      <Input value={pdf.partidas[i.id]?.monto ?? ""} onChange={(e) => setPartida(i.id, { monto: e.target.value })} inputMode="decimal" placeholder="0 o vacío = sin envío" className="w-40" />
+                    </Field>
+                    <Field label="El monto es">
+                      <Select value={pdf.partidas[i.id]?.tipo ?? "total"} onChange={(e) => setPartida(i.id, { tipo: e.target.value as "unidad" | "total" })} className="w-48">
+                        <option value="unidad">por unidad</option>
+                        <option value="total">total de la partida</option>
+                      </Select>
+                    </Field>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
-          <div className="space-y-1 rounded-md bg-slate-50 p-3">
-            <p className="text-sm font-medium text-slate-700">Vista previa del total (precios sin IVA)</p>
+          <div className="space-y-2 rounded-md bg-slate-50 p-3">
+            <p className="text-sm font-medium text-slate-700">Vista previa del PDF (precios sin IVA)</p>
             {preview.perCurrency.length === 0 ? (
               <p className="text-xs text-slate-500">Elige el precio de las partidas para ver el total.</p>
             ) : (
-              <table className="w-full max-w-md text-sm">
-                <tbody>
-                  {preview.perCurrency.map((c) => (
-                    <tr key={c.currency} className="align-top">
-                      <td className="py-1 pr-3 font-medium">{c.currency}</td>
-                      <td className="py-1 text-right tabular-nums">
-                        <div>Subtotal {c.subtotal}</div>
-                        {c.shipping && <div>Envío al cliente {c.shipping}</div>}
-                        <div className="font-semibold">Total con envío {c.total}</div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <>
+                <table className="w-full max-w-xl text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-slate-500"><th className="py-1 pr-3 font-normal">Partida</th><th className="py-1 pr-3 text-right font-normal">U. Price</th><th className="py-1 text-right font-normal">Price</th></tr>
+                  </thead>
+                  <tbody>
+                    {quoted.filter((i) => preview.lines[i.id]).map((i) => (
+                      <tr key={i.id}>
+                        <td className="py-0.5 pr-3">{i.folio} {i.producto}</td>
+                        <td className="py-0.5 pr-3 text-right tabular-nums">{preview.lines[i.id].precioUnitario}</td>
+                        <td className="py-0.5 text-right tabular-nums">{preview.lines[i.id].importe}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <table className="w-full max-w-xl text-sm">
+                  <tbody>
+                    {preview.perCurrency.map((c) => (
+                      <tr key={c.currency}>
+                        <td className="py-1 pr-3 font-medium">Total {c.currency}</td>
+                        <td className="py-1 text-right font-semibold tabular-nums">{c.total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {preview.envioIncluido && <p className="text-xs text-slate-600">Envío incluido en precios: {preview.envioIncluido}</p>}
+              </>
             )}
             {unpicked > 0 && <p className="text-xs text-amber-800">Faltan {unpicked} partida(s) por elegir precio; no están en este total.</p>}
           </div>

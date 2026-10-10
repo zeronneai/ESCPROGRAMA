@@ -51,6 +51,8 @@ export function friendlyError(message: string | undefined): string {
   return message;
 }
 
+import { DEFAULT_SHIPPING_LEGEND } from "@/lib/pdf/shipping";
+
 export interface CompanyProfile {
   nombre_comercial: string;
   razon_social: string;
@@ -60,15 +62,17 @@ export interface CompanyProfile {
   rfc: string;
   condiciones_default: string;
   pie_lineas: string[];
+  leyenda_envio: string;
 }
 
 export async function getCompanyProfile(supabase: SupabaseClient): Promise<CompanyProfile> {
   const { data } = await supabase
     .from("company_profile")
-    .select("nombre_comercial, razon_social, telefono, web, direccion, rfc, condiciones_default, pie_lineas")
+    .select("nombre_comercial, razon_social, telefono, web, direccion, rfc, condiciones_default, pie_lineas, leyenda_envio")
     .single();
   return (
     (data as CompanyProfile | null) ?? {
+      leyenda_envio: DEFAULT_SHIPPING_LEGEND,
       nombre_comercial: "ESC Representaciones",
       razon_social: "ESC REPRESENTACIONES S. DE R. L. MI.",
       telefono: "(614) 424-6200",
