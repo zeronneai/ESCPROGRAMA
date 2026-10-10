@@ -6,7 +6,7 @@ import { requireBuyer } from "@/lib/auth/guards";
 import { calcTabulador, type PricingFactors } from "@/lib/pricing/tabulador";
 import { friendlyError, getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
-import { businessHoursBetween } from "@/lib/time/business-hours";
+import { netResponseHours } from "@/lib/quotes/clock";
 import { parseNotFoundNote, parseQuoteForm, type QuoteFormValues } from "@/lib/validation/response";
 import type { Result } from "./requests";
 
@@ -23,7 +23,9 @@ async function responseHours(itemId: string) {
   const submitted = (data?.quote_requests as unknown as { submitted_at: string } | null)?.submitted_at;
   if (!submitted) return null;
   const cfg = await getBusinessSettings(supabase);
-  const hours = Math.max(0, businessHoursBetween(new Date(submitted), new Date(), cfg));
+  // Horas habiles de respuesta SIN contar el tiempo en pausa por aclaraciones.
+  const { data: pauses } = await supabase.from("item_clarification_pauses").select("clarification_requested_at, resumed_at").eq("item_id", itemId);
+  const hours = netResponseHours(new Date(submitted), new Date(), pauses ?? [], cfg);
   return { hours: Math.round(hours * 100) / 100, requestId: data!.request_id as string };
 }
 

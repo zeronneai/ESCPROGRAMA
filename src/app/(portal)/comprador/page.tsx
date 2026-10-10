@@ -13,7 +13,7 @@ interface Row {
   due_at: string;
   customers: { nombre: string } | null;
   profiles: { nombre: string } | null;
-  quote_items: { estado: string }[];
+  quote_items: { estado: string; item_update_requests: { due_at: string; resolved_at: string | null }[] }[];
 }
 
 export default async function CompradorHome({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
@@ -24,7 +24,7 @@ export default async function CompradorHome({ searchParams }: { searchParams: Pr
   const [{ data }, cfg] = await Promise.all([
     supabase
       .from("quote_requests")
-      .select("id, folio, submitted_at, due_at, customers(nombre), profiles:vendedor_id(nombre), quote_items(estado)")
+      .select("id, folio, submitted_at, due_at, customers(nombre), profiles:vendedor_id(nombre), quote_items(estado, item_update_requests(due_at, resolved_at))")
       .eq("estado", "enviada")
       .is("archived_at", null)
       .order("due_at"),
@@ -35,11 +35,17 @@ export default async function CompradorHome({ searchParams }: { searchParams: Pr
     .map((r) => ({
       ...r,
       pendientes: r.quote_items.filter((i) => i.estado === "pendiente").length,
+      actualizaciones: r.quote_items.filter((i) => i.estado === "actualizacion_solicitada").length,
+      aclaraciones: r.quote_items.filter((i) => i.estado === "esperando_aclaracion").length,
+      updateRemaining: Math.min(
+        ...r.quote_items.flatMap((i) => i.item_update_requests.filter((u) => !u.resolved_at).map((u) => businessHoursBetween(now, new Date(u.due_at), cfg))),
+        Number.POSITIVE_INFINITY,
+      ),
       noEncontradas: r.quote_items.filter((i) => i.estado === "no_encontrada").length,
       remaining: businessHoursBetween(now, new Date(r.due_at), cfg),
     }))
-    .filter((r) => todas || r.pendientes > 0 || r.noEncontradas > 0)
-    .sort((a, b) => Number(b.pendientes > 0) - Number(a.pendientes > 0) || a.remaining - b.remaining);
+    .filter((r) => todas || r.pendientes > 0 || r.actualizaciones > 0 || r.aclaraciones > 0 || r.noEncontradas > 0)
+    .sort((a, b) => Number(b.pendientes + b.actualizaciones > 0) - Number(a.pendientes + a.actualizaciones > 0) || a.remaining - b.remaining);
 
   return (
     <div className="space-y-4">
@@ -80,9 +86,17 @@ export default async function CompradorHome({ searchParams }: { searchParams: Pr
                 <td className="px-3 py-2">
                   {r.pendientes} de {r.quote_items.length}
                   {r.noEncontradas > 0 && <span className="ml-2 text-xs text-slate-500">{r.noEncontradas} no encontrada(s)</span>}
+                  {r.actualizaciones > 0 && <span className="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-800">{r.actualizaciones} actualización(es) solicitada(s)</span>}
+                  {r.aclaraciones > 0 && <span className="ml-2 rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-800">{r.aclaraciones} esperando aclaración</span>}
                 </td>
                 <td className="px-3 py-2">
-                  {r.pendientes > 0 ? <SemaforoBadge remaining={r.remaining} /> : <span className="text-slate-500">Respondida</span>}
+                  {r.pendientes > 0 ? (
+                    <SemaforoBadge remaining={r.remaining} />
+                  ) : Number.isFinite(r.updateRemaining) ? (
+                    <SemaforoBadge remaining={r.updateRemaining} />
+                  ) : (
+                    <span className="text-slate-500">{r.aclaraciones > 0 ? "En pausa" : "Respondida"}</span>
+                  )}
                 </td>
               </tr>
             ))}

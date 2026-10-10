@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 # Regenera supabase/instalar-todo.sql juntando las migraciones en orden.
-# Ejecutar cada vez que cambie una migracion:  bash scripts/build-install-sql.sh
+# Solo para regenerar desde cero:  bash scripts/build-install-sql.sh --force
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUT="$ROOT/supabase/instalar-todo.sql"
+# instalar-todo.sql esta CONGELADO (ya se instalo en Supabase). Los cambios nuevos van en
+# supabase/migrations/NNNN_*.sql y se copian a supabase/actualizaciones/NNNN_*.sql.
+if [ -e "$OUT" ] && [ "${1:-}" != "--force" ]; then
+  echo "instalar-todo.sql ya existe y esta congelado. Usa --force solo para una instalacion nueva desde cero." >&2
+  exit 1
+fi
 {
   cat <<'HEADER'
 -- =============================================================================
