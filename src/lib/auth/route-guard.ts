@@ -30,8 +30,8 @@ export function decideRoute(input: {
 }): GuardDecision {
   const { pathname, hasUser, profile } = input;
 
-  // El cron se autentica con su propio secreto.
-  if (pathname.startsWith("/api/cron/")) return { type: "next" };
+  // El cron y la entrada de leads del sitio web se autentican con su propio secreto.
+  if (pathname.startsWith("/api/cron/") || pathname === "/api/leads/entrada") return { type: "next" };
 
   if (!hasUser) {
     if (pathname === LOGIN_PATH) return { type: "next" };

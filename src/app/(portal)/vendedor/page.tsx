@@ -1,7 +1,7 @@
 import { minAlert } from "@/lib/quotes/min-purchase";
 import Link from "next/link";
 import { DateTime } from "luxon";
-import { Button, Card, Field, Input, Select } from "@/components/ui";
+import { Button, Card, EmptyState, Field, Input, PageHeader, Select, StatCard } from "@/components/ui";
 import { ItemStatusBadge, SemaforoBadge } from "@/components/status";
 import { requireUser } from "@/lib/auth/guards";
 import { getBusinessSettings } from "@/lib/quotes/server";
@@ -38,15 +38,6 @@ const ESTADOS = [
   ["esperando_aclaracion", "Esperando aclaración"],
   ["enviada_cliente", "Enviada al cliente"],
 ] as const;
-
-function Counter({ label, value, tone = "" }: { label: string; value: number; tone?: string }) {
-  return (
-    <Card className={tone}>
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
-    </Card>
-  );
-}
 
 export default async function VendedorHome({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireUser();
@@ -85,34 +76,58 @@ export default async function VendedorHome({ searchParams }: { searchParams: Pro
   const c = summarizeSeller(items.map((i) => ({ requestId: i.quote_requests.id, estado: i.estado, dueAt: i.quote_requests.due_at })), now);
   const shown = items.filter((i) => !sp.estado || viewState(i.estado, i.quote_requests.due_at, now) === sp.estado);
 
+  const filtrosActivos = [sp.estado, sp.buscar, sp.cliente, sp.desde, sp.hasta].filter(Boolean).length;
+  const minBadge = (i: ItemRowDb) => {
+    const last = [...(i.item_quotes ?? [])].sort((a, b) => b.version - a.version)[0];
+    const alerta = last ? minAlert(i, last) : null;
+    return alerta ? <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">{alerta.text}</span> : null;
+  };
+  const estadoBadges = (i: ItemRowDb, vs: ReturnType<typeof viewState>) => (
+    <>
+      <ItemStatusBadge estado={i.estado} vencida={vs === "vencida"} />
+      {vs === "pendiente" && <SemaforoBadge remaining={businessHoursBetween(now, new Date(i.quote_requests.due_at), cfg)} />}
+    </>
+  );
+  const counter = (label: string, value: number, estado?: string, tone?: "amber" | "purple" | "brand") => (
+    <Link href={estado ? `/vendedor?estado=${estado}` : "/vendedor"} className="block transition hover:-translate-y-0.5">
+      <StatCard label={label} value={value} tone={value > 0 && tone ? tone : "default"} />
+    </Link>
+  );
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Mis solicitudes</h1>
-        <Link href="/vendedor/solicitudes/nueva" className="rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
-          Nueva solicitud
-        </Link>
-      </div>
+      <PageHeader
+        title="Mis solicitudes"
+        subtitle="Da seguimiento a tus cotizaciones y marca lo que ya enviaste al cliente."
+        actions={
+          <Link href="/vendedor/solicitudes/nueva" className="hidden rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 md:inline-flex">
+            Nueva solicitud
+          </Link>
+        }
+      />
 
       {c.sinEnviar > 0 && (
-        <div className="rounded-md border-2 border-amber-400 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
-          Tienes {c.sinEnviar} partida(s) respondida(s) que aun no marcas como enviadas al cliente.{" "}
-          <Link href="/vendedor?estado=cotizada" className="underline">
-            Verlas
-          </Link>
-        </div>
+        <Link
+          href="/vendedor?estado=cotizada"
+          className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100"
+        >
+          <span>
+            Tienes <strong>{c.sinEnviar}</strong> partida(s) respondida(s) que aún no marcas como enviadas al cliente.
+          </span>
+          <span className="shrink-0 font-medium underline">Verlas</span>
+        </Link>
       )}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-5">
-        <Counter label="Solicitudes creadas" value={c.solicitudes} />
-        <Counter label="Pendientes" value={c.pendientes} />
-        <Counter label="Respondidas" value={c.respondidas} />
-        <Counter label="No encontradas" value={c.noEncontradas} />
-        <Counter label="Vencidas" value={c.vencidas} />
-        <Counter label="Enviadas al cliente" value={c.enviadas} />
-        <Counter label="Respondidas sin enviar" value={c.sinEnviar} tone={c.sinEnviar > 0 ? "border-amber-400 bg-amber-50" : ""} />
-        <Counter label="Actualizaciones solicitadas" value={c.actualizaciones} />
-        <Counter label="Esperando tu aclaración" value={c.aclaraciones} tone={c.aclaraciones > 0 ? "border-purple-400 bg-purple-50" : ""} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {counter("Solicitudes creadas", c.solicitudes)}
+        {counter("Pendientes", c.pendientes, "pendiente", "brand")}
+        {counter("Respondidas sin enviar", c.sinEnviar, "cotizada", "amber")}
+        {counter("Esperando tu aclaración", c.aclaraciones, "esperando_aclaracion", "purple")}
+        {counter("Enviadas al cliente", c.enviadas, "enviada_cliente")}
+        {counter("Respondidas", c.respondidas)}
+        {counter("No encontradas", c.noEncontradas, "no_encontrada")}
+        {counter("Vencidas", c.vencidas, "vencida")}
+        {counter("Actualizaciones solicitadas", c.actualizaciones, "actualizacion_solicitada")}
       </div>
 
       {(drafts ?? []).length > 0 && (
@@ -131,94 +146,128 @@ export default async function VendedorHome({ searchParams }: { searchParams: Pro
         </Card>
       )}
 
-      <form method="get" className="grid items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:grid-cols-6">
-        <Field label="Estado">
-          <Select name="estado" defaultValue={sp.estado ?? ""}>
-            <option value="">Todos</option>
-            {ESTADOS.map(([v, l]) => (
-              <option key={v} value={v}>
-                {l}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Buscar (nombre, uso o descripción)">
-          <Input name="buscar" defaultValue={sp.buscar ?? ""} />
-        </Field>
-        <Field label="Cliente">
-          <Select name="cliente" defaultValue={sp.cliente ?? ""}>
-            <option value="">Todos</option>
-            {(clientes ?? []).map((cl) => (
-              <option key={cl.id} value={cl.id}>
-                {cl.nombre}
-              </option>
-            ))}
-          </Select>
-        </Field>
-        <Field label="Enviada desde">
-          <Input type="date" name="desde" defaultValue={sp.desde ?? ""} />
-        </Field>
-        <Field label="Hasta">
-          <Input type="date" name="hasta" defaultValue={sp.hasta ?? ""} />
-        </Field>
-        <div className="flex gap-2">
-          <Button type="submit">Filtrar</Button>
-          <Link href="/vendedor" className="self-center text-sm text-slate-600 underline">
-            Limpiar
-          </Link>
-        </div>
-      </form>
+      <details className="group rounded-lg border border-slate-200 bg-white" open={filtrosActivos > 0 || undefined}>
+        <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium text-slate-700">
+          <span>
+            Filtros{filtrosActivos > 0 && <span className="ml-2 rounded-full bg-brand-600 px-2 py-0.5 text-xs text-white">{filtrosActivos}</span>}
+          </span>
+          <span className="text-slate-400 transition group-open:rotate-180">▾</span>
+        </summary>
+        <form method="get" className="grid items-end gap-3 border-t border-slate-100 p-4 sm:grid-cols-2 lg:grid-cols-6">
+          <Field label="Estado">
+            <Select name="estado" defaultValue={sp.estado ?? ""}>
+              <option value="">Todos</option>
+              {ESTADOS.map(([v, l]) => (
+                <option key={v} value={v}>
+                  {l}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Buscar (nombre, uso o descripción)">
+            <Input name="buscar" defaultValue={sp.buscar ?? ""} />
+          </Field>
+          <Field label="Cliente">
+            <Select name="cliente" defaultValue={sp.cliente ?? ""}>
+              <option value="">Todos</option>
+              {(clientes ?? []).map((cl) => (
+                <option key={cl.id} value={cl.id}>
+                  {cl.nombre}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Enviada desde">
+            <Input type="date" name="desde" defaultValue={sp.desde ?? ""} />
+          </Field>
+          <Field label="Hasta">
+            <Input type="date" name="hasta" defaultValue={sp.hasta ?? ""} />
+          </Field>
+          <div className="flex gap-2">
+            <Button type="submit" className="flex-1">Filtrar</Button>
+            <Link href="/vendedor" className="inline-flex items-center rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
+              Limpiar
+            </Link>
+          </div>
+        </form>
+      </details>
 
-      <Card className="overflow-x-auto p-0">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-100 text-slate-600">
-            <tr>
-              <th className="px-3 py-2">Partida</th>
-              <th className="px-3 py-2">Producto</th>
-              <th className="px-3 py-2">Cliente</th>
-              <th className="px-3 py-2">Enviada</th>
-              <th className="px-3 py-2">Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-slate-500">
-                  No hay partidas con esos filtros.
-                </td>
-              </tr>
-            )}
-            {shown.map((i) => {
-              const vs = viewState(i.estado, i.quote_requests.due_at, now);
-              return (
-                <tr key={i.id} className="border-t border-slate-200">
-                  <td className="px-3 py-2">
-                    <Link href={`/vendedor/solicitudes/${i.quote_requests.id}`} className="font-medium text-brand-600 hover:underline">
-                      {i.folio}
-                    </Link>
-                  </td>
-                  <td className="px-3 py-2">{i.producto}<div className="max-w-md truncate text-xs text-slate-500">{i.descripcion}</div>
-                    {(() => {
-                      const last = [...(i.item_quotes ?? [])].sort((a, b) => b.version - a.version)[0];
-                      const alerta = last ? minAlert(i, last) : null;
-                      return alerta ? <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">{alerta.text}</span> : null;
-                    })()}
-                  </td>
-                  <td className="px-3 py-2">{i.quote_requests.customers?.nombre}</td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    {new Date(i.quote_requests.submitted_at).toLocaleDateString("es-MX", { dateStyle: "medium" })}
-                  </td>
-                  <td className="space-x-2 px-3 py-2 whitespace-nowrap">
-                    <ItemStatusBadge estado={i.estado} vencida={vs === "vencida"} />
-                    {vs === "pendiente" && (
-                      <SemaforoBadge remaining={businessHoursBetween(now, new Date(i.quote_requests.due_at), cfg)} />
-                    )}
-                  </td>
+      <Card className="p-0">
+        {shown.length === 0 ? (
+          <EmptyState
+            title={items.length === 0 ? "Aún no tienes solicitudes" : "No hay partidas con esos filtros"}
+            action={
+              items.length === 0 ? (
+                <Link href="/vendedor/solicitudes/nueva" className="text-sm font-medium text-brand-600 hover:underline">
+                  Crear la primera
+                </Link>
+              ) : undefined
+            }
+          />
+        ) : (
+          <>
+            <table className="hidden w-full text-left text-sm md:table">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium">Partida</th>
+                  <th className="px-4 py-2.5 font-medium">Producto</th>
+                  <th className="px-4 py-2.5 font-medium">Cliente</th>
+                  <th className="px-4 py-2.5 font-medium">Enviada</th>
+                  <th className="px-4 py-2.5 font-medium">Estado</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {shown.map((i) => {
+                  const vs = viewState(i.estado, i.quote_requests.due_at, now);
+                  return (
+                    <tr key={i.id} className="align-top hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <Link href={`/vendedor/solicitudes/${i.quote_requests.id}`} className="font-medium text-brand-600 hover:underline">
+                          {i.folio}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        {i.producto}
+                        <div className="max-w-md truncate text-xs text-slate-500">{i.descripcion}</div>
+                        {minBadge(i)}
+                      </td>
+                      <td className="px-4 py-3">{i.quote_requests.customers?.nombre}</td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {new Date(i.quote_requests.submitted_at).toLocaleDateString("es-MX", { dateStyle: "medium" })}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1.5">{estadoBadges(i, vs)}</div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <ul className="divide-y divide-slate-100 md:hidden">
+              {shown.map((i) => {
+                const vs = viewState(i.estado, i.quote_requests.due_at, now);
+                return (
+                  <li key={i.id}>
+                    <Link href={`/vendedor/solicitudes/${i.quote_requests.id}`} className="block space-y-1 px-3 py-3 active:bg-slate-50">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-brand-600">{i.folio}</p>
+                          <p className="font-medium text-slate-900">{i.producto}</p>
+                        </div>
+                        <span className="shrink-0 text-xs text-slate-500">
+                          {new Date(i.quote_requests.submitted_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
+                        </span>
+                      </div>
+                      <p className="truncate text-xs text-slate-500">{i.quote_requests.customers?.nombre}</p>
+                      <div className="flex flex-wrap gap-1.5">{estadoBadges(i, vs)}</div>
+                      {minBadge(i)}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
       </Card>
     </div>
   );

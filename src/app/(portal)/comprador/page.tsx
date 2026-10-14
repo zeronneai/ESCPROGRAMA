@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Card } from "@/components/ui";
+import { Card, EmptyState, FilterChip, PageHeader, StatCard } from "@/components/ui";
 import { SemaforoBadge } from "@/components/status";
 import { requireBuyer } from "@/lib/auth/guards";
 import { getBusinessSettings } from "@/lib/quotes/server";
@@ -47,61 +47,110 @@ export default async function CompradorHome({ searchParams }: { searchParams: Pr
     .filter((r) => todas || r.pendientes > 0 || r.actualizaciones > 0 || r.aclaraciones > 0 || r.noEncontradas > 0)
     .sort((a, b) => Number(b.pendientes + b.actualizaciones > 0) - Number(a.pendientes + a.actualizaciones > 0) || a.remaining - b.remaining);
 
+  const urgentes = rows.filter((r) => r.pendientes > 0 && r.remaining <= 6).length;
+  const totalPend = rows.reduce((a, r) => a + r.pendientes, 0);
+  const totalAct = rows.reduce((a, r) => a + r.actualizaciones, 0);
+  const totalAcl = rows.reduce((a, r) => a + r.aclaraciones, 0);
+
+  const plazo = (r: (typeof rows)[number]) =>
+    r.pendientes > 0 ? (
+      <SemaforoBadge remaining={r.remaining} />
+    ) : Number.isFinite(r.updateRemaining) ? (
+      <SemaforoBadge remaining={r.updateRemaining} />
+    ) : (
+      <span className="text-xs text-slate-500">{r.aclaraciones > 0 ? "En pausa" : "Respondida"}</span>
+    );
+  const chips = (r: (typeof rows)[number]) => (
+    <>
+      {r.noEncontradas > 0 && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{r.noEncontradas} no encontrada(s)</span>}
+      {r.actualizaciones > 0 && <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-800">{r.actualizaciones} actualización(es)</span>}
+      {r.aclaraciones > 0 && <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-800">{r.aclaraciones} esperando aclaración</span>}
+    </>
+  );
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold">Pendientes por responder</h1>
-        <Link href={todas ? "/comprador" : "/comprador?ver=todas"} className="text-sm text-brand-600 hover:underline">
-          {todas ? "Ver solo pendientes" : "Ver todas las solicitudes"}
-        </Link>
+    <div className="space-y-5">
+      <PageHeader
+        title={todas ? "Todas las solicitudes" : "Pendientes por responder"}
+        subtitle={todas ? "Incluye las ya respondidas." : "Ordenadas por tiempo restante del plazo."}
+        actions={
+          <>
+            <FilterChip href="/comprador" active={!todas}>Pendientes</FilterChip>
+            <FilterChip href="/comprador?ver=todas" active={todas}>Todas</FilterChip>
+            <FilterChip href="/comprador/historial">Ver historial</FilterChip>
+          </>
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard label="Partidas por cotizar" value={totalPend} tone={totalPend > 0 ? "brand" : "default"} />
+        <StatCard label="Urgentes (menos de 6 h)" value={urgentes} tone={urgentes > 0 ? "red" : "default"} />
+        <StatCard label="Actualizaciones" value={totalAct} tone={totalAct > 0 ? "amber" : "default"} />
+        <StatCard label="Esperando aclaración" value={totalAcl} tone={totalAcl > 0 ? "purple" : "default"} />
       </div>
-      <Card className="overflow-x-auto p-0">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-slate-100 text-slate-600">
-            <tr>
-              <th className="px-3 py-2">Folio</th>
-              <th className="px-3 py-2">Cliente</th>
-              <th className="px-3 py-2">Vendedor</th>
-              <th className="px-3 py-2">Pendientes</th>
-              <th className="px-3 py-2">Plazo</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={5} className="px-3 py-6 text-center text-slate-500">
-                  No hay solicitudes pendientes.
-                </td>
-              </tr>
-            )}
-            {rows.map((r) => (
-              <tr key={r.id} className="border-t border-slate-200">
-                <td className="px-3 py-2">
-                  <Link href={`/comprador/solicitudes/${r.id}`} className="font-medium text-brand-600 hover:underline">
-                    {r.folio}
+
+      <Card className="p-0">
+        {rows.length === 0 ? (
+          <EmptyState
+            title="Todo al día"
+            action={<Link href="/comprador/historial" className="text-sm font-medium text-brand-600 hover:underline">Ver lo que ya respondiste</Link>}
+          >
+            No hay solicitudes pendientes por responder.
+          </EmptyState>
+        ) : (
+          <>
+            <table className="hidden w-full text-left text-sm md:table">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-2.5 font-medium">Folio</th>
+                  <th className="px-4 py-2.5 font-medium">Cliente</th>
+                  <th className="px-4 py-2.5 font-medium">Vendedor</th>
+                  <th className="px-4 py-2.5 font-medium">Pendientes</th>
+                  <th className="px-4 py-2.5 font-medium">Plazo</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {rows.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3">
+                      <Link href={`/comprador/solicitudes/${r.id}`} className="font-medium text-brand-600 hover:underline">
+                        {r.folio}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3">{r.customers?.nombre}</td>
+                    <td className="px-4 py-3 text-slate-600">{r.profiles?.nombre}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="tabular-nums">{r.pendientes} de {r.quote_items.length}</span>
+                        {chips(r)}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">{plazo(r)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <ul className="divide-y divide-slate-100 md:hidden">
+              {rows.map((r) => (
+                <li key={r.id}>
+                  <Link href={`/comprador/solicitudes/${r.id}`} className="block space-y-1.5 px-3 py-3 active:bg-slate-50">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-brand-600">{r.folio}</p>
+                        <p className="truncate text-sm text-slate-900">{r.customers?.nombre}</p>
+                      </div>
+                      {plazo(r)}
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      {r.profiles?.nombre} · {r.pendientes} de {r.quote_items.length} pendiente(s)
+                    </p>
+                    <div className="flex flex-wrap gap-1">{chips(r)}</div>
                   </Link>
-                </td>
-                <td className="px-3 py-2">{r.customers?.nombre}</td>
-                <td className="px-3 py-2">{r.profiles?.nombre}</td>
-                <td className="px-3 py-2">
-                  {r.pendientes} de {r.quote_items.length}
-                  {r.noEncontradas > 0 && <span className="ml-2 text-xs text-slate-500">{r.noEncontradas} no encontrada(s)</span>}
-                  {r.actualizaciones > 0 && <span className="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-xs text-orange-800">{r.actualizaciones} actualización(es) solicitada(s)</span>}
-                  {r.aclaraciones > 0 && <span className="ml-2 rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-800">{r.aclaraciones} esperando aclaración</span>}
-                </td>
-                <td className="px-3 py-2">
-                  {r.pendientes > 0 ? (
-                    <SemaforoBadge remaining={r.remaining} />
-                  ) : Number.isFinite(r.updateRemaining) ? (
-                    <SemaforoBadge remaining={r.updateRemaining} />
-                  ) : (
-                    <span className="text-slate-500">{r.aclaraciones > 0 ? "En pausa" : "Respondida"}</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </Card>
     </div>
   );

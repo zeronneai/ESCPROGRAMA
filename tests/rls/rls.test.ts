@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fase4Suite } from "./fase4.suite";
+import { leadsSuite } from "./leads.suite";
 import { calcTabulador } from "@/lib/pricing/tabulador";
 import { DATABASE_URL, as, failure, pool, type Actor } from "./helpers";
 
@@ -531,6 +532,7 @@ async function newPendingItem(): Promise<string> {
 
 // La suite de la fase 4 corre DESPUES de la anterior y con sus propios usuarios.
 fase4Suite();
+leadsSuite();
 
 afterAll(async () => {
   await pool?.end();

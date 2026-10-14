@@ -13,3 +13,23 @@
 body {
   @apply bg-slate-50 text-slate-900 antialiased;
 }
+
+/* Barra de progreso de navegacion */
+@keyframes nav-progress {
+  0% { width: 0; }
+  10% { width: 35%; }
+  40% { width: 65%; }
+  100% { width: 90%; }
+}
+.nav-progress-run {
+  animation: nav-progress 8s cubic-bezier(0.1, 0.7, 0.3, 1) forwards;
+  box-shadow: 0 0 8px var(--color-brand-600);
+}
+
+/* Espacio para la barra inferior en movil */
+.pb-safe-nav {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 48rem) {
+  .pb-safe-nav { padding-bottom: 2rem; }
+}

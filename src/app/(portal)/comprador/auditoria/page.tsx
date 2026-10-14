@@ -32,7 +32,7 @@ export default async function Auditoria({ searchParams }: { searchParams: Promis
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold">Reporte de auditoria</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Reporte de auditoria</h1>
         <div className="flex gap-2 text-sm">
           <a className="rounded-md border border-slate-300 bg-white px-3 py-2 hover:bg-slate-100" href={`/api/admin/export?tipo=auditoria&formato=xlsx&${qs}`}>
             Exportar Excel

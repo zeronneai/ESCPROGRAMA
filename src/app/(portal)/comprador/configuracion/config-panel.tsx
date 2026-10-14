@@ -59,7 +59,7 @@ export function ConfigPanel(props: {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-lg font-semibold">Configuracion</h1>
+      <h1 className="text-xl font-semibold tracking-tight">Configuracion</h1>
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
 
       <Card className="space-y-3">
@@ -126,7 +126,7 @@ export function ConfigPanel(props: {
             <Input value={settings.warn} onChange={(e) => setSettings({ ...settings, warn: e.target.value })} inputMode="numeric" />
           </Field>
         </div>
-        <Button disabled={pending} onClick={() => run(() => saveSettingsAction(settings), "Configuracion guardada")}>
+        <Button loading={pending} onClick={() => run(() => saveSettingsAction(settings), "Configuracion guardada")}>
           Guardar
         </Button>
         <p className="text-xs text-slate-500">El plazo aplica a solicitudes que se envien desde ahora. Sabado y domingo nunca cuentan.</p>
@@ -150,7 +150,7 @@ export function ConfigPanel(props: {
         <Field label="Leyenda de envío del pie (usa {destino} y {via}; solo se imprime si el vendedor captura un destino)">
           <Input value={company.leyenda_envio} onChange={(e) => setCompany({ ...company, leyenda_envio: e.target.value })} />
         </Field>
-        <Button disabled={pending} onClick={() => run(() => saveCompanyAction(company), "Datos de la empresa guardados")}>Guardar datos del PDF</Button>
+        <Button loading={pending} onClick={() => run(() => saveCompanyAction(company), "Datos de la empresa guardados")}>Guardar datos del PDF</Button>
       </Card>
 
       <Card className="space-y-3">

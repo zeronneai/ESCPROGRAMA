@@ -25,12 +25,12 @@ export function ClientsPanel({ customers }: { customers: C[] }) {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-lg font-semibold">Clientes</h1>
+      <h1 className="text-xl font-semibold tracking-tight">Clientes</h1>
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
       <Card>
         <form className="flex flex-wrap items-end gap-2" onSubmit={(e) => { e.preventDefault(); run(() => createCustomerBuyerAction({ nombre }), () => setNombre("")); }}>
           <Field label="Nombre de la empresa"><Input value={nombre} onChange={(e) => setNombre(e.target.value)} required /></Field>
-          <Button type="submit" disabled={pending}>Agregar cliente</Button>
+          <Button type="submit" loading={pending}>Agregar cliente</Button>
         </form>
         <p className="mt-2 text-xs text-slate-500">Los vendedores también pueden agregar empresas nuevas al crear una solicitud.</p>
       </Card>
@@ -47,7 +47,7 @@ export function ClientsPanel({ customers }: { customers: C[] }) {
                     <td className="px-3 py-2"><Input value={edit.nombre} onChange={(e) => setEdit({ ...edit, nombre: e.target.value })} /></td>
                     <td className="px-3 py-2">{c.activo ? "Activo" : "Inactivo"}</td>
                     <td className="space-x-1 px-3 py-2 text-right">
-                      <Button disabled={pending} onClick={() => run(() => updateCustomerAction(c.id, { nombre: edit.nombre, activo: c.activo }), () => setEdit(null))}>Guardar</Button>
+                      <Button loading={pending} onClick={() => run(() => updateCustomerAction(c.id, { nombre: edit.nombre, activo: c.activo }), () => setEdit(null))}>Guardar</Button>
                       <Button variant="ghost" onClick={() => setEdit(null)}>Cancelar</Button>
                     </td>
                   </>

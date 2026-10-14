@@ -19,7 +19,7 @@ export function ChangePasswordForm() {
       <Field label="Confirma la contraseña nueva" error={fe.confirmar}>
         <Input name="confirmar" type="password" autoComplete="new-password" required />
       </Field>
-      <Button type="submit" className="w-full" disabled={pending}>
+      <Button type="submit" className="w-full" loading={pending}>
         {pending ? "Guardando..." : "Guardar contraseña"}
       </Button>
     </form>

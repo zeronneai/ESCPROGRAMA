@@ -185,7 +185,7 @@ export function SellerRequestView({ request, items, remainingByItem, pdfDefaults
       <div className="flex flex-wrap items-center gap-3">
         <Link href="/vendedor" className="text-sm text-slate-600 hover:underline">Mis solicitudes</Link>
         <span className="text-slate-400">/</span>
-        <h1 className="text-lg font-semibold">{revisionFolio(request.folio, request.revision)}</h1>
+        <h1 className="text-xl font-semibold tracking-tight">{revisionFolio(request.folio, request.revision)}</h1>
         <span className="text-sm text-slate-600">{request.cliente}</span>
       </div>
       {request.notas && <p className="text-sm text-slate-600">Notas: {request.notas}</p>}
@@ -552,7 +552,7 @@ function RequestUpdate({ itemId, onNotice, onRefresh }: { itemId: string; onNoti
       </Field>
       <div className="flex gap-2">
         <Button
-          disabled={pending}
+          loading={pending}
           onClick={() =>
             start(async () => {
               const r = await requestUpdateAction(itemId, nota);
@@ -620,7 +620,7 @@ function OutcomeForm({
       )}
       <Button
         variant="secondary"
-        disabled={pending}
+        loading={pending}
         onClick={() =>
           start(async () => {
             const r = await setOutcomeAction(itemId, v);

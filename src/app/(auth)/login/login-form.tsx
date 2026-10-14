@@ -15,7 +15,7 @@ export function LoginForm({ inactive }: { inactive?: boolean }) {
       <Field label="Contraseña">
         <Input name="password" type="password" autoComplete="current-password" required />
       </Field>
-      <Button type="submit" className="w-full" disabled={pending}>
+      <Button type="submit" className="w-full" loading={pending}>
         {pending ? "Entrando..." : "Entrar"}
       </Button>
     </form>

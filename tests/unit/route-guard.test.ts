@@ -50,4 +50,14 @@ describe("decideRoute", () => {
   it("el cron usa su propio secreto", () => {
     expect(d("/api/cron/avisos", null, false)).toEqual({ type: "next" });
   });
+
+  it("la entrada de leads del sitio web usa su propio secreto (solo esa ruta)", () => {
+    expect(d("/api/leads/entrada", null, false)).toEqual({ type: "next" });
+    expect(d("/api/leads/otra", null, false)).toMatchObject({ type: "deny", status: 401 });
+  });
+
+  it("leads es solo para vendedores", () => {
+    expect(d("/vendedor/leads", seller)).toEqual({ type: "next" });
+    expect(d("/vendedor/leads", buyer)).toEqual({ type: "redirect", to: "/comprador" });
+  });
 });

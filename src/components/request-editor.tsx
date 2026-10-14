@@ -270,7 +270,7 @@ export function RequestEditor({ initial, customers: initialCustomers }: { initia
           </p>
         )}
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="secondary" onClick={onSave} disabled={pending}>
+          <Button type="button" variant="secondary" onClick={onSave} loading={pending}>
             Guardar borrador
           </Button>
           <Button type="button" onClick={onSubmit} disabled={pending || problems.length > 0}>
