@@ -24,7 +24,7 @@ export default async function CompradorHome({ searchParams }: { searchParams: Pr
   const [{ data }, cfg] = await Promise.all([
     supabase
       .from("quote_requests")
-      .select("id, folio, submitted_at, due_at, customers(nombre), profiles:vendedor_id(nombre), quote_items(estado, item_update_requests(due_at, resolved_at))")
+      .select("id, folio, submitted_at, due_at, customers(nombre), profiles:vendedor_id(nombre), quote_items!quote_items_request_id_fkey(estado, item_update_requests(due_at, resolved_at))")
       .eq("estado", "enviada")
       .is("archived_at", null)
       .order("due_at"),

@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     admin.from("holidays").select("fecha"),
     admin
       .from("quote_requests")
-      .select("id, folio, due_at, quote_items!inner(estado, item_clarification_pauses(clarification_requested_at, resumed_at))")
+      .select("id, folio, due_at, quote_items!quote_items_request_id_fkey!inner(estado, item_clarification_pauses(clarification_requested_at, resumed_at))")
       .eq("estado", "enviada")
       .is("archived_at", null)
       .eq("quote_items.estado", "pendiente"),
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     admin.from("profiles").select("id").eq("rol", "comprador").eq("activo", true),
     admin
       .from("item_outcomes")
-      .select("item_id, quote_version, resultado, quote_items!inner(folio, producto, request_id, quote_requests!inner(vendedor_id))")
+      .select("item_id, quote_version, resultado, quote_items!inner(folio, producto, request_id, quote_requests!quote_items_request_id_fkey!inner(vendedor_id))")
       .eq("resultado", "sin_respuesta"),
   ]);
 

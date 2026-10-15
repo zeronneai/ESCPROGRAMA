@@ -73,7 +73,7 @@ export default async function Historial({ searchParams }: { searchParams: Promis
   const respondedCount = (from?: DateTime, estado?: ItemStatus) => {
     let q = supabase
       .from("quote_items")
-      .select("id, quote_requests!inner(estado)", { count: "exact", head: true })
+      .select("id, quote_requests!quote_items_request_id_fkey!inner(estado)", { count: "exact", head: true })
       .eq("quote_requests.estado", "enviada")
       .not("first_response_at", "is", null);
     if (from) q = q.gte("first_response_at", since(from));
@@ -87,7 +87,7 @@ export default async function Historial({ searchParams }: { searchParams: Promis
     .from("quote_items")
     .select(
       `id, folio, producto, descripcion, cantidad, unidad, estado, first_response_at, response_business_hours, not_found_note,
-       quote_requests!inner(id, estado, customers(nombre), profiles:vendedor_id(nombre)),
+       quote_requests!quote_items_request_id_fkey!inner(id, estado, customers(nombre), profiles:vendedor_id(nombre)),
        item_costs(version, costo, envio, proveedor),
        item_quotes(version, moneda, alt_nombre),
        item_dispatch(quote_version, precio_elegido, valor),

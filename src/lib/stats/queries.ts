@@ -67,7 +67,7 @@ export async function fetchStatItems(
       .from("quote_items")
       .select(
         `id, folio, producto, cantidad, unidad, talla, estado, first_response_at, response_business_hours, not_found_note,
-         quote_requests!inner(id, folio, submitted_at, due_at, vendedor_id, customer_id, estado, customers(nombre), profiles:vendedor_id(nombre)),
+         quote_requests!quote_items_request_id_fkey!inner(id, folio, submitted_at, due_at, vendedor_id, customer_id, estado, customers(nombre), profiles:vendedor_id(nombre)),
          item_quotes(version, moneda, price_1, price_2, price_3, price_4, price_5, quoted_at),
          item_dispatch(quote_version, precio_elegido, valor, enviado_at),
          item_outcomes(quote_version, resultado, motivo, cantidad_final),
