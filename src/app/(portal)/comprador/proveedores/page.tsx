@@ -18,7 +18,7 @@ export default async function Proveedores() {
   }
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold">Proveedores</h1>
+      <h1 className="text-xl font-semibold tracking-tight">Proveedores</h1>
       <p className="text-sm text-slate-600">Catálogo interno para el autocompletado. Solo el comprador lo ve.</p>
       <Card className="overflow-x-auto p-0">
         <table className="w-full text-left text-sm">

@@ -235,7 +235,7 @@ export function BuyerItemCard({
                 <input value={confirmNota} onChange={(e) => setConfirmNota(e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
               </Field>
               <div className="flex gap-2">
-                <Button disabled={pending} onClick={() => run(() => respondRevisionAction(item.id, "confirm", undefined, confirmNota), "Cotización confirmada con una versión nueva.", () => setUpdateMode(null))}>
+                <Button loading={pending} onClick={() => run(() => respondRevisionAction(item.id, "confirm", undefined, confirmNota), "Cotización confirmada con una versión nueva.", () => setUpdateMode(null))}>
                   Confirmar versión {q.version + 1}
                 </Button>
                 <Button variant="ghost" onClick={() => setUpdateMode(null)}>Cancelar</Button>
@@ -247,7 +247,7 @@ export function BuyerItemCard({
               <p className="text-sm">Captura el costo y el envío nuevos: los 5 precios se recalculan con los factores vigentes ahora. Las condiciones vienen de la versión anterior.</p>
               <QuoteForm form={updateForm} setForm={setUpdateForm} errors={errors} factors={factors} proveedores={proveedores} cantidad={item.cantidad} listId={`provs-upd-${item.id}`} />
               <div className="flex gap-2">
-                <Button disabled={pending} onClick={submitUpdateCost}>Guardar versión {q.version + 1}</Button>
+                <Button loading={pending} onClick={submitUpdateCost}>Guardar versión {q.version + 1}</Button>
                 <Button variant="ghost" onClick={() => setUpdateMode(null)}>Cancelar</Button>
               </div>
             </div>
@@ -293,7 +293,7 @@ export function BuyerItemCard({
               {!sourcing.proveedor.trim() && !sourcing.link_producto.trim() && (
                 <p className="text-xs text-amber-800">Recordatorio: anota dónde conseguirlo (proveedor o link) en la sección interna de abajo.</p>
               )}
-              <Button onClick={submitQuote} disabled={pending}>Guardar cotización</Button>
+              <Button onClick={submitQuote} loading={pending}>Guardar cotización</Button>
               <p className="text-xs text-amber-800">Al guardar, la cotización queda bloqueada y no se podrá editar.</p>
             </div>
           )}

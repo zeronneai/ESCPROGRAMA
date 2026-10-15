@@ -68,7 +68,7 @@ export function CountBar({ title, data, horizontal = false }: { title: string; d
               </>
             )}
             <Tooltip cursor={{ fill: "#f1f5f9" }} formatter={(v) => [String(v), "Partidas"]} />
-            <Bar dataKey="count" name="Partidas" fill={BLUE} radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={28} />
+            <Bar dataKey="count" name="Partidas" fill={BLUE} radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]} maxBarSize={28} isAnimationActive={!horizontal} />
           </BarChart>
         </ResponsiveContainer>
       </Box>

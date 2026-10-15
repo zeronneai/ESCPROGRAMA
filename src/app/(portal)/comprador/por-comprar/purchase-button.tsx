@@ -19,7 +19,7 @@ export function PurchaseButton({ itemId, compradaAt, por }: { itemId: string; co
       <Button
         variant={compradaAt ? "ghost" : "secondary"}
         className="px-2 py-1 text-xs"
-        disabled={pending}
+        loading={pending}
         onClick={() =>
           start(async () => {
             const r = await markPurchasedAction(itemId, !compradaAt);

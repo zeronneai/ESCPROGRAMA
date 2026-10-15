@@ -50,7 +50,7 @@ export function UsersPanel({ users, meId }: { users: UserRow[]; meId: string }) 
 
   return (
     <div className="space-y-6">
-      <h1 className="text-lg font-semibold">Usuarios</h1>
+      <h1 className="text-xl font-semibold tracking-tight">Usuarios</h1>
 
       {secret && (
         <Alert tone="info">
@@ -120,7 +120,7 @@ export function UsersPanel({ users, meId }: { users: UserRow[]; meId: string }) 
             Crear como comprador (administrador del sistema)
           </label>
           <div className="sm:col-span-2">
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" loading={pending}>
               Crear {form.comprador ? "comprador" : "vendedor"}
             </Button>
           </div>
@@ -152,7 +152,7 @@ export function UsersPanel({ users, meId }: { users: UserRow[]; meId: string }) 
                       }}
                     >
                       <Input value={editing.nombre} onChange={(e) => setEditing({ id: u.id, nombre: e.target.value })} />
-                      <Button type="submit" disabled={pending}>
+                      <Button type="submit" loading={pending}>
                         Guardar
                       </Button>
                     </form>

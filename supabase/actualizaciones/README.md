@@ -25,5 +25,6 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 8 | `0013_envio_modos.sql` | Envio al cliente dentro del precio unitario (por unidad, por pedido, por partida) y leyenda de envio editable. El envio ya guardado pasa a "por todo el pedido". |
 | 9 | `0014_alternativo_nombre_pdf.sql` | Producto alternativo del comprador (dentro de la version cotizada), "Nombre en el PDF" por partida y version, y busquedas que tambien consideran la descripcion/uso. |
 | 10 | `0015_compra_minima.sql` | Compra minima obligatoria (cantidad y unidad) en cada cotizacion nueva, y la decision del vendedor cuando la cantidad pedida es menor al minimo. No modifica cotizaciones ya bloqueadas. |
+| 11 | `0016_leads.sql` | Módulo de **Leads** para vendedores: prospectos, bitácora de contactos (llamada, WhatsApp, correo, visita), etapas, conversión a cliente y entrada desde el sitio web. Solo agrega tablas nuevas; no toca nada existente. |
 
 Si una ejecucion falla, **no sigas con la siguiente**: copia el mensaje de error y mandamelo.

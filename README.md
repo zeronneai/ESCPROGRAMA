@@ -24,6 +24,7 @@ Next.js 15 (App Router), TypeScript, Tailwind 4, Supabase (Postgres, Auth, Stora
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Publica | Project Settings > API Keys > clave `anon` / *Publishable key* |
 | `SUPABASE_SERVICE_ROLE_KEY` | **Secreta** | Project Settings > API Keys > clave `service_role` / *Secret key* (no la compartas ni la pongas en `NEXT_PUBLIC_`) |
 | `CRON_SECRET` | **Secreta** (fase 3) | No viene de Supabase: inventa una cadena aleatoria de 32+ caracteres |
+| `LEADS_WEBHOOK_SECRET` | **Secreta** (opcional) | Para la entrada de leads del sitio web. Inventa una cadena aleatoria de 32+ caracteres |
 
 `CRON_SECRET` ya se usa: Vercel la envia al cron diario de avisos (`vercel.json`).
 
@@ -85,3 +86,30 @@ Sin Docker, `tests/rls/run-local-pg.sh` levanta un Postgres temporal con un shim
 
 ## Cron en Vercel
 El plan gratuito (Hobby) solo permite cron **una vez al dia**. "Vencida" se calcula al consultar a partir de `due_at`; el cron diario solo genera avisos dentro del portal.
+
+## Leads (solo vendedores)
+Migración `0016_leads.sql`. Cada vendedor tiene su propio embudo de prospectos en **Leads**:
+- **Lista** con filtros por etapa, búsqueda, seguimientos vencidos o de hoy, y botones de llamar y WhatsApp en el celular.
+- **Ficha del lead**: datos del contacto, producto que le interesa, etapa (Nuevo, Contactado, Interesado, Cotizando, Negociación, Ganado, Perdido con motivo), registro rápido de contactos (llamada con resultado, WhatsApp, correo, visita, reunión, muestra, cotización, nota) con próximo seguimiento, e historial completo.
+- **Reglas automáticas**: el primer contacto pasa el lead de Nuevo a Contactado; cada contacto actualiza "último contacto"; cada cambio de etapa queda en el historial y en la bitácora de auditoría. Nada se borra: se archiva.
+- **Crear solicitud de cotización** desde el lead: lo da de alta como cliente prospecto y abre la solicitud con el cliente ya elegido. **Convertir a cliente** lo marca como ganado (reutiliza el cliente si ya existe con ese nombre).
+- **Gráficas**: leads por etapa, contactos por semana (llamadas, mensajes, visitas), nuevos vs. convertidos por mes y origen de los leads. Indicadores de activos, contactos del mes, clientes ganados, conversión y valor en proceso.
+- **Seguridad**: cada vendedor ve solo sus leads y los que no tienen dueño. El comprador no los ve.
+
+### Conectar el formulario del sitio web
+`POST /api/leads/entrada` con `Authorization: Bearer <LEADS_WEBHOOK_SECRET>` y un JSON (o form-urlencoded) con
+`empresa` (obligatorio), `telefono` o `correo` (al menos uno), y opcionales `nombre`, `puesto`, `ciudad`, `industria`, `producto`, `mensaje`, `pagina`, `externo_id` (evita duplicados) y `website` (campo trampa anti-spam: déjalo vacío y oculto).
+El lead entra **sin vendedor** con origen "Sitio web", todos los vendedores reciben una notificación y el primero que lo toma se queda con él.
+El secreto nunca debe ir en el navegador: el formulario del sitio lo debe enviar desde su propio servidor (por ejemplo una API route del sitio) o desde Zapier/Make.
+
+```bash
+curl -X POST https://<portal>/api/leads/entrada \
+  -H "Authorization: Bearer $LEADS_WEBHOOK_SECRET" -H "Content-Type: application/json" \
+  -d '{"empresa":"Planta Norte","nombre":"Laura","telefono":"6141234567","producto":"Guantes de nitrilo"}'
+```
+
+## Interfaz
+- Barra de navegación con la sección activa; en celular, barra inferior fija con las secciones principales y menú "Más".
+- Barra de progreso arriba y esqueletos de carga mientras se abre cada página; los botones muestran un indicador mientras guardan.
+- Listas como tarjetas en celular y tablas en escritorio.
+- **Historial del comprador**: ahora muestra por defecto todas las partidas que ya respondió (antes salía vacío hasta buscar), con contadores de hoy, semana, mes y total, filtros por estado y paginación. La búsqueda por producto o proveedor sigue igual.

@@ -79,7 +79,7 @@ export default async function CompradorSolicitud({ params }: { params: Promise<{
       <div className="flex flex-wrap items-center gap-3">
         <Link href="/comprador" className="text-sm text-slate-600 hover:underline">Pendientes</Link>
         <span className="text-slate-400">/</span>
-        <h1 className="text-lg font-semibold">{revisionFolio(req.folio!, revision)}</h1>
+        <h1 className="text-xl font-semibold tracking-tight">{revisionFolio(req.folio!, revision)}</h1>
         <span className="text-sm text-slate-600">{customer?.nombre}</span>
         <span className="text-sm text-slate-500">Vendedor: {(req.profiles as unknown as { nombre: string } | null)?.nombre}</span>
         {anyPending && <SemaforoBadge remaining={worst} />}
