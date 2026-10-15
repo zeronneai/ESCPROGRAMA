@@ -47,7 +47,7 @@ export default async function VendedorHome({ searchParams }: { searchParams: Pro
 
   let q = supabase
     .from("quote_items")
-    .select("id, folio, producto, descripcion, cantidad, unidad, estado, item_quotes(version, compra_min_cantidad, compra_min_unidad, compra_min_monto), quote_requests!inner(id, folio, estado, submitted_at, due_at, customer_id, vendedor_id, customers(nombre))")
+    .select("id, folio, producto, descripcion, cantidad, unidad, estado, item_quotes(version, compra_min_cantidad, compra_min_unidad, compra_min_monto), quote_requests!quote_items_request_id_fkey!inner(id, folio, estado, submitted_at, due_at, customer_id, vendedor_id, customers(nombre))")
     .eq("quote_requests.estado", "enviada")
     .eq("quote_requests.vendedor_id", user.id)
     .order("folio", { ascending: false })

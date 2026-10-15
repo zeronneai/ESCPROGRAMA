@@ -17,7 +17,7 @@ async function responseHours(itemId: string) {
   const supabase = await createClient();
   const { data } = await supabase
     .from("quote_items")
-    .select("request_id, quote_requests(submitted_at)")
+    .select("request_id, quote_requests!quote_items_request_id_fkey(submitted_at)")
     .eq("id", itemId)
     .single();
   const submitted = (data?.quote_requests as unknown as { submitted_at: string } | null)?.submitted_at;
