@@ -4,13 +4,14 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import {
-  createCustomerAction,
   discardDraftAction,
   saveDraftAction,
   submitRequestAction,
   uploadReferenceAction,
 } from "@/actions/requests";
+import { CustomerPicker } from "@/components/customers";
 import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
+import { customerMissing, type CustomerRecord } from "@/lib/validation/customer";
 import {
   IMAGE_TYPES,
   isHttpUrl,
@@ -20,10 +21,7 @@ import {
   type ItemDraft,
 } from "@/lib/validation/request";
 
-export interface CustomerOption {
-  id: string;
-  nombre: string;
-}
+export type CustomerOption = CustomerRecord;
 
 export interface EditorInitial {
   request_id: string;
@@ -60,11 +58,10 @@ const newItem = (): ItemDraft => ({
 export function RequestEditor({ initial, customers: initialCustomers }: { initial: EditorInitial; customers: CustomerOption[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [customers, setCustomers] = useState(initialCustomers);
+  const [customer, setCustomer] = useState<CustomerRecord | null>(initialCustomers.find((c) => c.id === initial.customer_id) ?? null);
   const [previews, setPreviews] = useState(initial.previews);
   const [savedOnce, setSavedOnce] = useState(initial.saved);
   const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string; list?: string[] } | null>(null);
-  const [customerName, setCustomerName] = useState(initialCustomers.find((c) => c.id === initial.customer_id)?.nombre ?? "");
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -79,29 +76,20 @@ export function RequestEditor({ initial, customers: initialCustomers }: { initia
   const { register, control, watch, getValues, setValue } = form;
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
   const values = watch();
-  // El cliente es solo el nombre de la empresa: si el nombre escrito ya existe se reutiliza; si no, se crea al guardar.
-  const matched = customers.find((c) => c.nombre.trim().toLowerCase() === customerName.trim().toLowerCase());
-  const problems = submitProblems({ ...values, customer_id: matched?.id ?? (customerName.trim().length >= 2 ? "nuevo" : "") });
+  const missing = customer ? customerMissing(customer) : [];
+  const problems = [
+    ...submitProblems({ ...values, customer_id: customer?.id ?? "" }),
+    ...(customer && missing.length ? [{ item: null, field: "customer" as const, message: `Completa los datos del cliente (${missing.join(", ")})` }] : []),
+  ];
 
-  /** Devuelve el id del cliente (creandolo si hace falta) o null si no se pudo. */
+  /** Id del cliente elegido, o null (con aviso) si aun no se elige. */
   async function resolveCustomer(): Promise<string | null> {
-    if (matched) {
-      setValue("customer_id", matched.id);
-      return matched.id;
+    if (customer) {
+      setValue("customer_id", customer.id);
+      return customer.id;
     }
-    if (customerName.trim().length < 2) {
-      setNotice({ tone: "error", text: "Escribe el nombre de la empresa (cliente)." });
-      return null;
-    }
-    const r = await createCustomerAction({ nombre: customerName });
-    if (!r.ok) {
-      setNotice({ tone: "error", text: r.error });
-      return null;
-    }
-    setCustomers((c) => (c.some((x) => x.id === r.id) ? c : [...c, { id: r.id, nombre: r.nombre }].sort((a, b) => a.nombre.localeCompare(b.nombre))));
-    setCustomerName(r.nombre);
-    setValue("customer_id", r.id);
-    return r.id;
+    setNotice({ tone: "error", text: "Elige o da de alta el cliente." });
+    return null;
   }
 
   async function save(): Promise<boolean> {
@@ -214,17 +202,18 @@ export function RequestEditor({ initial, customers: initialCustomers }: { initia
       )}
 
       <Card className="space-y-3">
-        <Field label="Cliente (nombre de la empresa)">
-          <Input list="clientes-previos" value={customerName} onChange={(e) => setCustomerName(e.target.value)} autoComplete="off" placeholder="Escribe o elige una empresa" />
-          <datalist id="clientes-previos">
-            {customers.map((c) => (
-              <option key={c.id} value={c.nombre} />
-            ))}
-          </datalist>
-        </Field>
-        {customerName.trim().length >= 2 && !matched && (
-          <p className="text-xs text-slate-500">Es una empresa nueva: se agregará al catálogo al guardar.</p>
-        )}
+        <div className="space-y-1.5">
+          <p className="text-sm font-medium text-slate-700">Cliente *</p>
+          <CustomerPicker
+            customers={initialCustomers}
+            value={customer?.id ?? ""}
+            onChange={(c) => {
+              setCustomer(c);
+              setValue("customer_id", c?.id ?? "");
+              if (c && !getValues().atencion && c.contacto_nombre) setValue("atencion", c.contacto_nombre);
+            }}
+          />
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Atención (persona de contacto, opcional)">
             <Input {...register("atencion")} />
@@ -263,7 +252,7 @@ export function RequestEditor({ initial, customers: initialCustomers }: { initia
         Agregar partida
       </Button>
 
-      <div className="sticky bottom-0 -mx-4 space-y-2 border-t border-slate-200 bg-slate-50/95 px-4 py-3 backdrop-blur">
+      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-4 space-y-2 border-t border-slate-200 bg-slate-50/95 px-4 py-3 backdrop-blur md:bottom-0">
         {problems.length > 0 && (
           <p className="text-xs text-amber-800">
             Para enviar falta: {problems.map((p) => p.message).join(" · ")}

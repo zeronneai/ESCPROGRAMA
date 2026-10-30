@@ -16,6 +16,7 @@ export function buildTimeline(
     Pick<ItemRow, "folio" | "producto" | "estado" | "not_found_note" | "first_response_at" | "item_quotes" | "item_dispatch"> &
       Partial<Pick<ItemRow, "item_update_requests" | "item_clarification_pauses" | "item_outcomes">>
   >,
+  opts: { skipDispatch?: boolean } = {},
 ): TimelineEvent[] {
   const ev: TimelineEvent[] = [];
   if (request.created_at) ev.push({ at: request.created_at, text: "Borrador creado" });
@@ -32,7 +33,7 @@ export function buildTimeline(
     for (const q of i.item_quotes ?? []) {
       ev.push({ at: q.quoted_at, text: `${label}: cotizada${q.version > 1 ? ` (version ${q.version}, ${revisionFolio(i.folio ?? "", q.version)})` : ""}` });
     }
-    for (const d of i.item_dispatch ?? []) {
+    for (const d of opts.skipDispatch ? [] : (i.item_dispatch ?? [])) {
       ev.push({ at: d.enviado_at, text: `${label}: enviada al cliente con el Precio ${d.precio_elegido}${d.quote_version > 1 ? ` (version ${d.quote_version})` : ""}` });
     }
     for (const u of i.item_update_requests ?? []) {
@@ -50,6 +51,33 @@ export function buildTimeline(
     }
   }
   return ev.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+}
+
+export const SEND_MEDIUM_LABEL: Record<string, string> = {
+  correo: "correo",
+  whatsapp: "WhatsApp",
+  en_persona: "en persona",
+  telefono: "teléfono",
+  otro: "otro medio",
+};
+
+/** Envios al cliente (por numero) y recotizaciones, para la linea de tiempo. */
+export function emissionEvents(
+  issues: Array<{ numero: string; sends: Array<{ medio: string; destinatario: string | null; enviado_at: string }> }>,
+  renegs: Array<{ motivo: string; abierta_at: string; cerrada_at: string | null; cancelada: boolean }>,
+): TimelineEvent[] {
+  const ev: TimelineEvent[] = [];
+  for (const i of issues) {
+    i.sends.forEach((s, n) => {
+      const to = s.destinatario ? ` a ${s.destinatario}` : "";
+      ev.push({ at: s.enviado_at, text: `${n === 0 ? "Cotización" : "Reenvío de la cotización"} ${i.numero} enviada al cliente por ${SEND_MEDIUM_LABEL[s.medio] ?? s.medio}${to}` });
+    });
+  }
+  for (const r of renegs) {
+    ev.push({ at: r.abierta_at, text: `Recotización abierta: ${r.motivo}` });
+    if (r.cerrada_at && r.cancelada) ev.push({ at: r.cerrada_at, text: "Recotización cancelada (se conservan los precios enviados)" });
+  }
+  return ev;
 }
 
 const ACTION_LABEL: Record<string, string> = {

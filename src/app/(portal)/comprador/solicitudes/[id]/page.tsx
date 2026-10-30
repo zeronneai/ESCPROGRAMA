@@ -8,7 +8,8 @@ import { remainingWithPauses } from "@/lib/quotes/clock";
 import { requestRevision, revisionFolio } from "@/lib/quotes/revisions";
 import { getBusinessSettings, withMessageImageUrls, withSignedUrls } from "@/lib/quotes/server";
 import type { ItemRow } from "@/lib/quotes/types";
-import { auditActionLabel, buildTimeline } from "@/lib/stats/timeline";
+import { auditActionLabel, buildTimeline, emissionEvents } from "@/lib/stats/timeline";
+import { IssuesList, toIssueList } from "@/components/issues-list";
 import { businessHoursBetween } from "@/lib/time/business-hours";
 import { createClient } from "@/lib/supabase/server";
 import { BuyerItemCard, type BuyerItem } from "./buyer-item-card";
@@ -73,6 +74,15 @@ export default async function CompradorSolicitud({ params }: { params: Promise<{
   const names = new Map((people ?? []).map((p) => [p.id as string, p.nombre as string]));
   const customer = req.customers as unknown as { nombre: string } | null;
   const revision = requestRevision(rows);
+  const [{ data: issueRows }, { data: renegs }] = await Promise.all([
+    supabase
+      .from("quote_issues")
+      .select("id, numero, emitida_at, snapshot, quote_issue_sends(medio, destinatario, enviado_at)")
+      .eq("request_id", req.id)
+      .order("emitida_at", { ascending: false }),
+    supabase.from("quote_renegotiations").select("issue_id, motivo, abierta_at, cerrada_at, cancelada").eq("request_id", req.id),
+  ]);
+  const issues = toIssueList(issueRows ?? [], renegs ?? []);
 
   return (
     <div className="space-y-4">
@@ -103,7 +113,13 @@ export default async function CompradorSolicitud({ params }: { params: Promise<{
           nowIso={now.toISOString()}
         />
       ))}
-      <Timeline events={buildTimeline({ folio: req.folio!, created_at: req.created_at, submitted_at: req.submitted_at, due_at: req.due_at }, rows)} />
+      <IssuesList issues={issues} requestId={req.id} />
+      <Timeline
+        events={[
+          ...buildTimeline({ folio: req.folio!, created_at: req.created_at, submitted_at: req.submitted_at, due_at: req.due_at }, rows, { skipDispatch: issues.length > 0 }),
+          ...emissionEvents(issues, renegs ?? []),
+        ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())}
+      />
       <Card>
         <details>
           <summary className="cursor-pointer text-sm font-medium">Bitácora de auditoría ({(audit ?? []).length})</summary>

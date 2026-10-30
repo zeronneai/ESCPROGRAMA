@@ -21,7 +21,10 @@ export async function createWorld(): Promise<World> {
       await q("insert into public.profiles (id, nombre, correo, rol, must_change_password) values ($1,$2,$3,$4,false)",
         [id, `${nombre} ${id.slice(0, 4)}`, `${id}@esc.test`, rol]);
     }
-    const c = await q("insert into public.customers (nombre) values ($1) returning id", [`Cliente ${randomUUID().slice(0, 8)}`]);
+    const c = await q(
+      "insert into public.customers (nombre, rfc, direccion, contacto_telefono) values ($1, $2, $3, $4) returning id",
+      [`Cliente ${randomUUID().slice(0, 8)}`, "ABC010101AB1", "Av. Industrial 100, Cd. Juarez", "6141234567"],
+    );
     customerId = c.rows[0].id;
   });
   const a = (id: string): Actor => ({ id, role: "authenticated" });

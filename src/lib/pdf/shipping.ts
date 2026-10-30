@@ -134,3 +134,125 @@ export function shippingDefaults(
     ),
   };
 }
+
+// ---------------------------------------------------------------------------
+// Como ve el cliente el envio (presentacion)
+// ---------------------------------------------------------------------------
+
+/**
+ * - sin_envio: cliente local o recoge; no hay cargo.
+ * - incluido:  "envio gratis": el monto se reparte dentro de los precios (por pedido, por unidad o por partida).
+ * - aparte:    un renglon "Envio" en el PDF, sumado al total.
+ * - mixto:     una parte incluida en los precios y otra como renglon aparte.
+ */
+export type ShippingPresentation = "sin_envio" | "incluido" | "aparte" | "mixto";
+
+export const PRESENTATION_LABEL: Record<ShippingPresentation, string> = {
+  sin_envio: "Sin envío",
+  incluido: "Incluido en el precio",
+  aparte: "Cargo aparte",
+  mixto: "Mixto",
+};
+export const PRESENTATION_HINT: Record<ShippingPresentation, string> = {
+  sin_envio: "Cliente local o recoge en sucursal. El PDF no menciona envío.",
+  incluido: "\"Envío gratis\": el envío se reparte dentro del precio unitario.",
+  aparte: "El PDF muestra un renglón \"Envío\" con su monto, sumado al total.",
+  mixto: "Una parte se reparte en los precios y otra sale como renglón \"Envío\".",
+};
+
+/** Los modos que reparten envio dentro del precio (para "incluido" y la parte incluida de "mixto"). */
+export type DistributionMode = Exclude<ShippingMode, "incluido">;
+export const DISTRIBUTION_LABEL: Record<DistributionMode, string> = {
+  por_pedido: "Repartido en todo el pedido",
+  por_unidad: "Mismo monto por unidad",
+  por_partida: "Monto por partida",
+};
+
+export interface ShippingAparte {
+  monto: number;
+  moneda: Currency;
+}
+
+export interface ShippingSetupInput extends ShippingInput {
+  presentacion: ShippingPresentation;
+  aparteMonto?: string | null;
+}
+
+export type ShippingSetupParse =
+  | {
+      ok: true;
+      presentacion: ShippingPresentation;
+      plan: ShippingPlan;
+      aparte: ShippingAparte | null;
+      db: ShippingDb & { presentacion: ShippingPresentation; aparte_monto: number | null; aparte_moneda: Currency | null };
+    }
+  | { ok: false; error: string };
+
+/** Valida la captura completa del envio: la parte incluida (plan) y la parte aparte. */
+export function parseShippingSetup(input: ShippingSetupInput, ctx: { currencies: Currency[]; itemIds: string[] }): ShippingSetupParse {
+  const p = input.presentacion;
+  const wantsIncluded = p === "incluido" || p === "mixto";
+  const wantsAparte = p === "aparte" || p === "mixto";
+
+  let included: Extract<ShippingParse, { ok: true }> = { ok: true, plan: NO_SHIPPING, db: { modo: "incluido", monto: null, moneda: null, partidas: [] } };
+  if (wantsIncluded) {
+    const modo: ShippingMode = input.modo === "incluido" ? "por_pedido" : input.modo;
+    const r = parseShippingPlan({ ...input, modo }, ctx);
+    if (!r.ok) return r;
+    if (r.plan.modo === "incluido") return { ok: false, error: "Captura el monto del envío incluido en los precios" };
+    included = r;
+  }
+
+  let aparte: ShippingAparte | null = null;
+  if (wantsAparte) {
+    const n = parseNumber(input.aparteMonto ?? "");
+    if (n === undefined || n === 0) return { ok: false, error: "Captura el monto del envío que va aparte" };
+    if (Number.isNaN(n) || n < 0) return { ok: false, error: "El monto del envío aparte no es válido" };
+    const moneda = resolveCurrency(input.moneda, ctx.currencies);
+    if (!moneda) return { ok: false, error: MIXED_ERROR };
+    aparte = { monto: Math.round(n * 100) / 100, moneda };
+  }
+
+  return {
+    ok: true,
+    presentacion: p,
+    plan: included.plan,
+    aparte,
+    db: { ...included.db, presentacion: p, aparte_monto: aparte?.monto ?? null, aparte_moneda: aparte?.moneda ?? null },
+  };
+}
+
+type StoredPdfRow = {
+  envio_modo?: string | null;
+  envio_monto?: number | string | null;
+  envio_moneda?: string | null;
+  envio_presentacion?: string | null;
+  envio_aparte_monto?: number | string | null;
+  envio_aparte_moneda?: string | null;
+} | null | undefined;
+
+/** Presentacion guardada; lo anterior a esta opcion se deduce del modo (con monto = incluido). */
+export function storedPresentation(row: StoredPdfRow): ShippingPresentation | null {
+  if (!row) return null;
+  const p = row.envio_presentacion;
+  if (p === "sin_envio" || p === "incluido" || p === "aparte" || p === "mixto") return p;
+  return null;
+}
+
+export function aparteFromStored(row: StoredPdfRow): ShippingAparte | null {
+  const p = storedPresentation(row);
+  if (p !== "aparte" && p !== "mixto") return null;
+  const m = row?.envio_aparte_moneda;
+  const n = Number(row?.envio_aparte_monto);
+  return (m === "MXN" || m === "USD") && n > 0 ? { monto: n, moneda: m } : null;
+}
+
+/** Valores iniciales de presentacion para el panel. */
+export function presentationDefaults(row: StoredPdfRow): { presentacion: ShippingPresentation; aparteMonto: string } {
+  const stored = storedPresentation(row);
+  const legacyIncluded = row?.envio_modo && row.envio_modo !== "incluido";
+  return {
+    presentacion: stored ?? (legacyIncluded ? "incluido" : "sin_envio"),
+    aparteMonto: row?.envio_aparte_monto ? String(Number(row.envio_aparte_monto)) : "",
+  };
+}

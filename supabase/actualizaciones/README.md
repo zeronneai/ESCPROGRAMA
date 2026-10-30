@@ -26,5 +26,6 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 9 | `0014_alternativo_nombre_pdf.sql` | Producto alternativo del comprador (dentro de la version cotizada), "Nombre en el PDF" por partida y version, y busquedas que tambien consideran la descripcion/uso. |
 | 10 | `0015_compra_minima.sql` | Compra minima obligatoria (cantidad y unidad) en cada cotizacion nueva, y la decision del vendedor cuando la cantidad pedida es menor al minimo. No modifica cotizaciones ya bloqueadas. |
 | 11 | `0016_leads.sql` | Módulo de **Leads** para vendedores: prospectos, bitácora de contactos (llamada, WhatsApp, correo, visita), etapas, conversión a cliente y entrada desde el sitio web. Solo agrega tablas nuevas; no toca nada existente. |
+| 12 | `0017_envio_cliente_recotizar.sql` | Registro de envío al cliente con número de cotización y copia fija del PDF, recotización con número nuevo (-V2, -V3), envío sin cargo / incluido / aparte / mixto, y base general de clientes (RFC, dirección y contacto obligatorios para enviar solicitudes nuevas). No modifica cotizaciones ya enviadas. |
 
 Si una ejecucion falla, **no sigas con la siguiente**: copia el mensaje de error y mandamelo.

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fase4Suite } from "./fase4.suite";
 import { leadsSuite } from "./leads.suite";
+import { emisionesSuite } from "./emisiones.suite";
 import { calcTabulador } from "@/lib/pricing/tabulador";
 import { DATABASE_URL, as, failure, pool, type Actor } from "./helpers";
 
@@ -75,7 +76,7 @@ describe.skipIf(!DATABASE_URL)("RLS e integridad (requiere Postgres con migracio
           [id, nombre, `${nombre.replace(" ", "")}@esc.test`, rol],
         );
       }
-      const c = await q("insert into public.customers (nombre, tipo) values ('Cliente SA','cliente') returning id");
+      const c = await q("insert into public.customers (nombre, tipo, rfc, direccion, contacto_correo) values ('Cliente SA','cliente','CSA010101AB1','Calle 1, Chihuahua','compras@cliente.example') returning id");
       customerId = c.rows[0].id;
     });
   });
@@ -533,6 +534,7 @@ async function newPendingItem(): Promise<string> {
 // La suite de la fase 4 corre DESPUES de la anterior y con sus propios usuarios.
 fase4Suite();
 leadsSuite();
+emisionesSuite();
 
 afterAll(async () => {
   await pool?.end();

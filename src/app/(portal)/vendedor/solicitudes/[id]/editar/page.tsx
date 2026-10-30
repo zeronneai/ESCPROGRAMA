@@ -1,3 +1,4 @@
+import { CUSTOMER_COLS, type CustomerRecord } from "@/lib/validation/customer";
 import { notFound, redirect } from "next/navigation";
 import { RequestEditor } from "@/components/request-editor";
 import { requireUser } from "@/lib/auth/guards";
@@ -18,7 +19,9 @@ export default async function EditarBorrador({ params }: { params: Promise<{ id:
   if (req.estado !== "borrador") redirect(`/vendedor/solicitudes/${id}`);
 
   const [{ data: customers }, { data: items }] = await Promise.all([
-    supabase.from("customers").select("id, nombre").eq("activo", true).order("nombre"),
+    supabase.from("customers")
+    .select(CUSTOMER_COLS)
+    .eq("activo", true).order("nombre"),
     supabase
       .from("quote_items")
       .select("id, posicion, producto, descripcion, cantidad, unidad, talla, notas, item_references(id, tipo, url)")
@@ -34,7 +37,7 @@ export default async function EditarBorrador({ params }: { params: Promise<{ id:
 
   return (
     <RequestEditor
-      customers={customers ?? []}
+      customers={(customers ?? []) as CustomerRecord[]}
       initial={{
         request_id: id,
         customer_id: req.customer_id,

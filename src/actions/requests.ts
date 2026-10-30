@@ -24,23 +24,6 @@ async function requireSeller() {
   return u;
 }
 
-/** El cliente es solo el nombre de la empresa. Si ya existe (sin importar mayusculas) se reutiliza. */
-export async function createCustomerAction(input: { nombre: string }): Promise<Result<{ id: string; nombre: string }>> {
-  const u = await requireSeller();
-  const parsed = z.object({ nombre: z.string().trim().min(2, "Escribe el nombre de la empresa") }).safeParse(input);
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
-  const supabase = await createClient();
-  const { data: existing } = await supabase.from("customers").select("id, nombre").ilike("nombre", parsed.data.nombre.replace(/[%_]/g, "\\$&")).limit(1);
-  if (existing?.[0]) return { ok: true, id: existing[0].id, nombre: existing[0].nombre };
-  const { data, error } = await supabase
-    .from("customers")
-    .insert({ nombre: parsed.data.nombre, created_by: u.id })
-    .select("id, nombre")
-    .single();
-  if (error) return { ok: false, error: friendlyError(error.message) };
-  return { ok: true, ...data };
-}
-
 export async function saveDraftAction(input: unknown): Promise<Result<{ id: string }>> {
   await requireSeller();
   const parsed = requestDraftSchema.safeParse(input);

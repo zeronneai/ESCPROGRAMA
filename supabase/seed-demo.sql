@@ -48,8 +48,9 @@ begin
   perform set_config('request.jwt.claim.sub', b::text, true);
 
   for i in 1..array_length(names, 1) loop
-    insert into public.customers (nombre, tipo, created_by)
-    values (names[i], case when i <= 5 then 'cliente' else 'prospecto' end::public.customer_kind, b)
+    insert into public.customers (nombre, tipo, created_by, rfc, direccion, contacto_telefono)
+    values (names[i], case when i <= 5 then 'cliente' else 'prospecto' end::public.customer_kind, b,
+            'DEM0101' || lpad(i::text, 2, '0') || 'AB1', 'Parque Industrial ' || i || ', Cd. Juarez, Chih.', '656 000 00' || lpad(i::text, 2, '0'))
     on conflict do nothing;
   end loop;
   select array_agg(id order by nombre) into custs from public.customers where nombre = any (names);

@@ -19,6 +19,7 @@ const NAV: Record<"comprador" | "vendedor", NavItem[]> = {
   ],
   vendedor: [
     { href: "/vendedor", label: "Mis solicitudes", short: "Solicitudes", icon: "list", match: ["/vendedor/solicitudes"] },
+    { href: "/vendedor/clientes", label: "Clientes", icon: "building" },
     { href: "/vendedor/solicitudes/nueva", label: "Nueva solicitud", short: "Nueva", icon: "plus", cta: true },
     { href: "/vendedor/leads", label: "Leads", icon: "target" },
   ],

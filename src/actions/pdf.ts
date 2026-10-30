@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
-import { parseShippingPlan } from "@/lib/pdf/shipping";
+import { parseShippingSetup } from "@/lib/pdf/shipping";
 import { PDF_NAME_MAX } from "@/lib/pdf/names";
 import { friendlyError } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
@@ -32,9 +32,13 @@ const pdfSchema = z.object({
   via: z.string().trim().max(120),
   condiciones: z.string().trim().max(120),
   atencion: z.string().trim().max(200),
-  /** Envio al cliente (opcional): va dentro del precio unitario. */
+  /** Como ve el cliente el envio: sin envio, incluido en el precio, cargo aparte o mixto. */
+  presentacion: z.enum(["sin_envio", "incluido", "aparte", "mixto"]),
+  /** Como se reparte la parte incluida en los precios. */
   envioModo: z.enum(["incluido", "por_unidad", "por_pedido", "por_partida"]),
   monto: z.string().max(30).optional(),
+  /** Monto del envio que sale como renglon aparte (aparte o mixto). */
+  aparteMonto: z.string().max(30).optional(),
   moneda: z.enum(["MXN", "USD", ""]).optional(),
   /** "Nombre en el PDF" por partida; vacio = usar el nombre por defecto. */
   nombres: z.array(z.object({ itemId: z.string().uuid(), nombre: z.string().trim().max(PDF_NAME_MAX, "El nombre en el PDF no puede pasar de 200 caracteres") })).max(200).optional(),
@@ -67,13 +71,13 @@ export async function savePdfDataAction(input: PdfDataInput): Promise<Result> {
     const last = [...(i.item_quotes ?? [])].sort((a, b) => b.version - a.version)[0];
     if (last) currencies.add(last.moneda);
   }
-  const ship = parseShippingPlan(
-    { modo: v.envioModo, monto: v.monto, moneda: v.moneda, partidas: v.partidas },
+  const ship = parseShippingSetup(
+    { presentacion: v.presentacion, modo: v.envioModo, monto: v.monto, moneda: v.moneda, partidas: v.partidas, aparteMonto: v.aparteMonto },
     { currencies: (["MXN", "USD"] as const).filter((c) => currencies.has(c)), itemIds },
   );
   if (!ship.ok) return { ok: false, error: ship.error };
 
-  const { error } = await supabase.rpc("save_pdf_envio", {
+  const { error } = await supabase.rpc("save_pdf_envio_v2", {
     p_request: v.requestId,
     p_destino: v.destino || null,
     p_via: v.via || null,
@@ -83,6 +87,9 @@ export async function savePdfDataAction(input: PdfDataInput): Promise<Result> {
     p_monto: ship.db.monto,
     p_moneda: ship.db.moneda,
     p_items: ship.db.partidas,
+    p_presentacion: ship.db.presentacion,
+    p_aparte_monto: ship.db.aparte_monto,
+    p_aparte_moneda: ship.db.aparte_moneda,
   });
   if (error) return { ok: false, error: friendlyError(error.message) };
   if (v.nombres?.length) {

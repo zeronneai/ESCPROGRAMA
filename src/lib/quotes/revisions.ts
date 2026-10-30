@@ -22,3 +22,11 @@ export function vigenciaDiasRestantes(q: Pick<QuoteRow, "valid_until">, now: Dat
   if (!q.valid_until) return null;
   return Math.ceil((new Date(q.valid_until).getTime() - now.getTime()) / 86_400_000);
 }
+
+/**
+ * Numero de una cotizacion emitida al cliente: folio, -R{revision} si el comprador actualizo costos y
+ * -V{secuencia} por cada recotizacion de la misma revision. Debe coincidir con issue_quote() en la BD.
+ */
+export function issueNumber(folio: string, revision: number, secuencia: number): string {
+  return `${revisionFolio(folio, revision)}${secuencia > 1 ? `-V${secuencia}` : ""}`;
+}

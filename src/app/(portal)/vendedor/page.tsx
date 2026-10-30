@@ -1,66 +1,66 @@
-import { minAlert } from "@/lib/quotes/min-purchase";
 import Link from "next/link";
 import { DateTime } from "luxon";
-import { Button, Card, EmptyState, Field, Input, PageHeader, Select, StatCard } from "@/components/ui";
-import { ItemStatusBadge, SemaforoBadge } from "@/components/status";
+import { Icon } from "@/components/icons";
+import { Card, EmptyState, FilterChip, PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guards";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import type { ItemStatus } from "@/lib/quotes/types";
-import { summarizeSeller, viewState } from "@/lib/stats/seller-summary";
+import { PIPELINE, requestStage, STAGE_INFO, type PipelineGroup, type StageResult } from "@/lib/stats/seller-pipeline";
 import { createClient } from "@/lib/supabase/server";
 import { businessHoursBetween } from "@/lib/time/business-hours";
 
-interface ItemRowDb {
+interface ReqRow {
   id: string;
-  folio: string | null;
-  producto: string;
-  descripcion: string;
-  cantidad: number | string | null;
-  unidad: string | null;
-  item_quotes: { version: number; compra_min_cantidad: number | string | null; compra_min_unidad: string | null; compra_min_monto: number | string | null }[];
-  estado: ItemStatus;
-  quote_requests: {
-    id: string;
-    folio: string;
-    submitted_at: string;
-    due_at: string;
-    customer_id: string;
-    customers: { nombre: string } | null;
-  };
+  folio: string;
+  submitted_at: string;
+  due_at: string;
+  customers: { nombre: string } | null;
+  quote_items: {
+    producto: string;
+    descripcion: string;
+    estado: ItemStatus;
+    item_quotes: { version: number; valid_until: string | null }[];
+    item_dispatch: { quote_version: number; enviado_at: string }[];
+    item_outcomes: { quote_version: number; resultado: "sin_respuesta" | "ganada" | "perdida"; updated_at: string }[];
+  }[];
+  quote_issues: { numero: string; emitida_at: string; quote_issue_sends: { enviado_at: string }[] }[];
+  quote_renegotiations: { cerrada_at: string | null }[];
 }
 
-const ESTADOS = [
-  ["pendiente", "Pendiente"],
-  ["cotizada", "Respondida sin enviar"],
-  ["no_encontrada", "No encontrada"],
-  ["vencida", "Vencida"],
-  ["actualizacion_solicitada", "Actualización solicitada"],
-  ["esperando_aclaracion", "Esperando aclaración"],
-  ["enviada_cliente", "Enviada al cliente"],
-] as const;
+const TONE: Record<string, string> = {
+  purple: "border-l-purple-500 bg-purple-50",
+  amber: "border-l-amber-500 bg-amber-50",
+  red: "border-l-red-500 bg-red-50",
+  indigo: "border-l-indigo-500 bg-indigo-50",
+};
+const pct = (v: number | null) => (v === null ? "-" : `${Math.round(v * 100)}%`);
+const ago = (iso: string, now: Date) => {
+  const d = Math.floor((now.getTime() - new Date(iso).getTime()) / 86_400_000);
+  return d <= 0 ? "hoy" : d === 1 ? "ayer" : `hace ${d} días`;
+};
 
 export default async function VendedorHome({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const user = await requireUser();
   const sp = await searchParams;
   const supabase = await createClient();
   const cfg = await getBusinessSettings(supabase);
+  const etapa = (sp.etapa ?? "") as PipelineGroup | "accion" | "";
+  const buscar = (sp.buscar ?? "").trim().toLowerCase();
 
-  let q = supabase
-    .from("quote_items")
-    .select("id, folio, producto, descripcion, cantidad, unidad, estado, item_quotes(version, compra_min_cantidad, compra_min_unidad, compra_min_monto), quote_requests!quote_items_request_id_fkey!inner(id, folio, estado, submitted_at, due_at, customer_id, vendedor_id, customers(nombre))")
-    .eq("quote_requests.estado", "enviada")
-    .eq("quote_requests.vendedor_id", user.id)
-    .order("folio", { ascending: false })
-    .limit(1000);
-  if (sp.desde) q = q.gte("quote_requests.submitted_at", DateTime.fromISO(sp.desde, { zone: cfg.timezone }).startOf("day").toUTC().toISO()!);
-  if (sp.hasta) q = q.lte("quote_requests.submitted_at", DateTime.fromISO(sp.hasta, { zone: cfg.timezone }).endOf("day").toUTC().toISO()!);
-  if (sp.cliente) q = q.eq("quote_requests.customer_id", sp.cliente);
-  // Busca en el nombre y tambien en la descripcion/uso (interno), para encontrar equivalencias.
-  const texto = (sp.buscar ?? "").replace(/[,()%*\\]/g, " ").trim().slice(0, 80);
-  if (texto) q = q.or(`producto.ilike.%${texto}%,descripcion.ilike.%${texto}%`);
-
-  const [{ data }, { data: drafts }, { data: clientes }] = await Promise.all([
-    q,
+  const [{ data, error }, { data: drafts }] = await Promise.all([
+    supabase
+      .from("quote_requests")
+      .select(
+        `id, folio, submitted_at, due_at, customers(nombre),
+         quote_items!quote_items_request_id_fkey(producto, descripcion, estado, item_quotes(version, valid_until), item_dispatch(quote_version, enviado_at), item_outcomes(quote_version, resultado, updated_at)),
+         quote_issues!quote_issues_request_id_fkey(numero, emitida_at, quote_issue_sends(enviado_at)),
+         quote_renegotiations!quote_renegotiations_request_id_fkey(cerrada_at)`,
+      )
+      .eq("vendedor_id", user.id)
+      .eq("estado", "enviada")
+      .is("archived_at", null)
+      .order("submitted_at", { ascending: false })
+      .limit(500),
     supabase
       .from("quote_requests")
       .select("id, created_at, customers(nombre)")
@@ -68,207 +68,237 @@ export default async function VendedorHome({ searchParams }: { searchParams: Pro
       .eq("estado", "borrador")
       .is("archived_at", null)
       .order("created_at", { ascending: false }),
-    supabase.from("customers").select("id, nombre").eq("activo", true).order("nombre"),
   ]);
 
-  const items = (data ?? []) as unknown as ItemRowDb[];
   const now = new Date();
-  const c = summarizeSeller(items.map((i) => ({ requestId: i.quote_requests.id, estado: i.estado, dueAt: i.quote_requests.due_at })), now);
-  const shown = items.filter((i) => !sp.estado || viewState(i.estado, i.quote_requests.due_at, now) === sp.estado);
+  const rows = ((data ?? []) as unknown as ReqRow[]).map((r) => {
+    const sends = [
+      ...r.quote_issues.flatMap((x) => x.quote_issue_sends.map((s) => s.enviado_at)),
+      ...r.quote_items.flatMap((i) => i.item_dispatch.map((d) => d.enviado_at)),
+    ].sort();
+    const s: StageResult = requestStage(
+      { items: r.quote_items, renegotiationOpen: r.quote_renegotiations.some((x) => !x.cerrada_at), lastSentAt: sends.at(-1) ?? null },
+      now,
+    );
+    const lastIssue = [...r.quote_issues].sort((a, b) => b.emitida_at.localeCompare(a.emitida_at))[0];
+    return { r, s, lastIssue, lastSent: sends.at(-1) ?? null, remaining: businessHoursBetween(now, new Date(r.due_at), cfg) };
+  });
 
-  const filtrosActivos = [sp.estado, sp.buscar, sp.cliente, sp.desde, sp.hasta].filter(Boolean).length;
-  const minBadge = (i: ItemRowDb) => {
-    const last = [...(i.item_quotes ?? [])].sort((a, b) => b.version - a.version)[0];
-    const alerta = last ? minAlert(i, last) : null;
-    return alerta ? <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">{alerta.text}</span> : null;
+  // Indicadores: ultimos 90 dias por solicitud, y envios del mes.
+  const monthStart = DateTime.now().setZone(cfg.timezone).startOf("month").toJSDate();
+  const recent = rows.filter((x) => now.getTime() - new Date(x.r.submitted_at).getTime() < 90 * 86_400_000);
+  const ganadas90 = recent.filter((x) => x.s.stage === "ganada").length;
+  const perdidas90 = recent.filter((x) => x.s.stage === "perdida").length;
+  const enviadasMes = rows.filter((x) => x.lastSent && new Date(x.lastSent) >= monthStart).length;
+  const ganadasMes = rows.filter((x) => x.r.quote_items.some((i) => i.item_outcomes.some((o) => o.resultado === "ganada" && new Date(o.updated_at) >= monthStart))).length;
+
+  const action = rows.filter((x) => x.s.action).sort((a, b) => ["purple", "red", "amber", "indigo"].indexOf(a.s.action!.tone) - ["purple", "red", "amber", "indigo"].indexOf(b.s.action!.tone));
+  const byGroup = Object.fromEntries(PIPELINE.map((p) => [p.id, rows.filter((x) => STAGE_INFO[x.s.stage].group === p.id).length])) as Record<PipelineGroup, number>;
+  const open = rows.length - byGroup.ganada - byGroup.cerrada;
+
+  const shown = rows.filter((x) => {
+    if (etapa === "accion" && !x.s.action) return false;
+    if (etapa && etapa !== "accion" && STAGE_INFO[x.s.stage].group !== etapa) return false;
+    if (!buscar) return true;
+    return [x.r.folio, x.r.customers?.nombre ?? "", x.lastIssue?.numero ?? "", ...x.r.quote_items.flatMap((i) => [i.producto, i.descripcion])]
+      .some((f) => f.toLowerCase().includes(buscar));
+  });
+  const href = (e?: string) => {
+    const p = new URLSearchParams();
+    if (e) p.set("etapa", e);
+    if (sp.buscar) p.set("buscar", sp.buscar);
+    const s = p.toString();
+    return `/vendedor${s ? `?${s}` : ""}`;
   };
-  const estadoBadges = (i: ItemRowDb, vs: ReturnType<typeof viewState>) => (
-    <>
-      <ItemStatusBadge estado={i.estado} vencida={vs === "vencida"} />
-      {vs === "pendiente" && <SemaforoBadge remaining={businessHoursBetween(now, new Date(i.quote_requests.due_at), cfg)} />}
-    </>
-  );
-  const counter = (label: string, value: number, estado?: string, tone?: "amber" | "purple" | "brand") => (
-    <Link href={estado ? `/vendedor?estado=${estado}` : "/vendedor"} className="block transition hover:-translate-y-0.5">
-      <StatCard label={label} value={value} tone={value > 0 && tone ? tone : "default"} />
-    </Link>
-  );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <PageHeader
-        title="Mis solicitudes"
-        subtitle="Da seguimiento a tus cotizaciones y marca lo que ya enviaste al cliente."
+        title="Mis cotizaciones"
+        subtitle="Lo urgente arriba; abajo el avance de todas tus solicitudes."
         actions={
-          <Link href="/vendedor/solicitudes/nueva" className="hidden rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 md:inline-flex">
-            Nueva solicitud
+          <Link href="/vendedor/solicitudes/nueva" className="hidden items-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 md:inline-flex">
+            <Icon name="plus" className="h-4 w-4" /> Nueva solicitud
           </Link>
         }
       />
+      {error && <Card className="border-red-200 bg-red-50 text-sm text-red-800">No se pudieron cargar tus solicitudes: {error.message}</Card>}
 
-      {c.sinEnviar > 0 && (
-        <Link
-          href="/vendedor?estado=cotizada"
-          className="flex items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 hover:bg-amber-100"
-        >
-          <span>
-            Tienes <strong>{c.sinEnviar}</strong> partida(s) respondida(s) que aún no marcas como enviadas al cliente.
-          </span>
-          <span className="shrink-0 font-medium underline">Verlas</span>
-        </Link>
-      )}
+      {/* 1. Lo que requiere accion */}
+      <section className="space-y-2">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Requieren tu atención</h2>
+          {action.length > 5 && <Link href={href("accion")} className="text-sm font-medium text-brand-600 hover:underline">Ver las {action.length}</Link>}
+        </div>
+        {action.length === 0 ? (
+          <Card className="flex items-center gap-3 border-green-200 bg-green-50 text-sm text-green-900">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-600 text-white">✓</span>
+            Nada pendiente de tu lado. Buen trabajo.
+          </Card>
+        ) : (
+          <ul className="grid gap-2 md:grid-cols-2">
+            {action.slice(0, 6).map(({ r, s }) => (
+              <li key={r.id}>
+                <Link href={`/vendedor/solicitudes/${r.id}`} className={`flex items-center justify-between gap-3 rounded-lg border border-l-4 border-slate-200 px-4 py-3 transition hover:shadow-sm ${TONE[s.action!.tone]}`}>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{r.customers?.nombre} <span className="font-normal text-slate-500">· {r.folio}</span></p>
+                    <p className="text-sm text-slate-700">{s.action!.text}</p>
+                  </div>
+                  <span className="shrink-0 text-slate-400">→</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        {counter("Solicitudes creadas", c.solicitudes)}
-        {counter("Pendientes", c.pendientes, "pendiente", "brand")}
-        {counter("Respondidas sin enviar", c.sinEnviar, "cotizada", "amber")}
-        {counter("Esperando tu aclaración", c.aclaraciones, "esperando_aclaracion", "purple")}
-        {counter("Enviadas al cliente", c.enviadas, "enviada_cliente")}
-        {counter("Respondidas", c.respondidas)}
-        {counter("No encontradas", c.noEncontradas, "no_encontrada")}
-        {counter("Vencidas", c.vencidas, "vencida")}
-        {counter("Actualizaciones solicitadas", c.actualizaciones, "actualizacion_solicitada")}
-      </div>
+      {/* 2. Embudo */}
+      <section className="space-y-3">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Avance de tus cotizaciones</h2>
+          <span className="text-sm text-slate-500">{open} abiertas</span>
+        </div>
+        <Card className="space-y-4 p-4">
+          {rows.length > 0 && (
+            <div className="flex h-3 overflow-hidden rounded-full bg-slate-100" aria-hidden>
+              {PIPELINE.map((p) => (byGroup[p.id] ? <div key={p.id} className={p.bar} style={{ width: `${(byGroup[p.id] / rows.length) * 100}%` }} /> : null))}
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {PIPELINE.map((p) => (
+              <Link
+                key={p.id}
+                href={etapa === p.id ? href() : href(p.id)}
+                className={`rounded-lg border p-3 transition hover:border-slate-400 ${etapa === p.id ? "border-slate-900 ring-1 ring-slate-900" : "border-slate-200"}`}
+              >
+                <span className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                  <span className={`h-2.5 w-2.5 rounded-full ${p.bar}`} />
+                  {p.label}
+                </span>
+                <span className={`mt-1 block text-2xl font-semibold tabular-nums ${p.text}`}>{byGroup[p.id]}</span>
+                <span className="block text-[11px] text-slate-500">{p.hint}</span>
+              </Link>
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-2 border-t border-slate-100 pt-3 text-center">
+            <div>
+              <p className="text-lg font-semibold tabular-nums">{pct(ganadas90 + perdidas90 ? ganadas90 / (ganadas90 + perdidas90) : null)}</p>
+              <p className="text-[11px] text-slate-500">Conversión (90 días)</p>
+            </div>
+            <div>
+              <p className="text-lg font-semibold tabular-nums">{enviadasMes}</p>
+              <p className="text-[11px] text-slate-500">Enviadas este mes</p>
+            </div>
+            <div>
+              <p className="text-lg font-semibold tabular-nums text-green-700">{ganadasMes}</p>
+              <p className="text-[11px] text-slate-500">Ganadas este mes</p>
+            </div>
+          </div>
+        </Card>
+      </section>
 
       {(drafts ?? []).length > 0 && (
-        <Card>
-          <h2 className="mb-2 text-sm font-medium">Borradores</h2>
-          <ul className="space-y-1 text-sm">
+        <Card className="space-y-1">
+          <h2 className="text-sm font-medium">Borradores sin enviar</h2>
+          <ul className="flex flex-wrap gap-2 text-sm">
             {(drafts ?? []).map((d) => (
               <li key={d.id}>
-                <Link href={`/vendedor/solicitudes/${d.id}/editar`} className="text-brand-600 hover:underline">
-                  Borrador de {(d.customers as unknown as { nombre: string } | null)?.nombre}
-                </Link>{" "}
-                <span className="text-xs text-slate-500">{new Date(d.created_at).toLocaleDateString("es-MX")}</span>
+                <Link href={`/vendedor/solicitudes/${d.id}/editar`} className="inline-block rounded-full border border-slate-300 px-3 py-1 hover:border-brand-600 hover:text-brand-700">
+                  {(d.customers as unknown as { nombre: string } | null)?.nombre ?? "Sin cliente"} · {new Date(d.created_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
+                </Link>
               </li>
             ))}
           </ul>
         </Card>
       )}
 
-      <details className="group rounded-lg border border-slate-200 bg-white" open={filtrosActivos > 0 || undefined}>
-        <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-sm font-medium text-slate-700">
-          <span>
-            Filtros{filtrosActivos > 0 && <span className="ml-2 rounded-full bg-brand-600 px-2 py-0.5 text-xs text-white">{filtrosActivos}</span>}
-          </span>
-          <span className="text-slate-400 transition group-open:rotate-180">▾</span>
-        </summary>
-        <form method="get" className="grid items-end gap-3 border-t border-slate-100 p-4 sm:grid-cols-2 lg:grid-cols-6">
-          <Field label="Estado">
-            <Select name="estado" defaultValue={sp.estado ?? ""}>
-              <option value="">Todos</option>
-              {ESTADOS.map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Buscar (nombre, uso o descripción)">
-            <Input name="buscar" defaultValue={sp.buscar ?? ""} />
-          </Field>
-          <Field label="Cliente">
-            <Select name="cliente" defaultValue={sp.cliente ?? ""}>
-              <option value="">Todos</option>
-              {(clientes ?? []).map((cl) => (
-                <option key={cl.id} value={cl.id}>
-                  {cl.nombre}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Enviada desde">
-            <Input type="date" name="desde" defaultValue={sp.desde ?? ""} />
-          </Field>
-          <Field label="Hasta">
-            <Input type="date" name="hasta" defaultValue={sp.hasta ?? ""} />
-          </Field>
-          <div className="flex gap-2">
-            <Button type="submit" className="flex-1">Filtrar</Button>
-            <Link href="/vendedor" className="inline-flex items-center rounded-md px-3 py-2 text-sm text-slate-600 hover:bg-slate-100">
-              Limpiar
-            </Link>
-          </div>
-        </form>
-      </details>
-
-      <Card className="p-0">
-        {shown.length === 0 ? (
-          <EmptyState
-            title={items.length === 0 ? "Aún no tienes solicitudes" : "No hay partidas con esos filtros"}
-            action={
-              items.length === 0 ? (
-                <Link href="/vendedor/solicitudes/nueva" className="text-sm font-medium text-brand-600 hover:underline">
-                  Crear la primera
-                </Link>
-              ) : undefined
-            }
+      {/* 3. Lista por cotizacion */}
+      <section className="space-y-3">
+        <form method="get" className="flex gap-2">
+          {etapa && <input type="hidden" name="etapa" value={etapa} />}
+          <input
+            name="buscar"
+            defaultValue={sp.buscar ?? ""}
+            placeholder="Buscar cliente, folio o producto"
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600"
           />
-        ) : (
-          <>
-            <table className="hidden w-full text-left text-sm md:table">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-4 py-2.5 font-medium">Partida</th>
-                  <th className="px-4 py-2.5 font-medium">Producto</th>
-                  <th className="px-4 py-2.5 font-medium">Cliente</th>
-                  <th className="px-4 py-2.5 font-medium">Enviada</th>
-                  <th className="px-4 py-2.5 font-medium">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {shown.map((i) => {
-                  const vs = viewState(i.estado, i.quote_requests.due_at, now);
-                  return (
-                    <tr key={i.id} className="align-top hover:bg-slate-50">
-                      <td className="px-4 py-3">
-                        <Link href={`/vendedor/solicitudes/${i.quote_requests.id}`} className="font-medium text-brand-600 hover:underline">
-                          {i.folio}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3">
-                        {i.producto}
-                        <div className="max-w-md truncate text-xs text-slate-500">{i.descripcion}</div>
-                        {minBadge(i)}
-                      </td>
-                      <td className="px-4 py-3">{i.quote_requests.customers?.nombre}</td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        {new Date(i.quote_requests.submitted_at).toLocaleDateString("es-MX", { dateStyle: "medium" })}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1.5">{estadoBadges(i, vs)}</div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            <ul className="divide-y divide-slate-100 md:hidden">
-              {shown.map((i) => {
-                const vs = viewState(i.estado, i.quote_requests.due_at, now);
+          <button className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">Buscar</button>
+        </form>
+        <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
+          <FilterChip href={href()} active={!etapa}>Todas {rows.length}</FilterChip>
+          <FilterChip href={href("accion")} active={etapa === "accion"}>Requieren atención {action.length}</FilterChip>
+          {PIPELINE.map((p) => (
+            <FilterChip key={p.id} href={href(p.id)} active={etapa === p.id}>{p.label} {byGroup[p.id]}</FilterChip>
+          ))}
+        </div>
+
+        <Card className="p-0">
+          {shown.length === 0 ? (
+            <EmptyState
+              title={rows.length === 0 ? "Aún no tienes solicitudes" : "No hay cotizaciones en esta vista"}
+              action={rows.length === 0 ? <Link href="/vendedor/solicitudes/nueva" className="text-sm font-medium text-brand-600 hover:underline">Crear la primera</Link> : undefined}
+            />
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {shown.map(({ r, s, lastIssue, lastSent, remaining }) => {
+                const info = STAGE_INFO[s.stage];
+                const detail =
+                  s.stage === "con_compras" ? (remaining > 0 ? `${s.counts.conCompras} por cotizar · quedan ${Math.round(remaining)} h hábiles` : `${s.counts.conCompras} por cotizar · plazo vencido`)
+                  : s.stage === "por_enviar" ? `${s.counts.porEnviar} de ${s.counts.total} con precio, sin enviar`
+                  : s.stage === "con_cliente" && lastSent ? `${lastIssue?.numero ?? "Enviada"} · ${ago(lastSent, now)}`
+                  : s.stage === "ganada" ? `${s.counts.ganadas} de ${s.counts.enviadas} partida(s) ganadas`
+                  : s.stage === "perdida" ? "Cliente no compró"
+                  : s.stage === "cerrada" ? "Ninguna partida se encontró"
+                  : s.stage === "recotizando" ? `Saldrá con número nuevo`
+                  : "Abre la partida marcada";
+                const products = r.quote_items.map((i) => i.producto);
                 return (
-                  <li key={i.id}>
-                    <Link href={`/vendedor/solicitudes/${i.quote_requests.id}`} className="block space-y-1 px-3 py-3 active:bg-slate-50">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium text-brand-600">{i.folio}</p>
-                          <p className="font-medium text-slate-900">{i.producto}</p>
-                        </div>
-                        <span className="shrink-0 text-xs text-slate-500">
-                          {new Date(i.quote_requests.submitted_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}
-                        </span>
+                  <li key={r.id}>
+                    <Link href={`/vendedor/solicitudes/${r.id}`} className="grid gap-2 px-4 py-3 hover:bg-slate-50 sm:grid-cols-[1fr_auto] sm:items-center">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-900">
+                          {r.customers?.nombre}
+                          <span className="ml-2 text-xs font-normal text-slate-500">{r.folio} · {new Date(r.submitted_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })}</span>
+                        </p>
+                        <p className="truncate text-sm text-slate-600">
+                          {products.slice(0, 2).join(", ")}
+                          {products.length > 2 && ` y ${products.length - 2} más`}
+                        </p>
+                        <Progress s={s} />
                       </div>
-                      <p className="truncate text-xs text-slate-500">{i.quote_requests.customers?.nombre}</p>
-                      <div className="flex flex-wrap gap-1.5">{estadoBadges(i, vs)}</div>
-                      {minBadge(i)}
+                      <div className="flex flex-wrap items-center gap-2 sm:flex-col sm:items-end">
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ${info.chip}`}>{info.label}</span>
+                        <span className={`text-xs ${s.action?.tone === "red" ? "font-medium text-red-700" : "text-slate-500"}`}>{s.action?.tone === "red" || s.action?.tone === "indigo" ? s.action.text : detail}</span>
+                      </div>
                     </Link>
                   </li>
                 );
               })}
             </ul>
-          </>
-        )}
-      </Card>
+          )}
+        </Card>
+      </section>
+    </div>
+  );
+}
+
+/** Barra de avance por partidas: con compras, con precio sin enviar, enviadas, ganadas. */
+function Progress({ s }: { s: StageResult }) {
+  const c = s.counts;
+  if (!c.total) return null;
+  const open = Math.max(c.enviadas - c.ganadas - c.perdidas, 0);
+  const seg = [
+    { n: c.conCompras, cls: "bg-sky-400" },
+    { n: c.porEnviar, cls: "bg-amber-400" },
+    { n: open, cls: "bg-indigo-400" },
+    { n: c.ganadas, cls: "bg-green-500" },
+    { n: c.perdidas, cls: "bg-slate-300" },
+  ];
+  const rest = Math.max(c.total - seg.reduce((a, x) => a + x.n, 0), 0);
+  return (
+    <div className="mt-1.5 flex h-1.5 max-w-xs overflow-hidden rounded-full bg-slate-100" title={`${c.total} partida(s)`}>
+      {seg.map((x, i) => (x.n ? <div key={i} className={x.cls} style={{ width: `${(x.n / c.total) * 100}%` }} /> : null))}
+      {rest > 0 && <div className="bg-slate-200" style={{ width: `${(rest / c.total) * 100}%` }} />}
     </div>
   );
 }

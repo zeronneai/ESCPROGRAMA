@@ -4,7 +4,7 @@ import { formatMinPurchase } from "@/lib/format/quote-text";
 import { minAlert, pdfQuantity, type MinDecision } from "@/lib/quotes/min-purchase";
 import { isVigenciaVencida, requestRevision, revisionFolio } from "@/lib/quotes/revisions";
 import { allocateShipping, NO_SHIPPING, totalsByCurrency, type AllocResult, type ShippingPlan } from "@/lib/pricing/shipping-allocation";
-import { renderShippingLegend } from "./shipping";
+import { renderShippingLegend, type ShippingAparte, type ShippingPresentation } from "./shipping";
 import type { QuoteRow } from "@/lib/quotes/types";
 
 /**
@@ -73,6 +73,8 @@ export function toPdfQuote(q: QuoteRow): PdfItemInput["quote"] {
 export interface PdfInput {
   company: PdfCompany;
   folio: string;
+  /** Numero de la cotizacion (emision). Si no viene, se usa el folio con la revision. */
+  numero?: string;
   customerName: string;
   vendedorNombre: string;
   items: PdfItemInput[];
@@ -81,8 +83,12 @@ export interface PdfInput {
     atencion: string | null;
     destino_entrega: string | null;
     via_envio: string | null;
-    /** Envio al cliente DENTRO del precio unitario (nunca se muestra como renglon ni desglose). */
+    /** Parte del envio que va DENTRO del precio unitario. */
     envio: ShippingPlan;
+    /** Parte del envio que sale como renglon "Envio" (cargo aparte o mixto). */
+    envioAparte?: ShippingAparte | null;
+    /** Como ve el cliente el envio; null = guardado antes de esta opcion (se comporta como antes). */
+    presentacion?: ShippingPresentation | null;
   };
   now: Date;
   timezone: string;
@@ -192,6 +198,8 @@ export interface OrderPreview {
   envioIncluido: string | null;
   /** Monedas con envio repartido (para el texto neutral "Envio incluido en precios"). */
   envioPorMoneda: { currency: PdfCurrency; amount: string }[];
+  /** Renglon de envio aparte (ya sumado al total de su moneda), o null. */
+  envioAparte: { currency: PdfCurrency; amount: string } | null;
 }
 
 const toLine = (r: AllocResult): OrderLinePreview => ({
@@ -216,6 +224,7 @@ export function computeOrder(
     decisionMin?: MinDecision | null;
   }>,
   plan: ShippingPlan = NO_SHIPPING,
+  aparte: ShippingAparte | null = null,
 ): OrderPreview {
   const alloc = items.flatMap((i) => {
     if (!i.quote) return [];
@@ -224,12 +233,16 @@ export function computeOrder(
   });
   const r = allocateShipping(alloc, plan);
   const totals = totalsByCurrency(r.lines);
+  // El envio aparte se suma al total de su moneda (solo si hay partidas con precio en esa moneda).
+  const aparteHit = aparte ? totals.find((t) => t.moneda === aparte.moneda) : undefined;
+  if (aparte && aparteHit) aparteHit.total = aparteHit.total.plus(new Decimal(aparte.monto).toDecimalPlaces(2, Decimal.ROUND_HALF_UP));
   const envioPorMoneda = totals.filter((t) => t.envio.greaterThan(0)).map((t) => ({ currency: CURRENCY[t.moneda], amount: formatMoney(t.envio) }));
   return {
     lines: Object.fromEntries(r.lines.map((l) => [l.id, toLine(l)])),
     perCurrency: totals.map((t) => ({ currency: CURRENCY[t.moneda], total: formatMoney(t.total), envio: formatMoney(t.envio) })),
     envioIncluido: r.repartido.greaterThan(0) ? formatMoney(r.repartido) : null,
     envioPorMoneda,
+    envioAparte: aparte && aparteHit ? { currency: CURRENCY[aparte.moneda], amount: formatMoney(aparte.monto) } : null,
   };
 }
 
@@ -239,7 +252,7 @@ export function buildPdfModel(input: PdfInput): PdfModel {
   const problems = pdfProblems(items, input.now);
   if (problems.length) throw new PdfNotReadyError(problems);
 
-  const order = computeOrder(items, input.data.envio);
+  const order = computeOrder(items, input.data.envio, input.data.envioAparte ?? null);
   const rows: PdfRow[] = items.map((i) => {
     const l = order.lines[i.id];
     // Si el vendedor eligio cotizar a la cantidad minima, CANT muestra el minimo y el total va sobre el minimo.
@@ -256,6 +269,10 @@ export function buildPdfModel(input: PdfInput): PdfModel {
       price: l.importe,
     };
   });
+  // Envio como cargo aparte: un renglon mas, ya sumado en el total de su moneda.
+  if (order.envioAparte) {
+    rows.push({ te: "", nombre: "Envío / Shipping", cant: "1", currency: order.envioAparte.currency, uPrice: order.envioAparte.amount, price: order.envioAparte.amount });
+  }
   const d = input.data;
   const destino = d.destino_entrega?.trim() || null;
   const via = d.via_envio?.trim() || null;
@@ -267,8 +284,10 @@ export function buildPdfModel(input: PdfInput): PdfModel {
   });
 
   const footer = [...input.company.pie_lineas];
-  // Leyenda de envio (editable en Configuracion): siempre que haya destino capturado.
-  const legend = renderShippingLegend(input.company.leyenda_envio, destino, via);
+  // Leyenda "Prices include shipping..." (editable en Configuracion): con destino capturado y solo si el envio va
+  // dentro de los precios (incluido o mixto). Sin envio o con cargo aparte no se pone (seria falsa).
+  const p = d.presentacion ?? null;
+  const legend = p === null || p === "incluido" || p === "mixto" ? renderShippingLegend(input.company.leyenda_envio, destino, via) : null;
   if (legend) footer.push(legend);
 
   const valids = items.map((i) => i.quote.valid_until).filter((v): v is string => !!v).sort();
@@ -284,7 +303,7 @@ export function buildPdfModel(input: PdfInput): PdfModel {
       rfc: input.company.rfc,
     },
     fecha: dmy(DateTime.fromJSDate(input.now, { zone: tz })),
-    folio: revisionFolio(input.folio, rev),
+    folio: input.numero ?? revisionFolio(input.folio, rev),
     condiciones: d.condiciones || "Credito",
     asesor: input.vendedorNombre,
     vigencia: valids[0] ? dmy(DateTime.fromISO(valids[0], { zone: tz })) : "",
