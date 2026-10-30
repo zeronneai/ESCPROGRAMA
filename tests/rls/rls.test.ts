@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fase4Suite } from "./fase4.suite";
 import { leadsSuite } from "./leads.suite";
 import { emisionesSuite } from "./emisiones.suite";
+import { bitacoraSuite } from "./bitacora.suite";
 import { calcTabulador } from "@/lib/pricing/tabulador";
 import { DATABASE_URL, as, failure, pool, type Actor } from "./helpers";
 
@@ -136,9 +137,9 @@ describe.skipIf(!DATABASE_URL)("RLS e integridad (requiere Postgres con migracio
       expect((await as(actor, (q) => q("select * from public.customers"))).rowCount).toBe(0);
       expect(await failure(as(actor, (q) => q("select public.log_event('logout','profiles','x')")))).toMatch(/No autorizado/);
       await as(actor, (q) => q("select public.complete_password_change()"));
-      expect((await as(actor, (q) => q("select * from public.customers"))).rowCount).toBeGreaterThan(0);
+      expect((await as(actor, (q) => q("select * from public.app_settings"))).rowCount).toBeGreaterThan(0);
       await as(B1, (q) => q("select public.admin_set_user_active($1,false)", [id]));
-      expect((await as(actor, (q) => q("select * from public.customers"))).rowCount).toBe(0);
+      expect((await as(actor, (q) => q("select * from public.app_settings"))).rowCount).toBe(0);
       expect(await failure(as(actor, (q) => q("select public.touch_login()")))).toMatch(/inactivo/);
       await as(B1, (q) => q("select public.admin_set_user_active($1,true)", [id]));
       await as(actor, (q) => q("select public.touch_login()"));
@@ -535,6 +536,7 @@ async function newPendingItem(): Promise<string> {
 fase4Suite();
 leadsSuite();
 emisionesSuite();
+bitacoraSuite();
 
 afterAll(async () => {
   await pool?.end();

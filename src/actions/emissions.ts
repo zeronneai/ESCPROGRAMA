@@ -16,8 +16,8 @@ async function requireSeller() {
   return u;
 }
 
-export const SEND_MEDIA = ["correo", "whatsapp", "en_persona", "telefono", "otro"] as const;
-export type SendMedium = (typeof SEND_MEDIA)[number];
+import { SEND_MEDIA } from "@/lib/quotes/send-media";
+export type { SendMedium } from "@/lib/quotes/send-media";
 
 const sendSchema = z.object({
   medio: z.enum(SEND_MEDIA, { message: "Elige por qué medio se envió" }),

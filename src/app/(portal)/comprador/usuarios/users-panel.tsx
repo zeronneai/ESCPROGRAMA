@@ -7,14 +7,14 @@ import {
   updateUserNameAction,
   type UserActionResult,
 } from "@/actions/users";
-import { Alert, Button, Card, Field, Input } from "@/components/ui";
+import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
 import { generateTempPassword } from "@/lib/auth/password";
 
 export interface UserRow {
   id: string;
   nombre: string;
   correo: string;
-  rol: "vendedor" | "comprador";
+  rol: "vendedor" | "comprador" | "jefe_ventas";
   activo: boolean;
   must_change_password: boolean;
   last_login_at: string | null;
@@ -24,11 +24,14 @@ export interface UserRow {
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" }) : "Nunca";
 
+type RolNuevo = "vendedor" | "comprador" | "jefe_ventas";
+const ROL_LABEL: Record<RolNuevo, string> = { vendedor: "Vendedor", comprador: "Comprador", jefe_ventas: "Jefa de ventas" };
+
 export function UsersPanel({ users, meId }: { users: UserRow[]; meId: string }) {
   const [pending, start] = useTransition();
   const [notice, setNotice] = useState<{ tone: "error" | "success"; text: string } | null>(null);
   const [secret, setSecret] = useState<{ para: string; password: string } | null>(null);
-  const [form, setForm] = useState({ nombre: "", correo: "", password: "", comprador: false });
+  const [form, setForm] = useState({ nombre: "", correo: "", password: "", rol: "vendedor" as RolNuevo });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<{ id: string; nombre: string } | null>(null);
 
@@ -78,7 +81,7 @@ export function UsersPanel({ users, meId }: { users: UserRow[]; meId: string }) 
           onSubmit={(e) => {
             e.preventDefault();
             run(() => createUserAction(form), form.nombre, () =>
-              setForm({ nombre: "", correo: "", password: "", comprador: false }),
+              setForm({ nombre: "", correo: "", password: "", rol: "vendedor" as RolNuevo }),
             );
           }}
         >
@@ -111,17 +114,16 @@ export function UsersPanel({ users, meId }: { users: UserRow[]; meId: string }) 
               </Button>
             </div>
           </Field>
-          <label className="flex items-center gap-2 self-end pb-2 text-sm">
-            <input
-              type="checkbox"
-              checked={form.comprador}
-              onChange={(e) => setForm({ ...form, comprador: e.target.checked })}
-            />
-            Crear como comprador (administrador del sistema)
-          </label>
+          <Field label="Rol">
+            <Select value={form.rol} onChange={(e) => setForm({ ...form, rol: e.target.value as RolNuevo })}>
+              <option value="vendedor">Vendedor</option>
+              <option value="jefe_ventas">Jefa de ventas (ve resúmenes de todos los vendedores)</option>
+              <option value="comprador">Comprador (administrador del sistema)</option>
+            </Select>
+          </Field>
           <div className="sm:col-span-2">
             <Button type="submit" loading={pending}>
-              Crear {form.comprador ? "comprador" : "vendedor"}
+              Crear {ROL_LABEL[form.rol].toLowerCase()}
             </Button>
           </div>
         </form>
@@ -161,7 +163,7 @@ export function UsersPanel({ users, meId }: { users: UserRow[]; meId: string }) 
                   )}
                 </td>
                 <td className="px-3 py-2">{u.correo}</td>
-                <td className="px-3 py-2 capitalize">{u.rol}</td>
+                <td className="px-3 py-2">{ROL_LABEL[u.rol]}</td>
                 <td className="px-3 py-2">
                   {u.activo ? (
                     <span className="text-green-700">Activo</span>

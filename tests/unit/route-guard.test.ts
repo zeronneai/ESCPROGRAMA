@@ -3,6 +3,7 @@ import { decideRoute, type GuardProfile } from "@/lib/auth/route-guard";
 
 const seller: GuardProfile = { activo: true, must_change_password: false, rol: "vendedor" };
 const buyer: GuardProfile = { activo: true, must_change_password: false, rol: "comprador" };
+const jefe: GuardProfile = { activo: true, must_change_password: false, rol: "jefe_ventas" };
 const mustChange: GuardProfile = { ...seller, must_change_password: true };
 const inactive: GuardProfile = { ...seller, activo: false };
 
@@ -59,5 +60,21 @@ describe("decideRoute", () => {
   it("leads es solo para vendedores", () => {
     expect(d("/vendedor/leads", seller)).toEqual({ type: "next" });
     expect(d("/vendedor/leads", buyer)).toEqual({ type: "redirect", to: "/comprador" });
+  });
+
+  it("jefa de ventas: entra a /ventas; no a vendedor, comprador ni administracion", () => {
+    expect(d("/", jefe)).toEqual({ type: "redirect", to: "/ventas" });
+    expect(d("/login", jefe)).toEqual({ type: "redirect", to: "/ventas" });
+    expect(d("/ventas", jefe)).toEqual({ type: "next" });
+    expect(d("/ventas/vendedor/x", jefe)).toEqual({ type: "next" });
+    expect(d("/vendedor/bitacora", jefe)).toEqual({ type: "redirect", to: "/ventas" });
+    expect(d("/comprador/clientes", jefe)).toEqual({ type: "redirect", to: "/ventas" });
+    expect(d("/api/admin/usuarios", jefe)).toMatchObject({ type: "deny", status: 403 });
+  });
+
+  it("/ventas: el comprador tambien entra (solo lectura); el vendedor no", () => {
+    expect(d("/ventas", buyer)).toEqual({ type: "next" });
+    expect(d("/ventas", seller)).toEqual({ type: "redirect", to: "/vendedor" });
+    expect(d("/ventasx", seller)).toEqual({ type: "next" });
   });
 });

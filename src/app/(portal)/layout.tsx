@@ -4,13 +4,15 @@ import { NavigationProgress } from "@/components/navigation-progress";
 import { NotificationBell } from "@/components/notification-bell";
 import { PortalNav, type NavItem } from "@/components/portal-nav";
 import { requireUser } from "@/lib/auth/guards";
+import type { Rol } from "@/lib/auth/route-guard";
 
-const NAV: Record<"comprador" | "vendedor", NavItem[]> = {
+const NAV: Record<Rol, NavItem[]> = {
   comprador: [
     { href: "/comprador", label: "Pendientes", icon: "inbox", match: ["/comprador/solicitudes"] },
     { href: "/comprador/historial", label: "Historial", icon: "history" },
     { href: "/comprador/por-comprar", label: "Por comprar", short: "Comprar", icon: "cart" },
     { href: "/comprador/estadisticas", label: "Estadísticas", short: "Stats", icon: "chart" },
+    { href: "/ventas", label: "Ventas", icon: "target", secondary: true },
     { href: "/comprador/clientes", label: "Clientes", icon: "building", secondary: true },
     { href: "/comprador/proveedores", label: "Proveedores", icon: "truck", secondary: true },
     { href: "/comprador/usuarios", label: "Usuarios", icon: "users", secondary: true },
@@ -19,9 +21,13 @@ const NAV: Record<"comprador" | "vendedor", NavItem[]> = {
   ],
   vendedor: [
     { href: "/vendedor", label: "Mis solicitudes", short: "Solicitudes", icon: "list", match: ["/vendedor/solicitudes"] },
-    { href: "/vendedor/clientes", label: "Clientes", icon: "building" },
+    { href: "/vendedor/bitacora", label: "Bitácora", icon: "target" },
     { href: "/vendedor/solicitudes/nueva", label: "Nueva solicitud", short: "Nueva", icon: "plus", cta: true },
-    { href: "/vendedor/leads", label: "Leads", icon: "target" },
+    { href: "/vendedor/clientes", label: "Clientes", icon: "building" },
+  ],
+  jefe_ventas: [
+    { href: "/ventas", label: "Resumen", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
+    { href: "/ventas/clientes", label: "Clientes", icon: "building" },
   ],
 };
 

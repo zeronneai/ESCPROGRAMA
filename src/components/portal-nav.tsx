@@ -77,7 +77,7 @@ export function PortalNav({
   const primary = items.filter((i) => !i.secondary);
   const secondary = items.filter((i) => i.secondary);
   const secondaryActive = secondary.some((i) => isActive(pathname, i, items));
-  const rolLabel = user.rol === "comprador" ? "Comprador" : "Vendedor";
+  const rolLabel = user.rol === "comprador" ? "Comprador" : user.rol === "jefe_ventas" ? "Jefa de ventas" : "Vendedor";
 
   const logout = (
     <form action="/api/auth/logout" method="post">

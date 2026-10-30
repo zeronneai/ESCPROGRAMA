@@ -145,7 +145,7 @@ describe("etapa de la solicitud para el vendedor", () => {
 });
 
 describe("clientes", () => {
-  const ok = { nombre: "Planta Norte", rfc: "abc-010101 ab1", direccion: "Av. Industrial 100, Cd. Juarez", contacto_telefono: "656 123 4567" };
+  const ok = { tipo: "cliente" as const, giro: "Electrónica", estado_geo: "Chihuahua", nombre: "Planta Norte", rfc: "abc-010101 ab1", direccion: "Av. Industrial 100, Cd. Juarez", contacto_telefono: "656 123 4567" };
   it("normaliza y valida el RFC; exige direccion y telefono o correo", () => {
     expect(normalizeRfc(" abc-010101.ab1 ")).toBe("ABC010101AB1");
     expect(customerSchema.parse(ok).rfc).toBe("ABC010101AB1");
@@ -154,9 +154,13 @@ describe("clientes", () => {
     expect(customerSchema.safeParse({ ...ok, direccion: "x" }).success).toBe(false);
     expect(customerSchema.safeParse({ ...ok, contacto_telefono: "" }).success).toBe(false);
     expect(customerSchema.safeParse({ ...ok, contacto_telefono: "", contacto_correo: "compras@norte.mx" }).success).toBe(true);
+    // Prospecto: el RFC es opcional; cliente: obligatorio. Giro y estado siempre.
+    expect(customerSchema.safeParse({ ...ok, tipo: "prospecto", rfc: "" }).success).toBe(true);
+    expect(customerSchema.safeParse({ ...ok, tipo: "cliente", rfc: "" }).success).toBe(false);
+    expect(customerSchema.safeParse({ ...ok, giro: "" }).success).toBe(false);
   });
   it("faltantes y busqueda sin acentos", () => {
-    const c = { id: "1", nombre: "Óptica Juárez", razon_social: null, rfc: null, direccion: null, contacto_nombre: "Ana", contacto_telefono: null, contacto_correo: null, activo: true };
+    const c = { id: "1", tipo: "prospecto" as const, giro: "Óptica", estado_geo: "Chihuahua", nombre: "Óptica Juárez", razon_social: null, rfc: null, direccion: null, contacto_nombre: "Ana", contacto_telefono: null, contacto_correo: null, activo: true };
     expect(customerMissing(c)).toEqual(["RFC", "dirección", "teléfono o correo"]);
     expect(matchCustomer(c, "optica juarez")).toBe(true);
     expect(matchCustomer(c, "ana")).toBe(true);

@@ -55,10 +55,10 @@ const newItem = (): ItemDraft => ({
   refs: [],
 });
 
-export function RequestEditor({ initial, customers: initialCustomers }: { initial: EditorInitial; customers: CustomerOption[] }) {
+export function RequestEditor({ initial, customer: initialCustomer }: { initial: EditorInitial; customer: CustomerOption | null }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [customer, setCustomer] = useState<CustomerRecord | null>(initialCustomers.find((c) => c.id === initial.customer_id) ?? null);
+  const [customer, setCustomer] = useState<CustomerRecord | null>(initialCustomer);
   const [previews, setPreviews] = useState(initial.previews);
   const [savedOnce, setSavedOnce] = useState(initial.saved);
   const [notice, setNotice] = useState<{ tone: "success" | "error"; text: string; list?: string[] } | null>(null);
@@ -205,8 +205,7 @@ export function RequestEditor({ initial, customers: initialCustomers }: { initia
         <div className="space-y-1.5">
           <p className="text-sm font-medium text-slate-700">Cliente *</p>
           <CustomerPicker
-            customers={initialCustomers}
-            value={customer?.id ?? ""}
+            value={customer}
             onChange={(c) => {
               setCustomer(c);
               setValue("customer_id", c?.id ?? "");

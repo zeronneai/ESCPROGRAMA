@@ -15,7 +15,7 @@ const createSchema = z.object({
   nombre: z.string().trim().min(2, "Escribe el nombre"),
   correo: z.string().trim().toLowerCase().email("Correo invalido"),
   password: passwordSchema,
-  comprador: z.boolean().default(false),
+  rol: z.enum(["vendedor", "comprador", "jefe_ventas"]).default("vendedor"),
 });
 
 const BAN_FOREVER = "876000h";
@@ -29,7 +29,7 @@ export async function createUserAction(input: {
   nombre: string;
   correo: string;
   password: string;
-  comprador: boolean;
+  rol: "vendedor" | "comprador" | "jefe_ventas";
 }): Promise<UserActionResult> {
   await requireBuyer();
   const parsed = createSchema.safeParse(input);
@@ -38,7 +38,7 @@ export async function createUserAction(input: {
     for (const i of parsed.error.issues) fieldErrors[String(i.path[0])] ??= i.message;
     return { ok: false, error: "Revisa los datos", fieldErrors };
   }
-  const { nombre, correo, password, comprador } = parsed.data;
+  const { nombre, correo, password, rol } = parsed.data;
 
   const admin = createAdminClient();
   const { data, error } = await admin.auth.admin.createUser({
@@ -61,7 +61,7 @@ export async function createUserAction(input: {
     p_id: data.user.id,
     p_nombre: nombre,
     p_correo: correo,
-    p_rol: comprador ? "comprador" : "vendedor",
+    p_rol: rol,
   });
   if (rpcError) {
     // Compensacion: no dejar un usuario de Auth sin perfil.

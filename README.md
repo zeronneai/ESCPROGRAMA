@@ -114,6 +114,14 @@ curl -X POST https://<portal>/api/leads/entrada \
 - Listas como tarjetas en celular y tablas en escritorio.
 - **Historial del comprador**: ahora muestra por defecto todas las partidas que ya respondió (antes salía vacío hasta buscar), con contadores de hoy, semana, mes y total, filtros por estado y paginación. La búsqueda por producto o proveedor sigue igual.
 
+## Bitácora de ventas / Prospección y Jefa de ventas (migraciones 0018 y 0019)
+
+- **Vendedor > Bitácora**: dos secciones en la misma pestaña, **Ventas diarias** (clientes) y **Prospección** (prospectos). Cada registro sigue las columnas del formato ESC-VEN-FR-002 como etapas: catálogo, necesidad, muestra, solicitud a compras, cotización, orden de compra, facturación (contado/crédito), entrega, cobranza y cartera; más comentarios del día, próximo seguimiento y resultado.
+- Se llena sola desde el portal: al enviar una solicitud (fecha de solicitud a compras), al registrar el envío de la cotización (fecha de cotización) y al marcar una partida Ganada (fecha de pedido).
+- **Clientes**: al dar de alta se elige Cliente o Prospecto. "Ya es cliente" lo convierte y guarda quién y cuándo, para medir prospectos convertidos. El vendedor no ve la lista completa: solo busca (mínimo 2 letras, máximo 10 resultados).
+- **Leads** se integró a Prospección; el formulario del sitio web (`/api/leads/entrada`) ahora crea el prospecto en la bitácora sin vendedor y avisa a los vendedores.
+- **Jefa de ventas** (rol `jefe_ventas`, se crea en Usuarios): ve `/ventas` con el resumen por vendedor (solicitudes, cotizaciones enviadas, pedidos, monto, prospectos, convertidos, cartera vencida, movimientos) y el detalle de cada vendedor en solo lectura; también la base de clientes. No ve costos ni proveedores. El comprador también puede abrir "Ventas".
+
 ## Envío al cliente, recotización y clientes (migración 0017)
 - **Registrar el envío al cliente** (por cotización, ya no por partida): en la solicitud, el vendedor elige los precios, revisa el PDF y, en 3 pasos, lo descarga o comparte, abre su correo o WhatsApp con el mensaje listo (adjunta el PDF) y lo **registra como enviado** eligiendo el medio (correo, WhatsApp, en persona, teléfono u otro) y a quién. Se guarda una **copia fija del PDF** con su número (`quote_issues`), los precios enviados (`quote_issue_lines`) y cada envío (`quote_issue_sends`). "Registrar otro envío" agrega un envío del mismo número sin crear otro.
 - **Número de cotización:** el folio de la solicitud; `-R2` si el comprador actualizó costos; `-V2`, `-V3` por cada recotización. Ej.: `COT-2026-0040`, `COT-2026-0040-V2`, `COT-2026-0040-R2`.

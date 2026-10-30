@@ -8,5 +8,5 @@ export default async function Clientes({ searchParams }: { searchParams: Promise
   const { editar } = await searchParams;
   const supabase = await createClient();
   const { data } = await supabase.from("customers").select(CUSTOMER_COLS).order("nombre");
-  return <ClientsDirectory customers={(data ?? []) as CustomerRecord[]} isBuyer editId={editar} />;
+  return <ClientsDirectory customers={(data ?? []) as CustomerRecord[]} role="comprador" editCustomer={((data ?? []) as CustomerRecord[]).find((c) => c.id === editar) ?? null} />;
 }

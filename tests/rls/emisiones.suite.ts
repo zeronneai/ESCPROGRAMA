@@ -128,13 +128,29 @@ export function emisionesSuite() {
       expect((await rpc("postgres", "select public.customer_is_complete($1) as ok", [id])).rows[0].ok).toBe(true);
     });
 
-    it("todos los vendedores ven y completan clientes; solo el comprador los desactiva", async () => {
-      const id = (await rpc(w.seller1, "insert into public.customers (nombre, created_by) values ($2,$1) returning id", [w.ids.s1, `Solo nombre ${randomUUID().slice(0, 6)}`])).rows[0].id;
-      expect((await rpc(w.seller2, "select id from public.customers where id=$1", [id])).rowCount).toBe(1);
-      await rpc(w.seller2, "update public.customers set rfc='SNS010101AB1', direccion='Av. 1, Chihuahua', contacto_telefono='6140000000' where id=$1", [id]);
-      expect((await rpc("postgres", "select public.customer_is_complete($1) as ok", [id])).rows[0].ok).toBe(true);
-      expect(await failure(rpc(w.seller2, "update public.customers set activo=false where id=$1", [id]))).toMatch(/Solo el comprador/);
+    it("un vendedor no ve la lista de clientes de otros, pero los encuentra con el buscador", async () => {
+      const tag = randomUUID().slice(0, 6);
+      const id = (await rpc(w.seller1, "insert into public.customers (nombre, created_by) values ($2,$1) returning id", [w.ids.s1, `Privado ${tag}`])).rows[0].id;
+      expect((await rpc(w.seller2, "select id from public.customers where id=$1", [id])).rowCount).toBe(0);
+      expect((await rpc(w.seller2, "update public.customers set giro='X' where id=$1", [id])).rowCount).toBe(0);
+      const found = await rpc(w.seller2, "select id, nombre from public.buscar_clientes($1, 8)", [`privado ${tag}`]);
+      expect(found.rows.map((r) => r.id)).toEqual([id]);
+      expect((await rpc(w.seller2, "select id from public.buscar_clientes('p', 8)")).rowCount).toBe(0); // minimo 2 letras
+      // El comprador y la jefa de ventas ven todos.
+      expect((await rpc(w.buyer1, "select id from public.customers where id=$1", [id])).rowCount).toBe(1);
+      expect(await failure(rpc(w.seller1, "update public.customers set activo=false where id=$1", [id]))).toMatch(/Solo el comprador/);
       await rpc(w.buyer1, "update public.customers set activo=false where id=$1", [id]);
+    });
+
+    it("estatus cliente/prospecto: registra la conversion y solo comprador o jefa regresan a prospecto", async () => {
+      const tag = randomUUID().slice(0, 6);
+      const id = (await rpc(w.seller1, "insert into public.customers (nombre, tipo, created_by) values ($2,'prospecto',$1) returning id", [w.ids.s1, `Prospecto ${tag}`])).rows[0].id;
+      await rpc(w.seller1, "update public.customers set tipo='cliente' where id=$1", [id]);
+      const c = (await rpc("postgres", "select tipo, tipo_inicial, convertido_at is not null as conv, convertido_por from public.customers where id=$1", [id])).rows[0];
+      expect(c).toEqual({ tipo: "cliente", tipo_inicial: "prospecto", conv: true, convertido_por: w.ids.s1 });
+      expect(await failure(rpc(w.seller1, "update public.customers set tipo='prospecto' where id=$1", [id]))).toMatch(/Solo el comprador o la jefa/);
+      await rpc(w.buyer1, "update public.customers set tipo='prospecto' where id=$1", [id]);
+      expect((await rpc("postgres", "select convertido_at from public.customers where id=$1", [id])).rows[0].convertido_at).toBeNull();
     });
 
     it("no se puede enviar una solicitud si el cliente no tiene RFC, direccion y contacto", async () => {

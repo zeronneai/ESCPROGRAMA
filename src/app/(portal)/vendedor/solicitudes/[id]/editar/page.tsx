@@ -18,10 +18,8 @@ export default async function EditarBorrador({ params }: { params: Promise<{ id:
   if (!req || req.vendedor_id !== user.id || req.archived_at) notFound();
   if (req.estado !== "borrador") redirect(`/vendedor/solicitudes/${id}`);
 
-  const [{ data: customers }, { data: items }] = await Promise.all([
-    supabase.from("customers")
-    .select(CUSTOMER_COLS)
-    .eq("activo", true).order("nombre"),
+  const [{ data: customer }, { data: items }] = await Promise.all([
+    supabase.from("customers").select(CUSTOMER_COLS).eq("id", req.customer_id).maybeSingle(),
     supabase
       .from("quote_items")
       .select("id, posicion, producto, descripcion, cantidad, unidad, talla, notas, item_references(id, tipo, url)")
@@ -37,7 +35,7 @@ export default async function EditarBorrador({ params }: { params: Promise<{ id:
 
   return (
     <RequestEditor
-      customers={(customers ?? []) as CustomerRecord[]}
+      customer={(customer as CustomerRecord | null) ?? null}
       initial={{
         request_id: id,
         customer_id: req.customer_id,

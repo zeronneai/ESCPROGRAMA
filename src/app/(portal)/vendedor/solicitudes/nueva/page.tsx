@@ -1,23 +1,21 @@
-import { CUSTOMER_COLS, type CustomerRecord } from "@/lib/validation/customer";
 import { RequestEditor } from "@/components/request-editor";
 import { requireUser } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { CUSTOMER_COLS, type CustomerRecord } from "@/lib/validation/customer";
 
 export default async function NuevaSolicitud({ searchParams }: { searchParams: Promise<{ cliente?: string }> }) {
   await requireUser();
   const { cliente } = await searchParams;
   const supabase = await createClient();
-  const { data: customers } = await supabase
-    .from("customers")
-    .select(CUSTOMER_COLS)
-    .eq("activo", true)
-    .order("nombre");
-  // Desde un lead: precarga el cliente vinculado (solo si existe en el catalogo).
-  const preset = (customers ?? []).find((c) => c.id === cliente)?.id ?? "";
+  // Desde la bitacora: precarga el cliente (solo si el vendedor puede verlo).
+  const { data: preset } = cliente && /^[0-9a-f-]{36}$/i.test(cliente)
+    ? await supabase.from("customers").select(CUSTOMER_COLS).eq("id", cliente).eq("activo", true).maybeSingle()
+    : { data: null };
+  const c = (preset as CustomerRecord | null) ?? null;
   return (
     <RequestEditor
-      customers={(customers ?? []) as CustomerRecord[]}
-      initial={{ request_id: crypto.randomUUID(), customer_id: preset, notas: "", atencion: "", destino_entrega: "", items: [], previews: {}, saved: false }}
+      customer={c}
+      initial={{ request_id: crypto.randomUUID(), customer_id: c?.id ?? "", notas: "", atencion: "", destino_entrega: "", items: [], previews: {}, saved: false }}
     />
   );
 }
