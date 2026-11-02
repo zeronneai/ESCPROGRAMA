@@ -4,9 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { DateTime } from "luxon";
+import { addBitacoraArticuloAction, removeBitacoraArticuloAction, updateBitacoraArticuloAction } from "@/actions/articulos";
 import { addBitacoraCommentAction, archiveBitacoraAction, claimBitacoraAction, createBitacoraAction, updateBitacoraAction } from "@/actions/bitacora";
 import { convertCustomerAction } from "@/actions/customers";
+import { ArticulosList } from "@/components/articulos-picker";
 import { CustomerPicker, KindBadge } from "@/components/customers";
+import type { BitacoraArticulo } from "@/lib/articulos";
 import { Alert, Button, Card, Input, Select } from "@/components/ui";
 import { currentStage, eventText, STAGES, stageState, type BitacoraRow, type StageKey } from "@/lib/bitacora/stages";
 import { bitacoraMissing, customerMissing, type CustomerKind, type CustomerRecord } from "@/lib/validation/customer";
@@ -79,6 +82,7 @@ export function BitacoraEditor({
   timezone,
   defaultKind = "cliente",
   basePath = "/vendedor/bitacora",
+  articulos: initialArticulos = [],
 }: {
   mode: "new" | "edit" | "readonly" | "claim";
   entry: BitacoraRow | null;
@@ -89,7 +93,9 @@ export function BitacoraEditor({
   timezone: string;
   defaultKind?: CustomerKind;
   basePath?: string;
+  articulos?: BitacoraArticulo[];
 }) {
+  const [arts, setArts] = useState<BitacoraArticulo[]>(initialArticulos);
   const router = useRouter();
   const [v, setV] = useState<Form>(() => toForm(entry));
   const [customer, setCustomer] = useState<CustomerRecord | null>(initialCustomer);
@@ -124,7 +130,7 @@ export function BitacoraEditor({
     run("save", async () => {
       if (mode === "new") {
         if (!customer) return setNotice({ tone: "error", text: "Elige o da de alta el cliente o prospecto." });
-        const r = await createBitacoraAction(customer.id, payload());
+        const r = await createBitacoraAction(customer.id, payload(), arts.map((a) => ({ articulo_id: a.articulo_id, cantidad: a.cantidad })));
         if (!r.ok) return setNotice({ tone: "error", text: r.error });
         router.push(`${basePath}/${r.id}`);
         return;
@@ -152,7 +158,41 @@ export function BitacoraEditor({
   const stageBody: Record<StageKey, React.ReactNode> = {
     catalogo: dateField("fecha_catalogo"),
     necesidad: (
-      <textarea value={v.necesidad} disabled={ro} onChange={(e) => set("necesidad", e.target.value)} rows={2} className={area} placeholder="Qué producto necesita, para qué uso, volumen aproximado" />
+      <div className="space-y-2">
+        <textarea value={v.necesidad} disabled={ro} onChange={(e) => set("necesidad", e.target.value)} rows={2} className={area} placeholder="Qué necesita, para qué uso, volumen aproximado" />
+        <div className="space-y-1">
+          <span className="block text-xs font-medium text-slate-600">Artículos del catálogo {customer?.tipo === "prospecto" ? "que le ofreciste" : "que compra o le ofreciste"}</span>
+          <ArticulosList
+            items={arts}
+            readOnly={ro}
+            busy={busy === "art"}
+            onAdd={(a) => {
+              const item: BitacoraArticulo = { id: null, articulo_id: a.id, clave: a.clave, nombre: a.nombre, cantidad: null };
+              if (mode === "new") return setArts((l) => [...l, item]);
+              run("art", async () => {
+                const r = await addBitacoraArticuloAction(entry!.id, a.id, null);
+                if (!r.ok) return setNotice({ tone: "error", text: r.error });
+                setArts((l) => [...l, { ...item, id: r.id }]);
+              });
+            }}
+            onRemove={(a) => {
+              if (mode === "new" || !a.id) return setArts((l) => l.filter((x) => x.articulo_id !== a.articulo_id));
+              run("art", async () => {
+                const r = await removeBitacoraArticuloAction(entry!.id, a.id!);
+                if (!r.ok) return setNotice({ tone: "error", text: r.error });
+                setArts((l) => l.filter((x) => x.articulo_id !== a.articulo_id));
+              });
+            }}
+            onQty={(a, cantidad) => {
+              setArts((l) => l.map((x) => (x.articulo_id === a.articulo_id ? { ...x, cantidad } : x)));
+              if (mode !== "new" && a.id) run("art", async () => {
+                const r = await updateBitacoraArticuloAction(entry!.id, a.id!, cantidad);
+                if (!r.ok) setNotice({ tone: "error", text: r.error });
+              });
+            }}
+          />
+        </div>
+      </div>
     ),
     muestra: (
       <div className="space-y-1.5">

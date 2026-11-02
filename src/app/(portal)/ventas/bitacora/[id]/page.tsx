@@ -30,6 +30,7 @@ export default async function RegistroVentas({ params }: { params: Promise<{ id:
         customer={d.customer}
         requests={d.requests}
         events={d.events}
+        articulos={d.articulos}
         today={DateTime.now().setZone(cfg.timezone).toISODate()!}
         timezone={cfg.timezone}
         basePath="/ventas"

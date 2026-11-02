@@ -16,6 +16,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/ventas", label: "Ventas", icon: "target", secondary: true },
     { href: "/calidad", label: "Quejas y acciones correctivas", icon: "alert", secondary: true },
     { href: "/comprador/clientes", label: "Clientes", icon: "building", secondary: true },
+    { href: "/articulos", label: "Artículos", icon: "package", secondary: true },
     { href: "/comprador/proveedores", label: "Proveedores", icon: "truck", secondary: true },
     { href: "/comprador/usuarios", label: "Usuarios", icon: "users", secondary: true },
     { href: "/comprador/configuracion", label: "Configuración", icon: "settings", secondary: true },
@@ -27,6 +28,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/vendedor/solicitudes/nueva", label: "Nueva solicitud", short: "Nueva", icon: "plus", cta: true },
     { href: "/guias", label: "Guías", icon: "package" },
     { href: "/vendedor/clientes", label: "Clientes", icon: "building", secondary: true },
+    { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
     { href: "/calidad", label: "Quejas de cliente", icon: "alert", secondary: true },
     { href: "/consumo", label: "Consumo interno", icon: "clipboard", secondary: true },
   ],
@@ -36,6 +38,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/ventas/clientes", label: "Clientes", icon: "building" },
     { href: "/guias", label: "Guías", icon: "package", secondary: true },
     { href: "/calidad", label: "Quejas y acciones correctivas", icon: "alert", secondary: true },
+    { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
   ],
   gerente: [
     { href: "/ventas", label: "Ventas", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
@@ -43,6 +46,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/guias", label: "Guías", icon: "package" },
     { href: "/ventas/clientes", label: "Clientes", icon: "building", secondary: true },
+    { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
   ],
   coordinador_iso: [
     { href: "/calidad", label: "Quejas y acciones correctivas", short: "Calidad", icon: "alert" },
@@ -50,6 +54,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/guias", label: "Guías", icon: "package" },
     { href: "/ventas/clientes", label: "Clientes", icon: "building", secondary: true },
+    { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
   ],
   marketplaces: [
     { href: "/guias", label: "Guías", icon: "package" },

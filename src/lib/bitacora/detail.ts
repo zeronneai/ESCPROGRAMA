@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BitacoraEvent } from "@/components/bitacora-editor";
 import type { BitacoraRow } from "@/lib/bitacora/stages";
+import type { BitacoraArticulo } from "@/lib/articulos";
 import { CUSTOMER_COLS, type CustomerRecord } from "@/lib/validation/customer";
 
 export interface BitacoraDetail {
@@ -9,6 +10,7 @@ export interface BitacoraDetail {
   customer: CustomerRecord | null;
   events: BitacoraEvent[];
   requests: { id: string; folio: string; submitted_at: string | null }[];
+  articulos: BitacoraArticulo[];
 }
 
 /** Carga un registro con su cliente, movimientos y solicitudes del portal del mismo cliente (RLS decide que se ve). */
@@ -20,7 +22,7 @@ export async function loadBitacoraDetail(supabase: SupabaseClient, id: string): 
     .eq("id", id)
     .maybeSingle();
   if (!entry) return null;
-  const [{ data: customer }, { data: ev }, { data: reqs }] = await Promise.all([
+  const [{ data: customer }, { data: ev }, { data: reqs }, { data: arts }] = await Promise.all([
     supabase.from("customers").select(CUSTOMER_COLS).eq("id", entry.customer_id).maybeSingle(),
     supabase
       .from("bitacora_eventos")
@@ -35,6 +37,7 @@ export async function loadBitacoraDetail(supabase: SupabaseClient, id: string): 
       .not("folio", "is", null)
       .order("submitted_at", { ascending: false })
       .limit(50),
+    supabase.from("bitacora_articulos").select("id, articulo_id, cantidad, articulos(clave, nombre)").eq("bitacora_id", id).order("created_at"),
   ]);
   return {
     entry: entry as BitacoraDetail["entry"],
@@ -44,5 +47,9 @@ export async function loadBitacoraDetail(supabase: SupabaseClient, id: string): 
       return { id: e.id, tipo: e.tipo, etapa: e.etapa, nota: e.nota, created_at: e.created_at, autor: p?.nombre ?? null };
     }),
     requests: (reqs ?? []).filter((r) => r.folio) as BitacoraDetail["requests"],
+    articulos: (arts ?? []).map((a) => {
+      const x = a.articulos as unknown as { clave: string; nombre: string } | null;
+      return { id: a.id, articulo_id: a.articulo_id, clave: x?.clave ?? "", nombre: x?.nombre ?? "", cantidad: a.cantidad === null ? null : Number(a.cantidad) };
+    }),
   };
 }

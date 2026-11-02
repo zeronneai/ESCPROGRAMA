@@ -6,6 +6,7 @@ import { currentStage, RESULT_LABEL, STAGES, stageState, type BitacoraRow } from
 export type BitacoraListRow = BitacoraRow & {
   customers: { id: string; nombre: string; tipo: "cliente" | "prospecto"; giro: string | null; estado_geo: string | null; contacto_nombre: string | null; contacto_telefono: string | null } | null;
   profiles?: { nombre: string } | null;
+  bitacora_articulos?: { cantidad: number | null; articulos: { clave: string; nombre: string } | null }[];
 };
 
 const fmt = (d: string | null) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "short" }) : "-");
@@ -46,6 +47,11 @@ export function BitacoraList({ rows, hrefFor, showSeller = false, today }: { row
                   {showSeller && r.profiles?.nombre && <> · <span className="text-slate-700">{r.profiles.nombre}</span></>}
                 </p>
                 {r.necesidad && <p className="truncate text-sm text-slate-600">{r.necesidad}</p>}
+                {!!r.bitacora_articulos?.length && (
+                  <p className="truncate text-xs text-slate-500">
+                    {r.bitacora_articulos.length} artículo(s): {r.bitacora_articulos.map((a) => a.articulos?.nombre.split(",")[0]).filter(Boolean).join(" · ")}
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
                 <StageDots row={r} />

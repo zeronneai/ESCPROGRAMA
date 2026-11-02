@@ -114,6 +114,11 @@ curl -X POST https://<portal>/api/leads/entrada \
 - Listas como tarjetas en celular y tablas en escritorio.
 - **Historial del comprador**: ahora muestra por defecto todas las partidas que ya respondió (antes salía vacío hasta buscar), con contadores de hoy, semana, mes y total, filtros por estado y paginación. La búsqueda por producto o proveedor sigue igual.
 
+## Catálogo de artículos y demostración (migraciones 0022 y 0023)
+
+- **Artículos**: catálogo de ESC con estatus. En la bitácora (ventas y prospección) se ligan los artículos vendidos u ofrecidos, con cantidad opcional. La jefa ve los artículos más movidos en el Resumen. Página `/articulos` para buscar.
+- **Demostración**: Configuración > Demostración. El comprador activa ejemplos por sección o todo junto; se crean con los usuarios reales. Para quitarlos: `supabase/borrar-datos-de-prueba.sql`.
+
 ## Quejas, acciones correctivas, consumo interno y guías (migraciones 0020 y 0021)
 
 | Puesto | Inicio | Qué hace |

@@ -19,7 +19,7 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
   const fromIso = from.toUTC().toISO()!;
   const toIso = to.toUTC().toISO()!;
 
-  const [sellers, requests, issues, bitacora, conversions, events] = await Promise.all([
+  const [sellers, requests, issues, bitacora, conversions, events, arts] = await Promise.all([
     supabase.from("profiles").select("id, nombre, activo").eq("rol", "vendedor").order("nombre"),
     supabase.from("quote_requests").select("vendedor_id, submitted_at").gte("submitted_at", fromIso).lte("submitted_at", toIso).limit(5000),
     supabase.from("quote_issues").select("emitida_por, request_id, emitida_at").gte("emitida_at", fromIso).lte("emitida_at", toIso).limit(5000),
@@ -30,7 +30,22 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
       .limit(10000),
     supabase.from("customers").select("convertido_por").gte("convertido_at", fromIso).lte("convertido_at", toIso).limit(5000),
     supabase.from("bitacora_eventos").select("created_by, created_at").gte("created_at", fromIso).lte("created_at", toIso).limit(20000),
+    supabase.from("bitacora_articulos").select("articulo_id, articulos(clave, nombre), bitacora(fecha_pedido, archived_at, customers(tipo))").limit(10000),
   ]);
+  const topArts = Object.values(
+    ((arts.data ?? []) as unknown as { articulo_id: string; articulos: { clave: string; nombre: string } | null; bitacora: { fecha_pedido: string | null; archived_at: string | null; customers: { tipo: string } | null } | null }[])
+      .filter((a) => a.bitacora && !a.bitacora.archived_at)
+      .reduce<Record<string, { nombre: string; clave: string; registros: number; prospectos: number; vendidos: number }>>((acc, a) => {
+        const k = a.articulo_id;
+        acc[k] ??= { nombre: a.articulos?.nombre ?? "", clave: a.articulos?.clave ?? "", registros: 0, prospectos: 0, vendidos: 0 };
+        acc[k].registros++;
+        if (a.bitacora?.customers?.tipo !== "cliente") acc[k].prospectos++;
+        if (a.bitacora?.fecha_pedido) acc[k].vendidos++;
+        return acc;
+      }, {}),
+  )
+    .sort((a, b) => b.vendidos - a.vendidos || b.registros - a.registros)
+    .slice(0, 8);
   const err = [sellers, requests, issues, bitacora, conversions, events].find((r) => r.error)?.error;
   const rows = summarizeSellers({
     sellers: sellers.data ?? [],
@@ -152,6 +167,19 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
             ))}
           </div>
         </>
+      )}
+      {topArts.length > 0 && (
+        <Card className="space-y-3 p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Artículos más movidos en la bitácora</h2>
+          <ul className="divide-y divide-slate-100 text-sm">
+            {topArts.map((a) => (
+              <li key={a.clave} className="flex flex-col gap-1 py-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0"><p className="truncate text-slate-900">{a.nombre}</p><p className="text-xs text-slate-500">{a.clave}</p></div>
+                <p className="shrink-0 text-xs text-slate-600">{a.vendidos} con pedido · {a.registros} registros · {a.prospectos} en prospección</p>
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
       <p className="text-xs text-slate-500">
         Pedidos y monto salen de la bitácora (fecha de orden de compra). Los montos en USD no se suman. Ventas en curso, prospectos y cartera son el estado actual.

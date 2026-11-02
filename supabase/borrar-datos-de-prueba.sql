@@ -1,13 +1,13 @@
 -- =============================================================================
 -- BORRAR DATOS DE PRUEBA  (correlo SOLO cuando quieras empezar en limpio; NO se puede deshacer)
--- Requiere 0021 ya aplicado.
+-- Requiere 0023 ya aplicado.
 --
 -- BORRA: solicitudes y partidas, cotizaciones y envios al cliente, PDFs registrados, aclaraciones,
 --        compras, clientes y prospectos, bitacora de ventas/prospeccion, leads, quejas, acciones
 --        correctivas, consumo interno, guias, avisos de la campanita y la bitacora de auditoria.
 --        Los folios vuelven a empezar en 1 (COT, QC, SAC, CI y G).
 -- CONSERVA: usuarios (todos), configuracion, dias festivos, datos de la empresa, tabulador de
---        precios y proveedores.
+--        precios, proveedores y el catalogo de articulos.
 -- Los archivos ya subidos (imagenes, guias, evidencias) quedan en Storage sin uso; si quieres
 -- borrarlos, vacia los buckets desde Supabase > Storage.
 -- Como aplicarlo: pega este archivo COMPLETO en SQL Editor y presiona Run.
@@ -20,7 +20,7 @@ truncate table
   public.guia_eventos, public.guias,
   public.consumo_eventos, public.consumo_solicitudes,
   public.calidad_archivos, public.calidad_eventos, public.acciones_correctivas, public.quejas,
-  public.bitacora_eventos, public.bitacora,
+  public.demo_cargas, public.bitacora_articulos, public.bitacora_eventos, public.bitacora,
   public.lead_activities, public.leads,
   public.quote_issue_sends, public.quote_issue_lines, public.quote_renegotiations, public.quote_issues,
   public.quote_pdf_shipping_items, public.quote_pdf_min_choices, public.quote_pdf_data,

@@ -19,7 +19,11 @@ const refresh = (id?: string) => {
   if (id) revalidatePath(`/vendedor/bitacora/${id}`);
 };
 
-export async function createBitacoraAction(customerId: string, input: BitacoraInput): Promise<Result<{ id: string }>> {
+export async function createBitacoraAction(
+  customerId: string,
+  input: BitacoraInput,
+  articulos: { articulo_id: string; cantidad: number | null }[] = [],
+): Promise<Result<{ id: string }>> {
   const u = await requireSeller();
   if (!uuid.safeParse(customerId).success) return { ok: false, error: "Elige el cliente o prospecto" };
   const parsed = bitacoraSchema.safeParse(input);
@@ -31,6 +35,10 @@ export async function createBitacoraAction(customerId: string, input: BitacoraIn
     .select("id")
     .single();
   if (error) return { ok: false, error: friendlyError(error.message) };
+  const arts = articulos.filter((a) => uuid.safeParse(a.articulo_id).success).slice(0, 50);
+  if (arts.length) {
+    await supabase.from("bitacora_articulos").insert(arts.map((a) => ({ bitacora_id: data.id, articulo_id: a.articulo_id, cantidad: a.cantidad && a.cantidad > 0 ? a.cantidad : null })));
+  }
   refresh();
   return { ok: true, id: data.id };
 }
