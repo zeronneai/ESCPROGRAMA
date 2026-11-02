@@ -7,6 +7,7 @@ export const ROL_LABEL: Record<Rol, string> = {
   gerente: "Gerente",
   coordinador_iso: "Coordinador ISO",
   marketplaces: "Marketplaces",
+  almacen: "Almacén",
 };
 
 /** Puestos que leen ventas, clientes y bitacora de todos (sin editar). */

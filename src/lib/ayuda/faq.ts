@@ -234,6 +234,37 @@ export const FAQ: Faq[] = [
     keys: ["por comprar", "comprar", "ganadas", "orden", "proveedor", "comprada"],
     a: ["Son las partidas que el vendedor marcó Ganadas: lo que hay que comprarle al proveedor.", "Cuando hagas la compra márcala como Comprada; queda la fecha y quién la hizo."],
   },
+
+  // ----- Evaluaciones e indicadores
+  {
+    id: "eval-clientes", q: "¿Cómo mando la evaluación a mis clientes?", roles: V, paths: ["/evaluaciones/clientes", "/vendedor/clientes"],
+    keys: ["evaluacion", "encuesta", "satisfaccion", "link", "calificar", "evaluar cliente", "clientes"],
+    a: ["Cuando la evaluación está activa, ve a Clientes > Evaluación de clientes.", "En cada cliente toca \"Generar link\" y luego WhatsApp, Correo o Copiar link.", "Ahí ves si ya se envió y si ya respondió. Son 5 preguntas y el cliente no necesita cuenta."],
+    links: [{ label: "Evaluación de clientes", href: "/evaluaciones/clientes" }],
+  },
+  {
+    id: "eval-proveedores", q: "¿Cómo evalúo a un proveedor?", roles: ["comprador", "almacen"], paths: ["/evaluaciones/proveedores"],
+    keys: ["evaluacion", "evaluar", "proveedor", "proveedores", "calificar", "almacen", "recibido", "golpeado", "incompleto"],
+    a: ["Ve a Evaluación de proveedores (solo aparece para calificar cuando está activa).", "En \"Me faltan\" abre el proveedor y califica cada punto del 1 (malo) al 5 (excelente).", "El comprador califica comunicación, entrega, precio, documentos y atención; Almacén califica estado, cantidades, empaque, especificación y documentos de entrega."],
+    links: [{ label: "Evaluación de proveedores", href: "/evaluaciones/proveedores" }],
+  },
+  {
+    id: "eval-activar", q: "¿Cómo se activan las evaluaciones?", roles: ["comprador", "jefe_ventas"],
+    keys: ["activar", "evaluacion", "semestre", "seis meses", "6 meses", "periodo", "automatica"],
+    a: ["La primera la activas cuando quieras con \"Activar evaluación\" (proveedores: comprador; clientes: comprador o jefa de ventas).", "Al activarla se programa sola la siguiente a 6 meses y ese día se activa en automático con aviso en la campanita.", "Si necesitas, puedes adelantarla o cerrar el periodo."],
+  },
+  {
+    id: "proveedor-alta", q: "¿Cómo doy de alta un proveedor?", roles: C, paths: ["/comprador/proveedores"],
+    keys: ["proveedor", "alta", "nuevo proveedor", "datos", "contacto"],
+    a: ["Ve a Más > Proveedores > \"Nuevo proveedor\".", "Llena nombre, razón social, RFC, qué surte, contacto, teléfono y correo.", "Deja marcado \"Incluir en la evaluación\" si se debe evaluar."],
+    links: [{ label: "Proveedores", href: "/comprador/proveedores" }],
+  },
+  {
+    id: "indicadores", q: "¿Qué son los indicadores?",
+    keys: ["indicadores", "kpi", "metas", "desempeño", "medicion", "resultados"],
+    a: ["En Más > Indicadores ves los números de tu puesto que salen solos del portal (ventas, tiempos, satisfacción, evaluaciones).", "Verde va bien, ámbar a vigilar y rojo hay que atender. Cuando se definan las metas oficiales se ajustan."],
+    links: [{ label: "Indicadores", href: "/indicadores" }],
+  },
 ];
 
 /** Minusculas y sin acentos. */

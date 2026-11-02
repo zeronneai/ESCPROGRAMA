@@ -6,6 +6,7 @@ import { emisionesSuite } from "./emisiones.suite";
 import { bitacoraSuite } from "./bitacora.suite";
 import { operacionesSuite } from "./operaciones.suite";
 import { demoSuite, ventasSuite } from "./demo.suite";
+import { evaluacionesSuite } from "./evaluaciones.suite";
 import { calcTabulador } from "@/lib/pricing/tabulador";
 import { DATABASE_URL, as, failure, pool, type Actor } from "./helpers";
 
@@ -542,6 +543,7 @@ bitacoraSuite();
 operacionesSuite();
 demoSuite();
 ventasSuite();
+evaluacionesSuite();
 
 afterAll(async () => {
   await pool?.end();

@@ -93,4 +93,12 @@ describe("decideRoute", () => {
     expect(d("/vendedor", p("gerente"))).toEqual({ type: "redirect", to: "/ventas" });
     expect(d("/comprador", p("coordinador_iso"))).toEqual({ type: "redirect", to: "/calidad" });
   });
+
+  it("almacen va a evaluacion de proveedores; la encuesta del cliente se abre sin sesion", () => {
+    const alm: GuardProfile = { activo: true, must_change_password: false, rol: "almacen" };
+    expect(d("/", alm)).toEqual({ type: "redirect", to: "/evaluaciones/proveedores" });
+    expect(d("/ventas", alm)).toEqual({ type: "redirect", to: "/evaluaciones/proveedores" });
+    expect(d("/calidad", alm)).toEqual({ type: "redirect", to: "/evaluaciones/proveedores" });
+    expect(d("/encuesta/abc", null, false)).toEqual({ type: "next" });
+  });
 });

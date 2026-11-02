@@ -19,6 +19,9 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/comprador/clientes", label: "Clientes", icon: "building", secondary: true },
     { href: "/articulos", label: "Artículos", icon: "package", secondary: true },
     { href: "/comprador/proveedores", label: "Proveedores", icon: "truck", secondary: true },
+    { href: "/evaluaciones/proveedores", label: "Evaluación de proveedores", icon: "truck", secondary: true },
+    { href: "/evaluaciones/clientes", label: "Evaluación de clientes", icon: "users", secondary: true },
+    { href: "/indicadores", label: "Indicadores", icon: "chart", secondary: true },
     { href: "/comprador/usuarios", label: "Usuarios", icon: "users", secondary: true },
     { href: "/comprador/configuracion", label: "Configuración", icon: "settings", secondary: true },
     { href: "/comprador/auditoria", label: "Auditoría", icon: "shield", secondary: true },
@@ -32,6 +35,8 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
     { href: "/calidad", label: "Quejas de cliente", icon: "alert", secondary: true },
     { href: "/consumo", label: "Consumo interno", icon: "clipboard", secondary: true },
+    { href: "/evaluaciones/clientes", label: "Evaluación de clientes", icon: "users", secondary: true },
+    { href: "/indicadores", label: "Indicadores", icon: "chart", secondary: true },
   ],
   jefe_ventas: [
     { href: "/ventas", label: "Resumen", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
@@ -40,6 +45,8 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/guias", label: "Guías", icon: "package", secondary: true },
     { href: "/calidad", label: "Quejas y acciones correctivas", icon: "alert", secondary: true },
     { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
+    { href: "/evaluaciones/clientes", label: "Evaluación de clientes", icon: "users", secondary: true },
+    { href: "/indicadores", label: "Indicadores", icon: "chart", secondary: true },
   ],
   gerente: [
     { href: "/ventas", label: "Ventas", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
@@ -48,6 +55,9 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/guias", label: "Guías", icon: "package" },
     { href: "/ventas/clientes", label: "Clientes", icon: "building", secondary: true },
     { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
+    { href: "/evaluaciones/proveedores", label: "Evaluación de proveedores", icon: "truck", secondary: true },
+    { href: "/evaluaciones/clientes", label: "Evaluación de clientes", icon: "users", secondary: true },
+    { href: "/indicadores", label: "Indicadores", icon: "chart", secondary: true },
   ],
   coordinador_iso: [
     { href: "/calidad", label: "Quejas y acciones correctivas", short: "Calidad", icon: "alert" },
@@ -56,10 +66,19 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/guias", label: "Guías", icon: "package" },
     { href: "/ventas/clientes", label: "Clientes", icon: "building", secondary: true },
     { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
+    { href: "/evaluaciones/proveedores", label: "Evaluación de proveedores", icon: "truck", secondary: true },
+    { href: "/evaluaciones/clientes", label: "Evaluación de clientes", icon: "users", secondary: true },
+    { href: "/indicadores", label: "Indicadores", icon: "chart", secondary: true },
   ],
   marketplaces: [
     { href: "/guias", label: "Guías", icon: "package" },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
+    { href: "/indicadores", label: "Indicadores", icon: "chart", secondary: true },
+  ],
+  almacen: [
+    { href: "/evaluaciones/proveedores", label: "Evaluación de proveedores", short: "Evaluación", icon: "truck" },
+    { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
+    { href: "/indicadores", label: "Indicadores", icon: "chart" },
   ],
 };
 

@@ -114,6 +114,14 @@ curl -X POST https://<portal>/api/leads/entrada \
 - Listas como tarjetas en celular y tablas en escritorio.
 - **Historial del comprador**: ahora muestra por defecto todas las partidas que ya respondió (antes salía vacío hasta buscar), con contadores de hoy, semana, mes y total, filtros por estado y paginación. La búsqueda por producto o proveedor sigue igual.
 
+## Evaluaciones e indicadores (migraciones 0025 y 0026)
+
+- **Proveedores**: el comprador los da de alta con sus datos y marca cuáles se evalúan.
+- **Evaluación de proveedores**: el comprador la activa; Almacén solo la ve activa. Comprador: comunicación, entrega a tiempo, precio, documentación, atención a reclamos. Almacén: buen estado, pedido completo, empaque, conforme a lo solicitado, documentos de entrega. Escala 1 a 5; puntaje en %.
+- **Evaluación de clientes**: cada vendedor genera un link único por cliente (`/encuesta/<token>`, sin cuenta), lo manda por WhatsApp o correo y ve si se envió y si respondió. 5 preguntas: No satisfactorio, Satisfactorio, Muy satisfactorio.
+- **Dos veces al año**: al activar un periodo se programa el siguiente a 6 meses; la tarea diaria (`/api/cron/avisos`) lo activa y avisa en la campanita.
+- **Indicadores** (`/indicadores`): por puesto, calculados de lo que ya registra el portal.
+
 ## Ayuda en el portal
 
 - Botón "?" abajo a la derecha: preguntas frecuentes por puesto y por página, con buscador por palabras (sin IA, sin costo). Las respuestas están en `src/lib/ayuda/faq.ts`; para agregar una, se añade un elemento a la lista.

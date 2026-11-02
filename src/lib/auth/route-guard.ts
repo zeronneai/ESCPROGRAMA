@@ -1,7 +1,7 @@
 /**
  * Decision pura de acceso por ruta (se usa en el middleware y se prueba aparte).
  */
-export type Rol = "vendedor" | "comprador" | "jefe_ventas" | "gerente" | "coordinador_iso" | "marketplaces";
+export type Rol = "vendedor" | "comprador" | "jefe_ventas" | "gerente" | "coordinador_iso" | "marketplaces" | "almacen";
 
 export interface GuardProfile {
   activo: boolean;
@@ -28,6 +28,8 @@ export function homeFor(rol: Rol): string {
       return "/calidad";
     case "marketplaces":
       return "/guias";
+    case "almacen":
+      return "/evaluaciones/proveedores";
     default:
       return "/vendedor";
   }
@@ -44,6 +46,8 @@ export function decideRoute(input: {
 
   // El cron y la entrada de leads del sitio web se autentican con su propio secreto.
   if (pathname.startsWith("/api/cron/") || pathname === "/api/leads/entrada") return { type: "next" };
+  // Encuesta de satisfaccion: el cliente la abre con su link, sin cuenta.
+  if (pathname.startsWith("/encuesta/")) return { type: "next" };
 
   if (!hasUser) {
     if (pathname === LOGIN_PATH) return { type: "next" };
@@ -85,7 +89,7 @@ export function decideRoute(input: {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   // Quejas y acciones correctivas: todos menos Marketplaces.
-  if (under("/calidad") && profile.rol === "marketplaces") {
+  if (under("/calidad") && (profile.rol === "marketplaces" || profile.rol === "almacen")) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   if (pathname.startsWith("/api/admin") && profile.rol !== "comprador") {

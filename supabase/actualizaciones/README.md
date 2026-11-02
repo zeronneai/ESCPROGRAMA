@@ -34,6 +34,8 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 17 | `0022_articulos.sql` | **Catálogo de artículos** (987 del sistema de ESC: 695 activos, 5 sin compras pero con existencia, 154 suspendidos y 133 bajas). En la bitácora solo se eligen los activos y los que aún tienen existencia. |
 | 18 | `0023_demo.sql` | **Demostración**: el comprador activa ejemplos por sección desde Configuración. |
 | 19 | `0024_ventas_diarias.sql` | **Ventas diarias** separadas de la **Prospección**: registro sencillo por venta (cliente, artículos, pedido, factura, monto, contado o crédito, entrega y cobranza) con cartera vencida calculada sola. Paqueterías de guías: Paquete Express, Estafeta, Tinypack, Porteo, DHL u Otra. |
+| 20 | `0025_rol_almacen.sql` | Agrega el puesto **Almacén**. Córrelo **solo**, en su propia ejecución, antes del 21. |
+| 21 | `0026_evaluaciones.sql` | **Proveedores** con datos completos, **evaluación de proveedores** (comprador + almacén, escala 1 a 5) y **evaluación de clientes** (link único por cliente, 3 respuestas). Dos veces al año: la siguiente se activa sola a los 6 meses. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 
