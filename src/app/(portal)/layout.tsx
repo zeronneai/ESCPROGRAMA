@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Logo } from "@/components/logo";
 import { NavigationProgress } from "@/components/navigation-progress";
+import { HelpChat } from "@/components/help-chat";
 import { NotificationBell } from "@/components/notification-bell";
 import { PortalNav, type NavItem } from "@/components/portal-nav";
 import { requireUser } from "@/lib/auth/guards";
@@ -71,6 +72,7 @@ export default async function PortalLayout({ children }: { children: React.React
       </Suspense>
       <PortalNav items={NAV[user.rol]} user={{ nombre: user.nombre, rol: user.rol }} bell={<NotificationBell />} logo={<Logo className="h-7 sm:h-8" />} />
       <main className="pb-safe-nav mx-auto max-w-6xl px-4 pt-5 sm:pt-6">{children}</main>
+      <HelpChat rol={user.rol} nombre={user.nombre} />
     </div>
   );
 }

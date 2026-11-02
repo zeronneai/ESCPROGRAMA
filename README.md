@@ -114,6 +114,10 @@ curl -X POST https://<portal>/api/leads/entrada \
 - Listas como tarjetas en celular y tablas en escritorio.
 - **Historial del comprador**: ahora muestra por defecto todas las partidas que ya respondió (antes salía vacío hasta buscar), con contadores de hoy, semana, mes y total, filtros por estado y paginación. La búsqueda por producto o proveedor sigue igual.
 
+## Ayuda en el portal
+
+- Botón "?" abajo a la derecha: preguntas frecuentes por puesto y por página, con buscador por palabras (sin IA, sin costo). Las respuestas están en `src/lib/ayuda/faq.ts`; para agregar una, se añade un elemento a la lista.
+
 ## Ventas diarias y Prospección (migración 0024)
 
 - **Ventas diarias** (clientes): un renglón por venta con fecha, cliente, artículos y cantidad, pedido/OC, factura, monto, contado o crédito (días), entrega y % cobrado. La cartera vencida se calcula con la fecha y los días de crédito. Al marcar Ganada una partida del portal, la venta se registra sola.
