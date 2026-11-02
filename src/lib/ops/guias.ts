@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const PAQUETERIAS = ["DHL", "FedEx", "Estafeta", "Paquetexpress", "UPS", "Redpack", "99 Minutos", "Castores", "Tres Guerras", "Otra"] as const;
+export const PAQUETERIAS = ["Paquete Express", "Estafeta", "Tinypack", "Porteo", "DHL", "Otra"] as const;
 export type Paqueteria = (typeof PAQUETERIAS)[number];
 export const SERVICIOS = { estandar: "Estándar", express: "Express", dia_siguiente: "Día siguiente", economico: "Económico / terrestre" } as const;
 export type Servicio = keyof typeof SERVICIOS;

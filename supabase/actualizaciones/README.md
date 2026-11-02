@@ -33,6 +33,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 16 | `0021_calidad_consumo_guias.sql` | **Quejas de cliente** (ESC-SGC-FR-002), **acciones correctivas** (ESC-SGC-FR-001), **consumo interno** con aprobación de la jefa de ventas y **guías de paquetería** con Marketplaces, recordatorio a las 4 horas y alerta a las 24. |
 | 17 | `0022_articulos.sql` | **Catálogo de artículos** (987 del sistema de ESC: 695 activos, 5 sin compras pero con existencia, 154 suspendidos y 133 bajas). En la bitácora solo se eligen los activos y los que aún tienen existencia. |
 | 18 | `0023_demo.sql` | **Demostración**: el comprador activa ejemplos por sección desde Configuración. |
+| 19 | `0024_ventas_diarias.sql` | **Ventas diarias** separadas de la **Prospección**: registro sencillo por venta (cliente, artículos, pedido, factura, monto, contado o crédito, entrega y cobranza) con cartera vencida calculada sola. Paqueterías de guías: Paquete Express, Estafeta, Tinypack, Porteo, DHL u Otra. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

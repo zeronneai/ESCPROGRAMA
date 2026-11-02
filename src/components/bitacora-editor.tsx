@@ -11,7 +11,7 @@ import { ArticulosList } from "@/components/articulos-picker";
 import { CustomerPicker, KindBadge } from "@/components/customers";
 import type { BitacoraArticulo } from "@/lib/articulos";
 import { Alert, Button, Card, Input, Select } from "@/components/ui";
-import { currentStage, eventText, STAGES, stageState, type BitacoraRow, type StageKey } from "@/lib/bitacora/stages";
+import { currentStage, eventText, PROSPECT_STAGES, stageState, type BitacoraRow, type StageKey } from "@/lib/bitacora/stages";
 import { bitacoraMissing, customerMissing, type CustomerKind, type CustomerRecord } from "@/lib/validation/customer";
 
 type Form = {
@@ -222,11 +222,19 @@ export function BitacoraEditor({
     cotizacion: dateField("fecha_cotizacion", "Se llena sola al registrar el envío de la cotización"),
     pedido: (
       <div className="space-y-2">
-        {dateField("fecha_pedido", "Se llena sola al marcar una partida Ganada")}
-        <div className="flex flex-wrap items-center gap-2">
-          <Input value={v.monto_venta} disabled={ro} onChange={(e) => set("monto_venta", e.target.value)} inputMode="decimal" placeholder="Monto de la venta (sin IVA)" className="w-56!" />
-          <Select value={v.moneda} disabled={ro} onChange={(e) => set("moneda", e.target.value as "MXN" | "USD")} className="w-24!"><option value="MXN">MXN</option><option value="USD">USD</option></Select>
-        </div>
+        {v.fecha_pedido ? (
+          <p className="text-sm text-green-800">
+            Compró el {new Date(`${v.fecha_pedido}T12:00:00`).toLocaleDateString("es-MX", { day: "numeric", month: "long" })}
+            {v.monto_venta && ` · $${Number(v.monto_venta).toLocaleString("es-MX")} ${v.moneda}`}. Sus ventas siguen en Ventas diarias.
+          </p>
+        ) : (
+          <p className="text-xs text-slate-500">Cuando compre, registra la venta: pasa a cliente y este prospecto se cierra como ganado.</p>
+        )}
+        {!ro && mode !== "new" && customer && basePath.startsWith("/vendedor") && (
+          <Link href={`/vendedor/bitacora/venta/nueva?cliente=${customer.id}`} className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700">
+            {v.fecha_pedido ? "Registrar otra venta" : "Registrar su primera venta"}
+          </Link>
+        )}
       </div>
     ),
     factura: (
@@ -319,7 +327,7 @@ export function BitacoraEditor({
           <span className="text-xs text-slate-500">Etapa actual: <strong className="text-slate-800">{stage.stage?.short ?? "Sin iniciar"}</strong></span>
         </div>
         <ol>
-          {STAGES.map((s, i) => {
+          {PROSPECT_STAGES.map((s, i) => {
             const st = stageState(preview, i);
             const dot = st === "done" ? "bg-green-600 text-white" : st === "na" ? "bg-slate-200 text-slate-400" : st === "pending" ? "bg-amber-400 text-white" : "bg-white text-slate-400 ring-1 ring-slate-300";
             return (

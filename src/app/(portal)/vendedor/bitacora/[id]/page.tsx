@@ -15,13 +15,12 @@ export default async function RegistroBitacora({ params }: { params: Promise<{ i
   const [d, cfg] = await Promise.all([loadBitacoraDetail(supabase, id), getBusinessSettings(supabase)]);
   if (!d) notFound();
   const mode = !d.entry.vendedor_id ? "claim" : d.entry.vendedor_id === user.id ? "edit" : "readonly";
-  const isProspect = d.customer?.tipo !== "cliente";
   return (
     <div className="space-y-4">
-      <Link href={`/vendedor/bitacora${isProspect ? "?tab=prospeccion" : ""}`} className="text-sm text-slate-500 hover:text-slate-800">← Bitácora</Link>
+      <Link href="/vendedor/bitacora?tab=prospeccion" className="text-sm text-slate-500 hover:text-slate-800">← Prospección</Link>
       <PageHeader
         title={d.customer?.nombre ?? "Registro"}
-        subtitle={`${isProspect ? "Prospección" : "Ventas diarias"} · creado ${DateTime.fromISO(d.entry.created_at, { zone: cfg.timezone }).setLocale("es-MX").toFormat("d LLL yyyy")}${d.entry.archived_at ? " · archivado" : ""}`}
+        subtitle={`Prospección · creado ${DateTime.fromISO(d.entry.created_at, { zone: cfg.timezone }).setLocale("es-MX").toFormat("d LLL yyyy")}${d.entry.archived_at ? " · archivado" : ""}`}
       />
       <BitacoraEditor
         key={d.entry.updated_at}

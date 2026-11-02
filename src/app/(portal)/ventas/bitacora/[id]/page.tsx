@@ -14,15 +14,14 @@ export default async function RegistroVentas({ params }: { params: Promise<{ id:
   const supabase = await createClient();
   const [d, cfg] = await Promise.all([loadBitacoraDetail(supabase, id), getBusinessSettings(supabase)]);
   if (!d) notFound();
-  const isProspect = d.customer?.tipo !== "cliente";
   return (
     <div className="space-y-4">
-      <Link href={d.entry.vendedor_id ? `/ventas/vendedor/${d.entry.vendedor_id}${isProspect ? "?tab=prospeccion" : ""}` : "/ventas"} className="text-sm text-slate-500 hover:text-slate-800">
+      <Link href={d.entry.vendedor_id ? `/ventas/vendedor/${d.entry.vendedor_id}?tab=prospeccion` : "/ventas"} className="text-sm text-slate-500 hover:text-slate-800">
         ← {d.entry.profiles?.nombre ?? "Resumen de ventas"}
       </Link>
       <PageHeader
         title={d.customer?.nombre ?? "Registro"}
-        subtitle={`${isProspect ? "Prospección" : "Ventas diarias"} · ${d.entry.profiles?.nombre ?? "Sin vendedor"} · solo lectura`}
+        subtitle={`Prospección · ${d.entry.profiles?.nombre ?? "Sin vendedor"} · solo lectura`}
       />
       <BitacoraEditor
         mode="readonly"

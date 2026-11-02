@@ -105,7 +105,7 @@ export function GuiaForm({ id, initial, onDone }: { id: string | null; initial?:
           <Field label="Valor declarado (MXN)"><Input value={s("valor_declarado")} onChange={set("valor_declarado")} inputMode="decimal" /></Field>
         </div>
         <div className="flex flex-wrap gap-4 text-sm">
-          <label className="flex items-center gap-2"><input type="checkbox" checked={!!v.asegurar} onChange={(e) => setV((x) => ({ ...x, asegurar: e.target.checked }))} /> Asegurar el envío</label>
+          <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5" checked={!!v.asegurar} onChange={(e) => setV((x) => ({ ...x, asegurar: e.target.checked }))} /> <span>Asegurar el envío<span className="block text-xs text-slate-500">Si se pierde o llega dañado, la paquetería paga el valor declarado. Tiene costo extra.</span></span></label>
           <label className="flex items-center gap-2 font-medium text-red-700"><input type="checkbox" checked={!!v.urgente} onChange={(e) => setV((x) => ({ ...x, urgente: e.target.checked }))} /> Es urgente</label>
         </div>
         <Field label="Notas para Marketplaces">

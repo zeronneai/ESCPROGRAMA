@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 import type { BitacoraRow } from "@/lib/bitacora/stages";
+import { cobroEstado, saldo, type VentaRow } from "@/lib/ventas";
 
 /** Resumen por vendedor para la jefa de ventas (cotizaciones + bitacora de ventas y prospeccion). */
 export type Period = "7d" | "mes" | "mes_anterior" | "anio";
@@ -25,10 +26,9 @@ export function periodRange(p: Period, now: DateTime): { from: DateTime; to: Dat
   }
 }
 
-export type SummaryBitacora = Pick<
-  BitacoraRow,
-  "vendedor_id" | "resultado" | "fecha_pedido" | "monto_venta" | "moneda" | "cartera_dias_vencidos" | "cartera_monto" | "proximo_seguimiento" | "created_at" | "updated_at" | "archived_at"
-> & { customers: { tipo: "cliente" | "prospecto" } | null };
+export type SummaryBitacora = Pick<BitacoraRow, "vendedor_id" | "resultado" | "proximo_seguimiento" | "created_at" | "updated_at" | "archived_at">;
+
+export type SummaryVenta = Pick<VentaRow, "vendedor_id" | "fecha" | "monto" | "moneda" | "pago" | "vence" | "porcentaje_cobrado" | "cancelada_at" | "request_id" | "created_at">;
 
 export interface SummaryInput {
   sellers: { id: string; nombre: string; activo: boolean }[];
@@ -36,10 +36,13 @@ export interface SummaryInput {
   requests: { vendedor_id: string; submitted_at: string }[];
   /** Cotizaciones registradas como enviadas al cliente en el periodo. */
   issues: { emitida_por: string; request_id: string; emitida_at: string }[];
+  /** Prospeccion (seguimiento por etapas). */
   bitacora: SummaryBitacora[];
+  /** Ventas diarias (todas: el periodo se filtra aqui; la cartera es al dia de hoy). */
+  ventas: SummaryVenta[];
   /** Prospectos convertidos a cliente en el periodo. */
   conversions: { convertido_por: string | null }[];
-  /** Movimientos de bitacora en el periodo. */
+  /** Movimientos de prospeccion en el periodo. */
   events: { created_by: string | null; created_at: string }[];
   /** Fechas (yyyy-mm-dd) del periodo y de hoy en la zona del negocio. */
   fromDate: string;
@@ -53,14 +56,14 @@ export interface SellerSummary {
   activo: boolean;
   solicitudes: number;
   cotizacionesEnviadas: number;
-  pedidos: number;
-  montoPedidos: number;
+  ventas: number;
+  montoVentas: number;
   conversion: number | null;
-  ventasActivas: number;
+  porCobrar: number;
+  carteraVencida: number;
   prospectosActivos: number;
   prospectosNuevos: number;
   convertidos: number;
-  carteraVencida: number;
   seguimientosVencidos: number;
   movimientos: number;
   ultimaActividad: string | null;
@@ -72,45 +75,47 @@ export function summarizeSellers(i: SummaryInput): SellerSummary[] {
   return i.sellers
     .map((s) => {
       const b = i.bitacora.filter((r) => r.vendedor_id === s.id && !r.archived_at);
-      const pedidosRows = b.filter((r) => inDate(r.fecha_pedido));
+      const v = i.ventas.filter((x) => x.vendedor_id === s.id && !x.cancelada_at);
+      const vp = v.filter((x) => inDate(x.fecha));
       const cotizaciones = new Set(i.issues.filter((x) => x.emitida_por === s.id).map((x) => x.request_id)).size;
+      const ganadas = new Set(vp.filter((x) => x.request_id).map((x) => x.request_id)).size;
       const ev = i.events.filter((e) => e.created_by === s.id).map((e) => e.created_at);
-      const last = [...ev, ...b.map((r) => r.updated_at)].sort().at(-1) ?? null;
+      const last = [...ev, ...b.map((r) => r.updated_at), ...v.map((x) => x.created_at)].sort().at(-1) ?? null;
+      const st = v.map((x) => ({ x, e: cobroEstado(x, i.today) }));
       return {
         id: s.id,
         nombre: s.nombre,
         activo: s.activo,
         solicitudes: i.requests.filter((r) => r.vendedor_id === s.id).length,
         cotizacionesEnviadas: cotizaciones,
-        pedidos: pedidosRows.length,
-        montoPedidos: pedidosRows.reduce((a, r) => a + (r.moneda === "MXN" ? Number(r.monto_venta ?? 0) : 0), 0),
-        conversion: cotizaciones ? Math.round((Math.min(pedidosRows.length, cotizaciones) / cotizaciones) * 100) : null,
-        ventasActivas: b.filter((r) => r.resultado === "abierta" && r.customers?.tipo === "cliente").length,
-        prospectosActivos: b.filter((r) => r.resultado === "abierta" && r.customers?.tipo !== "cliente").length,
-        prospectosNuevos: b.filter((r) => r.customers?.tipo !== "cliente" && inDate(dayOf(r.created_at))).length,
+        ventas: vp.length,
+        montoVentas: vp.reduce((a, x) => a + (x.moneda === "MXN" ? Number(x.monto ?? 0) : 0), 0),
+        conversion: cotizaciones ? Math.round((Math.min(ganadas, cotizaciones) / cotizaciones) * 100) : null,
+        porCobrar: st.filter((y) => y.e === "por_cobrar").reduce((a, y) => a + saldo(y.x), 0),
+        carteraVencida: st.filter((y) => y.e === "vencida").reduce((a, y) => a + saldo(y.x), 0),
+        prospectosActivos: b.filter((r) => r.resultado === "abierta").length,
+        prospectosNuevos: b.filter((r) => inDate(dayOf(r.created_at))).length,
         convertidos: i.conversions.filter((c) => c.convertido_por === s.id).length,
-        carteraVencida: b.reduce((a, r) => a + (Number(r.cartera_dias_vencidos ?? 0) > 0 ? Number(r.cartera_monto ?? 0) : 0), 0),
         seguimientosVencidos: b.filter((r) => r.resultado === "abierta" && !!r.proximo_seguimiento && r.proximo_seguimiento < i.today).length,
-        movimientos: ev.length,
+        movimientos: ev.length + v.filter((x) => inDate(dayOf(x.created_at))).length,
         ultimaActividad: last,
       };
     })
-    .sort((a, b) => Number(b.activo) - Number(a.activo) || b.montoPedidos - a.montoPedidos || b.movimientos - a.movimientos || a.nombre.localeCompare(b.nombre));
+    .sort((a, b) => Number(b.activo) - Number(a.activo) || b.montoVentas - a.montoVentas || b.movimientos - a.movimientos || a.nombre.localeCompare(b.nombre));
 }
 
 export function totals(rows: SellerSummary[]) {
   const sum = (k: keyof SellerSummary) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
-  const cot = sum("cotizacionesEnviadas");
   return {
     solicitudes: sum("solicitudes"),
-    cotizacionesEnviadas: cot,
-    pedidos: sum("pedidos"),
-    montoPedidos: sum("montoPedidos"),
-    conversion: cot ? Math.round((Math.min(sum("pedidos"), cot) / cot) * 100) : null,
+    cotizacionesEnviadas: sum("cotizacionesEnviadas"),
+    ventas: sum("ventas"),
+    montoVentas: sum("montoVentas"),
+    porCobrar: sum("porCobrar"),
+    carteraVencida: sum("carteraVencida"),
     prospectosActivos: sum("prospectosActivos"),
     prospectosNuevos: sum("prospectosNuevos"),
     convertidos: sum("convertidos"),
-    carteraVencida: sum("carteraVencida"),
     movimientos: sum("movimientos"),
   };
 }

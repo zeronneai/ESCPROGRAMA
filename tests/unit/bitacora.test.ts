@@ -1,7 +1,8 @@
 import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
 import { currentStage, eventText, prospectGroup, salesGroup, stageState, type BitacoraRow } from "@/lib/bitacora/stages";
-import { periodRange, summarizeSellers, totals, type SummaryBitacora } from "@/lib/stats/sales-summary";
+import { periodRange, summarizeSellers, totals, type SummaryBitacora, type SummaryVenta } from "@/lib/stats/sales-summary";
+import { cobroEstado, diasVencidos, saldo } from "@/lib/ventas";
 
 const row = (o: Partial<BitacoraRow> = {}): BitacoraRow => ({
   id: "b1", vendedor_id: "v1", customer_id: "c1", request_id: null, necesidad: null, fecha_catalogo: null, fecha_muestra: null,
@@ -41,10 +42,11 @@ describe("etapas de la bitacora (ESC-VEN-FR-002)", () => {
 });
 
 describe("resumen por vendedor (jefa de ventas)", () => {
-  const b = (o: Partial<SummaryBitacora> & { tipo?: "cliente" | "prospecto" }): SummaryBitacora => {
-    const { tipo = "cliente", ...rest } = o;
-    return { ...row(), ...rest, customers: { tipo } } as SummaryBitacora;
-  };
+  const b = (o: Partial<SummaryBitacora>): SummaryBitacora => ({ ...row(), ...o }) as SummaryBitacora;
+  const v = (o: Partial<SummaryVenta>): SummaryVenta => ({
+    vendedor_id: "v1", fecha: "2026-10-06", monto: "1000", moneda: "MXN", pago: "contado", vence: null, porcentaje_cobrado: "0",
+    cancelada_at: null, request_id: null, created_at: "2026-10-06T15:00:00Z", ...o,
+  });
   const rows = summarizeSellers({
     sellers: [{ id: "v1", nombre: "Ana", activo: true }, { id: "v2", nombre: "Beto", activo: true }],
     requests: [{ vendedor_id: "v1", submitted_at: "2026-10-02T15:00:00Z" }, { vendedor_id: "v1", submitted_at: "2026-10-03T15:00:00Z" }],
@@ -53,12 +55,12 @@ describe("resumen por vendedor (jefa de ventas)", () => {
       { emitida_por: "v1", request_id: "r1", emitida_at: "2026-10-05T15:00:00Z" },
       { emitida_por: "v1", request_id: "r2", emitida_at: "2026-10-05T15:00:00Z" },
     ],
-    bitacora: [
-      b({ fecha_pedido: "2026-10-06", monto_venta: "1000", cartera_dias_vencidos: 5, cartera_monto: "300" }),
-      b({ fecha_pedido: "2026-09-20", monto_venta: "999" }),
-      b({ tipo: "prospecto", proximo_seguimiento: "2026-10-10" }),
-      b({ tipo: "prospecto", archived_at: "2026-10-02T00:00:00Z" }),
-      b({ vendedor_id: "v2", tipo: "prospecto", created_at: "2026-09-01T00:00:00Z" }),
+    bitacora: [b({ proximo_seguimiento: "2026-10-10" }), b({ archived_at: "2026-10-02T00:00:00Z" }), b({ vendedor_id: "v2", created_at: "2026-09-01T00:00:00Z" })],
+    ventas: [
+      v({ request_id: "r1", monto: "1000", porcentaje_cobrado: "100" }),
+      v({ fecha: "2026-09-20", monto: "999", pago: "credito", vence: "2026-10-01", porcentaje_cobrado: "50" }),
+      v({ fecha: "2026-10-10", monto: "400", pago: "credito", vence: "2026-11-09" }),
+      v({ monto: "5000", cancelada_at: "2026-10-07T00:00:00Z" }),
     ],
     conversions: [{ convertido_por: "v1" }],
     events: [{ created_by: "v1", created_at: "2026-10-14T15:00:00Z" }],
@@ -66,19 +68,32 @@ describe("resumen por vendedor (jefa de ventas)", () => {
     toDate: "2026-10-31",
     today: "2026-10-14",
   });
-  it("cuenta cotizaciones distintas, pedidos del periodo, conversion y cartera", () => {
+  it("ventas del periodo, conversion de cotizaciones, por cobrar y cartera vencida calculada", () => {
     const ana = rows.find((r) => r.id === "v1")!;
-    expect(ana).toMatchObject({ solicitudes: 2, cotizacionesEnviadas: 2, pedidos: 1, montoPedidos: 1000, conversion: 50, carteraVencida: 300 });
-    expect(ana).toMatchObject({ ventasActivas: 2, prospectosActivos: 1, prospectosNuevos: 1, convertidos: 1, seguimientosVencidos: 1, movimientos: 1 });
+    expect(ana).toMatchObject({ solicitudes: 2, cotizacionesEnviadas: 2, ventas: 2, montoVentas: 1400, conversion: 50, porCobrar: 400 });
+    expect(ana.carteraVencida).toBeCloseTo(499.5);
+    expect(ana).toMatchObject({ prospectosActivos: 1, prospectosNuevos: 1, convertidos: 1, seguimientosVencidos: 1 });
     const beto = rows.find((r) => r.id === "v2")!;
-    expect(beto).toMatchObject({ prospectosActivos: 1, prospectosNuevos: 0, conversion: null });
+    expect(beto).toMatchObject({ prospectosActivos: 1, prospectosNuevos: 0, conversion: null, ventas: 0 });
     expect(rows[0].id).toBe("v1");
-    expect(totals(rows)).toMatchObject({ pedidos: 1, cotizacionesEnviadas: 2, prospectosActivos: 2 });
+    expect(totals(rows)).toMatchObject({ ventas: 2, cotizacionesEnviadas: 2, prospectosActivos: 2 });
   });
   it("periodos", () => {
     const now = DateTime.fromISO("2026-10-14T10:00:00", { zone: "America/Mexico_City" });
     expect(periodRange("mes", now).from.toISODate()).toBe("2026-10-01");
     expect(periodRange("mes_anterior", now).to.toISODate()).toBe("2026-09-30");
     expect(periodRange("7d", now).from.toISODate()).toBe("2026-10-08");
+  });
+});
+
+describe("ventas diarias: cobro", () => {
+  it("cartera vencida solo en credito pasado su plazo y con saldo", () => {
+    const base = { monto: "1000", porcentaje_cobrado: "0", cancelada_at: null, pago: "credito" as const, vence: "2026-10-10" };
+    expect(cobroEstado(base, "2026-10-14")).toBe("vencida");
+    expect(diasVencidos(base, "2026-10-14")).toBe(4);
+    expect(cobroEstado({ ...base, porcentaje_cobrado: "100" }, "2026-10-14")).toBe("cobrada");
+    expect(cobroEstado({ ...base, pago: "contado", vence: null }, "2026-10-14")).toBe("por_cobrar");
+    expect(saldo({ ...base, porcentaje_cobrado: "25" })).toBe(750);
+    expect(saldo({ ...base, cancelada_at: "x" })).toBe(0);
   });
 });

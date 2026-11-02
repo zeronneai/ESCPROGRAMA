@@ -114,6 +114,12 @@ curl -X POST https://<portal>/api/leads/entrada \
 - Listas como tarjetas en celular y tablas en escritorio.
 - **Historial del comprador**: ahora muestra por defecto todas las partidas que ya respondió (antes salía vacío hasta buscar), con contadores de hoy, semana, mes y total, filtros por estado y paginación. La búsqueda por producto o proveedor sigue igual.
 
+## Ventas diarias y Prospección (migración 0024)
+
+- **Ventas diarias** (clientes): un renglón por venta con fecha, cliente, artículos y cantidad, pedido/OC, factura, monto, contado o crédito (días), entrega y % cobrado. La cartera vencida se calcula con la fecha y los días de crédito. Al marcar Ganada una partida del portal, la venta se registra sola.
+- **Prospección** (prospectos): seguimiento por etapas hasta el primer pedido. Su primera venta lo vuelve cliente y cierra el prospecto como ganado.
+- La jefa de ventas ve ventas, monto, por cobrar y cartera vencida desde Ventas diarias; prospectos y conversiones desde Prospección.
+
 ## Catálogo de artículos y demostración (migraciones 0022 y 0023)
 
 - **Artículos**: catálogo de ESC con estatus. En la bitácora (ventas y prospección) se ligan los artículos vendidos u ofrecidos, con cantidad opcional. La jefa ve los artículos más movidos en el Resumen. Página `/articulos` para buscar.

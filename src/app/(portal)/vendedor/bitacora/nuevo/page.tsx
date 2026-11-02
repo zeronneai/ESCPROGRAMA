@@ -10,7 +10,7 @@ import { CUSTOMER_COLS, type CustomerRecord } from "@/lib/validation/customer";
 export default async function NuevoRegistro({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   await requireUser();
   const sp = await searchParams;
-  const tipo = sp.tipo === "prospecto" ? "prospecto" : "cliente";
+  const tipo = sp.tipo === "cliente" ? "cliente" : "prospecto";
   const supabase = await createClient();
   const cfg = await getBusinessSettings(supabase);
   let customer: CustomerRecord | null = null;
@@ -20,10 +20,10 @@ export default async function NuevoRegistro({ searchParams }: { searchParams: Pr
   }
   return (
     <div className="space-y-4">
-      <Link href={`/vendedor/bitacora${tipo === "prospecto" ? "?tab=prospeccion" : ""}`} className="text-sm text-slate-500 hover:text-slate-800">← Bitácora</Link>
+      <Link href="/vendedor/bitacora?tab=prospeccion" className="text-sm text-slate-500 hover:text-slate-800">← Prospección</Link>
       <PageHeader
-        title={tipo === "prospecto" ? "Nuevo prospecto" : "Nuevo registro de venta"}
-        subtitle="Busca al cliente o dalo de alta. Si ya está registrado, sus datos se llenan solos."
+        title="Nuevo prospecto"
+        subtitle="Búscalo o dalo de alta. Si ya está registrado, sus datos se llenan solos. Para registrar una venta a un cliente usa Ventas diarias."
       />
       <BitacoraEditor mode="new" entry={null} customer={customer} requests={[]} events={[]} today={DateTime.now().setZone(cfg.timezone).toISODate()!} timezone={cfg.timezone} defaultKind={tipo} />
     </div>

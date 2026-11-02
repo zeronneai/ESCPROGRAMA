@@ -51,11 +51,14 @@ export const STAGES: StageDef[] = [
   { key: "muestra", label: "Preparación de muestra (cuando aplique)", short: "Muestra", field: "fecha_muestra", hint: "Si pidió muestra" },
   { key: "solicitud", label: "Solicitud de cotización a compras", short: "Solicitud a compras", field: "fecha_solicitud_compras", hint: "Se llena sola al enviar la solicitud en el portal" },
   { key: "cotizacion", label: "Cotización enviada al cliente", short: "Cotización", field: "fecha_cotizacion", hint: "Se llena sola al registrar el envío en el portal" },
-  { key: "pedido", label: "Orden de compra o confirmación de pedido", short: "Pedido", field: "fecha_pedido", hint: "Se llena sola al marcar una partida Ganada" },
+  { key: "pedido", label: "Primer pedido (se vuelve cliente)", short: "Pedido", field: "fecha_pedido", hint: "Se llena solo al registrar su primera venta" },
   { key: "factura", label: "Facturación", short: "Facturado", field: "fecha_factura", hint: "Contado o crédito" },
   { key: "entrega", label: "Entrega del producto", short: "Entregado", field: "fecha_entrega", hint: "Fecha en que se entregó" },
   { key: "cobranza", label: "Cobranza", short: "Cobrado", field: null, hint: "Porcentaje cobrado" },
 ];
+
+/** Prospeccion: de la presentacion al primer pedido (lo demas vive en Ventas diarias). */
+export const PROSPECT_STAGES = STAGES.slice(0, 6);
 
 export function stageDone(row: BitacoraRow, key: StageKey): boolean {
   switch (key) {

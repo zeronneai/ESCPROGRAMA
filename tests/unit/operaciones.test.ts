@@ -8,7 +8,7 @@ const ago = (h: number) => new Date(now.getTime() - h * 3_600_000).toISOString()
 
 describe("guias", () => {
   it("titulo: factura, persona o negocio y paqueteria", () => {
-    expect(guiaTitle({ factura: "A-123", destinatario: "Foxconn", paqueteria: "DHL" })).toBe("A-123 · Foxconn · DHL");
+    expect(guiaTitle({ factura: "A-123", destinatario: "Foxconn", paqueteria: "Paquete Express" })).toBe("A-123 · Foxconn · Paquete Express");
     expect(guiaTitle({ factura: "A-1", destinatario: "Juan", paqueteria: "Otra", paqueteria_otra: "Fletes Juárez" })).toBe("A-1 · Juan · Fletes Juárez");
   });
   it("alerta ambar a las 4 horas y roja a las 24; nada si ya esta lista", () => {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { KindBadgeStatic } from "@/components/kind-badge";
 import { EmptyState } from "@/components/ui";
-import { currentStage, RESULT_LABEL, STAGES, stageState, type BitacoraRow } from "@/lib/bitacora/stages";
+import { currentStage, PROSPECT_STAGES, RESULT_LABEL, stageState, type BitacoraRow } from "@/lib/bitacora/stages";
 
 export type BitacoraListRow = BitacoraRow & {
   customers: { id: string; nombre: string; tipo: "cliente" | "prospecto"; giro: string | null; estado_geo: string | null; contacto_nombre: string | null; contacto_telefono: string | null } | null;
@@ -16,7 +16,7 @@ const money = (v: number | string | null, m: string) => (v === null || v === "" 
 export function StageDots({ row }: { row: BitacoraRow }) {
   return (
     <div className="flex items-center gap-0.5" aria-label={`Etapa: ${currentStage(row).stage?.short ?? "Sin iniciar"}`}>
-      {STAGES.map((s, i) => {
+      {PROSPECT_STAGES.map((s, i) => {
         const st = stageState(row, i);
         const cls = st === "done" ? "bg-green-600" : st === "na" ? "bg-slate-200" : st === "pending" ? "bg-amber-400" : "bg-slate-200";
         return <span key={s.key} title={`${s.short}${st === "na" ? " (no aplica)" : st === "pending" ? " (pendiente)" : ""}`} className={`h-1.5 w-4 rounded-full sm:w-5 ${cls}`} />;
@@ -56,7 +56,7 @@ export function BitacoraList({ rows, hrefFor, showSeller = false, today }: { row
               <div className="space-y-1">
                 <StageDots row={r} />
                 <p className="text-xs text-slate-600">
-                  {r.resultado !== "abierta" ? <strong className={r.resultado === "ganada" ? "text-green-700" : "text-red-700"}>{RESULT_LABEL[r.resultado]}</strong> : st ? st.short : "Sin iniciar"}
+                  {r.resultado !== "abierta" ? <strong className={r.resultado === "ganada" ? "text-green-700" : "text-red-700"}>{r.resultado === "ganada" ? "Ya es cliente" : RESULT_LABEL[r.resultado]}</strong> : st ? st.short : "Sin iniciar"}
                   {money(r.monto_venta, r.moneda) && <span className="text-slate-500"> · {money(r.monto_venta, r.moneda)}</span>}
                   {Number(r.cartera_monto ?? 0) > 0 && <span className="text-red-700"> · Cartera {money(r.cartera_monto, r.moneda)}</span>}
                 </p>

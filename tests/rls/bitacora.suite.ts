@@ -57,7 +57,8 @@ export function bitacoraSuite() {
       expect(ev.rows[0].nota).toMatch(/convertido a cliente/);
     });
 
-    it("el portal llena la bitacora: solicitud enviada, cotizacion enviada y partida ganada", async () => {
+    it("el portal llena la prospeccion (cliente prospecto): solicitud, cotizacion y partida ganada, y registra la venta", async () => {
+      await rpc(w.buyer1, "update public.customers set tipo='prospecto' where id=$1", [w.customerId]);
       const { request, item } = await newQuotedItem(w);
       const b = await rpc(w.seller1, "select id, fecha_solicitud_compras is not null as sol, fecha_cotizacion, origen, necesidad from public.bitacora where request_id=$1", [request]);
       expect(b.rows).toHaveLength(1);
@@ -66,10 +67,14 @@ export function bitacoraSuite() {
       await rpc(w.seller1, "select * from public.issue_quote($1,'correo',null,null,$2::jsonb)", [request, SNAP]);
       await rpc(w.seller1, "select public.set_item_outcome($1,'ganada',null,null,null)", [item]);
       const after = await rpc(w.seller1, "select fecha_cotizacion is not null as cot, fecha_pedido is not null as ped from public.bitacora where request_id=$1", [request]);
+      const venta = await rpc(w.seller1, "select v.origen, v.monto > 0 as monto, (select count(*)::int from public.venta_lineas l where l.venta_id=v.id) as lineas from public.ventas v where v.request_id=$1", [request]);
+      expect(venta.rows).toEqual([{ origen: "portal", monto: true, lineas: 1 }]);
+      expect((await rpc(w.seller1, "select tipo from public.customers where id=$1", [w.customerId])).rows[0].tipo).toBe("cliente");
       expect(after.rows[0]).toEqual({ cot: true, ped: true });
     });
 
-    it("si ya habia un registro abierto con ese cliente, la solicitud se liga a el (no duplica)", async () => {
+    it("si ya habia un registro abierto con ese prospecto, la solicitud se liga a el (no duplica)", async () => {
+      await rpc(w.buyer1, "update public.customers set tipo='prospecto' where id=$1", [w.customerId]);
       const open = await newEntry(w.seller1, w.ids.s1, w.customerId);
       const { request } = await newQuotedItem(w);
       const linked = await rpc(w.seller1, "select request_id from public.bitacora where id=$1", [open]);
