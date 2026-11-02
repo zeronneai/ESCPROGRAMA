@@ -4,6 +4,7 @@ import { fase4Suite } from "./fase4.suite";
 import { leadsSuite } from "./leads.suite";
 import { emisionesSuite } from "./emisiones.suite";
 import { bitacoraSuite } from "./bitacora.suite";
+import { operacionesSuite } from "./operaciones.suite";
 import { calcTabulador } from "@/lib/pricing/tabulador";
 import { DATABASE_URL, as, failure, pool, type Actor } from "./helpers";
 
@@ -537,6 +538,7 @@ fase4Suite();
 leadsSuite();
 emisionesSuite();
 bitacoraSuite();
+operacionesSuite();
 
 afterAll(async () => {
   await pool?.end();

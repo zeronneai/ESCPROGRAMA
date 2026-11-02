@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireBuyer } from "@/lib/auth/guards";
+import type { Rol } from "@/lib/auth/route-guard";
 import { generateTempPassword, passwordSchema } from "@/lib/auth/password";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -15,7 +16,7 @@ const createSchema = z.object({
   nombre: z.string().trim().min(2, "Escribe el nombre"),
   correo: z.string().trim().toLowerCase().email("Correo invalido"),
   password: passwordSchema,
-  rol: z.enum(["vendedor", "comprador", "jefe_ventas"]).default("vendedor"),
+  rol: z.enum(["vendedor", "comprador", "jefe_ventas", "gerente", "coordinador_iso", "marketplaces"]).default("vendedor"),
 });
 
 const BAN_FOREVER = "876000h";
@@ -29,7 +30,7 @@ export async function createUserAction(input: {
   nombre: string;
   correo: string;
   password: string;
-  rol: "vendedor" | "comprador" | "jefe_ventas";
+  rol: Rol;
 }): Promise<UserActionResult> {
   await requireBuyer();
   const parsed = createSchema.safeParse(input);

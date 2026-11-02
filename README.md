@@ -114,6 +114,20 @@ curl -X POST https://<portal>/api/leads/entrada \
 - Listas como tarjetas en celular y tablas en escritorio.
 - **Historial del comprador**: ahora muestra por defecto todas las partidas que ya respondió (antes salía vacío hasta buscar), con contadores de hoy, semana, mes y total, filtros por estado y paginación. La búsqueda por producto o proveedor sigue igual.
 
+## Quejas, acciones correctivas, consumo interno y guías (migraciones 0020 y 0021)
+
+| Puesto | Inicio | Qué hace |
+| --- | --- | --- |
+| Vendedor | Mis solicitudes | Captura quejas de sus clientes, ve las acciones correctivas de sus quejas, pide consumo interno y guías. |
+| Jefa de ventas | Resumen de ventas | Aprueba el consumo interno; ve ventas, clientes, quejas y guías. |
+| Gerente | Ventas | Ve ventas, clientes, quejas, acciones correctivas, consumo y guías. No edita. |
+| Coordinador ISO | Calidad | Cambia el estatus y cierra quejas; es el único que llena la acción correctiva (6M, plan, verificación, cierre, evidencias). |
+| Marketplaces | Guías | Toma la guía, pide datos si faltan y sube la guía (PDF o imagen) con número de rastreo. |
+| Comprador | Pendientes | Ve el consumo interno ya aprobado y lo marca pedido/agendado y recibido/realizado. |
+
+- **Guías**: título = factura · persona o negocio · paquetería. Alerta ámbar a las 4 horas y roja a las 24. El vendedor puede "Recordar a Marketplaces" a partir de 4 horas (uno por hora). Mensajes entre vendedor y Marketplaces en cada guía.
+- Cada paso deja un movimiento con autor y fecha, y avisa en la campanita a quien le toca.
+
 ## Bitácora de ventas / Prospección y Jefa de ventas (migraciones 0018 y 0019)
 
 - **Vendedor > Bitácora**: dos secciones en la misma pestaña, **Ventas diarias** (clientes) y **Prospección** (prospectos). Cada registro sigue las columnas del formato ESC-VEN-FR-002 como etapas: catálogo, necesidad, muestra, solicitud a compras, cotización, orden de compra, facturación (contado/crédito), entrega, cobranza y cartera; más comentarios del día, próximo seguimiento y resultado.

@@ -9,12 +9,14 @@ import {
 } from "@/actions/users";
 import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
 import { generateTempPassword } from "@/lib/auth/password";
+import type { Rol } from "@/lib/auth/route-guard";
+import { ROL_LABEL } from "@/lib/ops/roles";
 
 export interface UserRow {
   id: string;
   nombre: string;
   correo: string;
-  rol: "vendedor" | "comprador" | "jefe_ventas";
+  rol: Rol;
   activo: boolean;
   must_change_password: boolean;
   last_login_at: string | null;
@@ -24,8 +26,7 @@ export interface UserRow {
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" }) : "Nunca";
 
-type RolNuevo = "vendedor" | "comprador" | "jefe_ventas";
-const ROL_LABEL: Record<RolNuevo, string> = { vendedor: "Vendedor", comprador: "Comprador", jefe_ventas: "Jefa de ventas" };
+type RolNuevo = Rol;
 
 export function UsersPanel({ users, meId }: { users: UserRow[]; meId: string }) {
   const [pending, start] = useTransition();
@@ -117,7 +118,10 @@ export function UsersPanel({ users, meId }: { users: UserRow[]; meId: string }) 
           <Field label="Rol">
             <Select value={form.rol} onChange={(e) => setForm({ ...form, rol: e.target.value as RolNuevo })}>
               <option value="vendedor">Vendedor</option>
-              <option value="jefe_ventas">Jefa de ventas (ve resúmenes de todos los vendedores)</option>
+              <option value="jefe_ventas">Jefa de ventas (resumen de vendedores, aprueba consumo interno)</option>
+              <option value="gerente">Gerente (ve casi todo, sin editar)</option>
+              <option value="coordinador_iso">Coordinador ISO (quejas y acciones correctivas)</option>
+              <option value="marketplaces">Marketplaces (genera las guías de paquetería)</option>
               <option value="comprador">Comprador (administrador del sistema)</option>
             </Select>
           </Field>

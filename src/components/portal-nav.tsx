@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Icon, type IconName } from "@/components/icons";
+import type { Rol } from "@/lib/auth/route-guard";
+import { ROL_LABEL } from "@/lib/ops/roles";
 
 export interface NavItem {
   href: string;
@@ -77,7 +79,7 @@ export function PortalNav({
   const primary = items.filter((i) => !i.secondary);
   const secondary = items.filter((i) => i.secondary);
   const secondaryActive = secondary.some((i) => isActive(pathname, i, items));
-  const rolLabel = user.rol === "comprador" ? "Comprador" : user.rol === "jefe_ventas" ? "Jefa de ventas" : "Vendedor";
+  const rolLabel = ROL_LABEL[user.rol as Rol] ?? user.rol;
 
   const logout = (
     <form action="/api/auth/logout" method="post">

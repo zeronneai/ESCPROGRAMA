@@ -77,4 +77,20 @@ describe("decideRoute", () => {
     expect(d("/ventas", seller)).toEqual({ type: "redirect", to: "/vendedor" });
     expect(d("/ventasx", seller)).toEqual({ type: "next" });
   });
+
+  it("gerente, coordinador ISO y Marketplaces van a su inicio y respetan sus areas", () => {
+    const p = (rol: GuardProfile["rol"]): GuardProfile => ({ activo: true, must_change_password: false, rol });
+    expect(d("/", p("gerente"))).toEqual({ type: "redirect", to: "/ventas" });
+    expect(d("/", p("coordinador_iso"))).toEqual({ type: "redirect", to: "/calidad" });
+    expect(d("/", p("marketplaces"))).toEqual({ type: "redirect", to: "/guias" });
+    expect(d("/ventas", p("gerente"))).toEqual({ type: "next" });
+    expect(d("/ventas", p("coordinador_iso"))).toEqual({ type: "next" });
+    expect(d("/ventas", p("marketplaces"))).toEqual({ type: "redirect", to: "/guias" });
+    expect(d("/calidad", p("marketplaces"))).toEqual({ type: "redirect", to: "/guias" });
+    expect(d("/calidad/quejas/x", seller)).toEqual({ type: "next" });
+    expect(d("/guias", p("marketplaces"))).toEqual({ type: "next" });
+    expect(d("/consumo", p("marketplaces"))).toEqual({ type: "next" });
+    expect(d("/vendedor", p("gerente"))).toEqual({ type: "redirect", to: "/ventas" });
+    expect(d("/comprador", p("coordinador_iso"))).toEqual({ type: "redirect", to: "/calidad" });
+  });
 });

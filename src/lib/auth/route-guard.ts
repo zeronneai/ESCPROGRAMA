@@ -1,7 +1,7 @@
 /**
  * Decision pura de acceso por ruta (se usa en el middleware y se prueba aparte).
  */
-export type Rol = "vendedor" | "comprador" | "jefe_ventas";
+export type Rol = "vendedor" | "comprador" | "jefe_ventas" | "gerente" | "coordinador_iso" | "marketplaces";
 
 export interface GuardProfile {
   activo: boolean;
@@ -18,7 +18,19 @@ export const CHANGE_PASSWORD_PATH = "/cambiar-password";
 export const LOGIN_PATH = "/login";
 
 export function homeFor(rol: Rol): string {
-  return rol === "comprador" ? "/comprador" : rol === "jefe_ventas" ? "/ventas" : "/vendedor";
+  switch (rol) {
+    case "comprador":
+      return "/comprador";
+    case "jefe_ventas":
+    case "gerente":
+      return "/ventas";
+    case "coordinador_iso":
+      return "/calidad";
+    case "marketplaces":
+      return "/guias";
+    default:
+      return "/vendedor";
+  }
 }
 
 const isApi = (p: string) => p === "/api" || p.startsWith("/api/");
@@ -67,8 +79,13 @@ export function decideRoute(input: {
   if (pathname.startsWith("/vendedor") && profile.rol !== "vendedor") {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
-  // Resumen de ventas: la jefa de ventas y el comprador (solo lectura).
-  if ((pathname === "/ventas" || pathname.startsWith("/ventas/")) && profile.rol !== "jefe_ventas" && profile.rol !== "comprador") {
+  const under = (p: string) => pathname === p || pathname.startsWith(`${p}/`);
+  // Resumen de ventas: jefa de ventas, gerente, coordinador ISO y comprador (solo lectura salvo la jefa).
+  if (under("/ventas") && !["jefe_ventas", "gerente", "coordinador_iso", "comprador"].includes(profile.rol)) {
+    return { type: "redirect", to: homeFor(profile.rol) };
+  }
+  // Quejas y acciones correctivas: todos menos Marketplaces.
+  if (under("/calidad") && profile.rol === "marketplaces") {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   if (pathname.startsWith("/api/admin") && profile.rol !== "comprador") {

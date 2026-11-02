@@ -304,10 +304,11 @@ export function ClientsDirectory({
   editCustomer,
 }: {
   customers: CustomerRecord[];
-  role: "comprador" | "jefe_ventas" | "vendedor";
+  role: "comprador" | "jefe_ventas" | "vendedor" | "lectura";
   editCustomer?: CustomerRecord | null;
 }) {
   const fullList = role !== "vendedor";
+  const readOnly = role === "lectura";
   const [customers, setCustomers] = useState(initial);
   const [q, setQ] = useState("");
   const search = useCustomerSearch();
@@ -362,9 +363,11 @@ export function ClientsDirectory({
             {fullList ? "Base general de clientes y prospectos de ESC." : "Busca un cliente para ver o completar sus datos, o da de alta uno nuevo."}
           </p>
         </div>
-        <Button onClick={() => setEditing("new")}>
-          <Icon name="plus" className="h-4 w-4" /> Nuevo
-        </Button>
+        {!readOnly && (
+          <Button onClick={() => setEditing("new")}>
+            <Icon name="plus" className="h-4 w-4" /> Nuevo
+          </Button>
+        )}
       </div>
       {notice && <Alert tone="success">{notice}</Alert>}
 
@@ -411,7 +414,7 @@ export function ClientsDirectory({
                       <CustomerSummary c={c} missing={customerMissing(c)} />
                       {c.convertido_at && <p className="mt-0.5 text-xs text-green-700">Se volvió cliente el {new Date(c.convertido_at).toLocaleDateString("es-MX", { dateStyle: "medium" })}</p>}
                     </div>
-                    <div className="flex shrink-0 flex-wrap gap-2">
+                    {!readOnly && <div className="flex shrink-0 flex-wrap gap-2">
                       {c.tipo === "prospecto" && (
                         <Button
                           className="bg-green-600 text-xs hover:bg-green-700"
@@ -462,7 +465,7 @@ export function ClientsDirectory({
                           {c.activo ? "Desactivar" : "Reactivar"}
                         </Button>
                       )}
-                    </div>
+                    </div>}
                   </div>
                 )}
               </li>

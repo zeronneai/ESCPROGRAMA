@@ -24,6 +24,11 @@ const PATHS = {
   note: "M5 4h10l4 4v12H5zM14 4v5h5M8 13h8M8 17h5",
   arrow: "M5 12h14M13 6l6 6-6 6",
   more: "M5 12h.01M12 12h.01M19 12h.01",
+  package: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5M8 5.3l8 4.5",
+  alert: "M12 3l10 18H2zM12 10v4M12 17.5h.01",
+  clipboard: "M9 4h6v3H9zM9 5.5H6a1 1 0 0 0-1 1V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6.5a1 1 0 0 0-1-1h-3M8.5 12h7M8.5 16h5",
+  download: "M12 4v11M7 10l5 5 5-5M5 20h14",
+  bell: "M6 16V11a6 6 0 1 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0",
 } as const;
 
 export type IconName = keyof typeof PATHS;
