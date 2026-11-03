@@ -18,3 +18,13 @@ export async function demoCargarAction(seccion: string): Promise<Result<{ detall
   revalidatePath("/", "layout");
   return { ok: true, detalle: String(data ?? "") };
 }
+
+/** Quita la demostracion: borra solo lo que creo (clientes "(Demo)" y todo lo ligado a ellos). */
+export async function demoQuitarAction(): Promise<Result<{ detalle: string }>> {
+  await requireBuyer();
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("demo_quitar");
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/", "layout");
+  return { ok: true, detalle: String(data ?? "") };
+}

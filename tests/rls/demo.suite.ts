@@ -49,6 +49,20 @@ export function demoSuite() {
       expect((await q(w.buyer1, "select public.demo_cargar('guias') as r")).rows[0].r).toMatch(/ya estaba cargada/);
       // La sesion del comprador queda como estaba.
       expect((await q(w.buyer1, "select public.demo_cargar('clientes') as r, auth.uid() as u")).rows[0].u).toBe(w.ids.b1);
+      // Quitar la demostracion: solo el comprador, y no toca lo real
+      const real = (await q("postgres", "select count(*)::int as n from public.customers where nombre not like '%(Demo)%'")).rows[0].n;
+      expect(await failure(q(w.seller1, "select public.demo_quitar()"))).toMatch(/comprador/);
+      expect((await q(w.buyer1, "select public.demo_quitar() as r")).rows[0].r).toMatch(/^9 clientes/);
+      const left = (await q("postgres", `select
+        (select count(*) from public.customers where nombre like '%(Demo)%')::int as clientes,
+        (select count(*) from public.customers where nombre not like '%(Demo)%')::int as reales,
+        (select count(*) from public.demo_cargas)::int as cargas,
+        (select count(*) from public.guias where factura in ('A-1234','A-1240','B-88','B-91'))::int as guias,
+        (select count(*) from public.consumo_solicitudes where descripcion like 'Caf%molido')::int as consumo`)).rows[0];
+      expect(left).toEqual({ clientes: 0, reales: real, cargas: 0, guias: 0, consumo: 0 });
+      // Los triggers quedan activos
+      expect((await q("postgres", "select count(*)::int as n from pg_trigger t join pg_class c on c.oid=t.tgrelid join pg_namespace s on s.oid=c.relnamespace where s.nspname='public' and not t.tgisinternal and t.tgenabled='D'")).rows[0].n).toBe(0);
+      expect((await q(w.buyer1, "select public.demo_cargar('guias') as r")).rows[0].r).not.toMatch(/ya estaba cargada/);
     });
   });
 }
@@ -73,6 +87,25 @@ export function ventasSuite() {
       await q(w.seller1, "update public.ventas set cancelada_at=now() where id=$1", [v.id]);
       expect((await q(w.seller1, "update public.ventas set monto=5 where id=$1", [v.id])).rowCount).toBe(0);
       expect(await failure(q("postgres", "delete from public.ventas where id=$1", [v.id]))).toMatch(/inmutable/);
+    });
+
+    it("visita sin venta: pide motivo y no convierte al prospecto", async () => {
+      const w = await createWorld();
+      const c = (await q(w.seller1, "insert into public.customers (nombre, tipo, giro, estado_geo, created_by) values ('Vis '||gen_random_uuid(),'prospecto','X','Chihuahua',$1) returning id", [w.ids.s1])).rows[0].id;
+      expect(await failure(q(w.seller1, "insert into public.ventas (customer_id, monto, tipo) values ($1, 0, 'visita')", [c]))).toMatch(/ventas_visita_motivo/);
+      await q(w.seller1, "insert into public.ventas (customer_id, monto, tipo, motivo_no_venta) values ($1, 0, 'visita', 'Precio: le parecio caro')", [c]);
+      expect((await q(w.seller1, "select tipo from public.customers where id=$1", [c])).rows[0].tipo).toBe("prospecto");
+    });
+
+    it("sucursales: cliente aparte con los datos de la matriz; el vendedor de la matriz la ve", async () => {
+      const w = await createWorld();
+      const m = (await q(w.seller1, "insert into public.customers (nombre, tipo, giro, estado_geo, rfc, created_by) values ('Matriz '||substr(gen_random_uuid()::text,1,6),'cliente','Industria','Chihuahua','AAA010101AA1',$1) returning id, nombre", [w.ids.s1])).rows[0];
+      const s = (await q(w.seller1, "insert into public.customers (nombre, tipo, giro, estado_geo, parent_id, sucursal, direccion, contacto_nombre, created_by) values ('x','prospecto','X',null,$1,' Sucursal Delicias ','Av. Delicias 1','Ana',$2) returning nombre, tipo, giro, rfc, estado_geo, sucursal", [m.id, w.ids.s1])).rows[0];
+      expect(s).toEqual({ nombre: `${m.nombre} · Sucursal Delicias`, tipo: "cliente", giro: "Industria", rfc: "AAA010101AA1", estado_geo: "Chihuahua", sucursal: "Sucursal Delicias" });
+      expect(await failure(q(w.seller1, "insert into public.customers (nombre, tipo, giro, estado_geo, parent_id, created_by) values ('x','cliente','X','Chihuahua',$1,$2)", [m.id, w.ids.s1]))).toMatch(/nombre de la sucursal/);
+      const sid = (await q("postgres", "select id from public.customers where parent_id=$1", [m.id])).rows[0].id;
+      await q("postgres", "update public.customers set created_by=$2 where id=$1", [sid, w.ids.s2]);
+      expect((await q(w.seller1, "select id from public.customers where id=$1", [sid])).rowCount).toBe(1);
     });
 
     it("solicitudes de clientes ya no abren prospeccion; la de un prospecto si", async () => {

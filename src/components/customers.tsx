@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { convertCustomerAction, saveCustomerAction, searchCustomersAction, setCustomerActiveAction, setCustomerKindAction } from "@/actions/customers";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
+import { convertCustomerAction, listSucursalesAction, saveCustomerAction, saveSucursalAction, searchCustomersAction, setCustomerActiveAction, setCustomerKindAction } from "@/actions/customers";
 import { Icon } from "@/components/icons";
 import { Alert, Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
 import {
@@ -77,7 +78,9 @@ export function CustomerForm({
       onSaved(r.customer);
     });
   }
+  if (customer?.parent_id) return <SucursalForm parentId={customer.parent_id} sucursal={customer} onSaved={onSaved} onCancel={onCancel} />;
   return (
+    <div className="space-y-4">
     <form onSubmit={submit} className="space-y-3" noValidate>
       {error && <Alert tone="error">{error}</Alert>}
       <div className="space-y-1">
@@ -142,6 +145,220 @@ export function CustomerForm({
         {onCancel && <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>Cancelar</Button>}
       </div>
     </form>
+    {customer && <SucursalesPanel parent={customer} />}
+    </div>
+  );
+}
+
+type SForm = Record<"sucursal" | "direccion" | "estado_geo" | "contacto_nombre" | "contacto_telefono" | "contacto_correo", string>;
+
+/** Alta o edicion de una sucursal (titulo, direccion y contacto; lo demas viene de la matriz). */
+export function SucursalForm({
+  parentId,
+  sucursal,
+  defaultEstado = "",
+  onSaved,
+  onCancel,
+}: {
+  parentId: string;
+  sucursal?: CustomerRecord | null;
+  defaultEstado?: string;
+  onSaved: (c: CustomerRecord) => void;
+  onCancel?: () => void;
+}) {
+  const [v, setV] = useState<SForm>({
+    sucursal: sucursal?.sucursal ?? "",
+    direccion: sucursal?.direccion ?? "",
+    estado_geo: sucursal?.estado_geo ?? defaultEstado,
+    contacto_nombre: sucursal?.contacto_nombre ?? "",
+    contacto_telefono: sucursal?.contacto_telefono ?? "",
+    contacto_correo: sucursal?.contacto_correo ?? "",
+  });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const set = (k: keyof SForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    setV((s) => ({ ...s, [k]: e.target.value }));
+    if (errors[k]) setErrors((x) => ({ ...x, [k]: "" }));
+  };
+  const save = () =>
+    start(async () => {
+      setError(null);
+      const r = await saveSucursalAction(parentId, sucursal?.id ?? null, v);
+      if (!r.ok) {
+        setError(r.error);
+        setErrors(("fields" in r && r.fields) || {});
+        return;
+      }
+      onSaved(r.customer);
+    });
+  return (
+    <div className="space-y-3">
+      {error && <Alert tone="error">{error}</Alert>}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Título de la sucursal *" error={errors.sucursal}>
+          <Input value={v.sucursal} onChange={set("sucursal")} autoFocus={!sucursal} placeholder="Ej. Sucursal Delicias" />
+        </Field>
+        <Field label="Estado *" error={errors.estado_geo}>
+          <Select value={v.estado_geo} onChange={set("estado_geo")}>
+            <option value="">Elige...</option>
+            {ESTADOS_MX.map((e) => <option key={e} value={e}>{e}</option>)}
+          </Select>
+        </Field>
+        <div className="sm:col-span-2">
+          <Field label="Dirección *" error={errors.direccion}>
+            <textarea value={v.direccion} onChange={set("direccion")} rows={2} className={area} placeholder="Calle, número, colonia, ciudad, C.P." />
+          </Field>
+        </div>
+        <Field label="Persona de contacto" error={errors.contacto_nombre}>
+          <Input value={v.contacto_nombre} onChange={set("contacto_nombre")} placeholder="Ej. Pedro Ruiz (Almacén)" />
+        </Field>
+        <Field label="Teléfono / WhatsApp" error={errors.contacto_telefono}>
+          <Input value={v.contacto_telefono} onChange={set("contacto_telefono")} type="tel" inputMode="tel" />
+        </Field>
+        <Field label="Correo" error={errors.contacto_correo}>
+          <Input value={v.contacto_correo} onChange={set("contacto_correo")} type="email" inputMode="email" />
+        </Field>
+      </div>
+      <p className="text-xs text-slate-500">La razón social, RFC y giro son los del cliente principal. La sucursal cuenta como cliente aparte en ventas, bitácora y encuesta.</p>
+      <div className="flex gap-2">
+        <Button type="button" loading={pending} onClick={save}>{sucursal ? "Guardar sucursal" : "Agregar sucursal"}</Button>
+        {onCancel && <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>Cancelar</Button>}
+      </div>
+    </div>
+  );
+}
+
+/** Sucursales del cliente: lista y boton para agregar otra direccion con titulo. */
+export function SucursalesPanel({ parent }: { parent: CustomerRecord }) {
+  const [list, setList] = useState<CustomerRecord[] | null>(null);
+  const [editing, setEditing] = useState<string | "new" | null>(null);
+  useEffect(() => {
+    let alive = true;
+    listSucursalesAction(parent.id).then((r) => alive && setList(r));
+    return () => {
+      alive = false;
+    };
+  }, [parent.id]);
+  const saved = (c: CustomerRecord) => {
+    setList((l) => (l?.some((x) => x.id === c.id) ? l.map((x) => (x.id === c.id ? c : x)) : [...(l ?? []), c]));
+    setEditing(null);
+  };
+  return (
+    <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-slate-800">Sucursales {list && list.length > 0 && <span className="font-normal text-slate-500">({list.length})</span>}</p>
+        {editing !== "new" && (
+          <Button type="button" variant="secondary" className="text-xs" onClick={() => setEditing("new")}>
+            <Icon name="plus" className="h-4 w-4" /> Agregar sucursal
+          </Button>
+        )}
+      </div>
+      {list === null ? (
+        <Spinner />
+      ) : list.length === 0 && editing !== "new" ? (
+        <p className="text-xs text-slate-500">¿El cliente tiene otra dirección (por ejemplo, otra planta o ciudad)? Agrégala como sucursal.</p>
+      ) : (
+        <ul className="divide-y divide-slate-200">
+          {list.map((c) => (
+            <li key={c.id} className="py-2">
+              {editing === c.id ? (
+                <SucursalForm parentId={parent.id} sucursal={c} onSaved={saved} onCancel={() => setEditing(null)} />
+              ) : (
+                <div className="flex items-start justify-between gap-2 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium text-slate-900">{c.sucursal}</p>
+                    <p className="truncate text-xs text-slate-500">{[c.direccion, c.estado_geo].filter(Boolean).join(" · ")}</p>
+                    <p className="truncate text-xs text-slate-600">{[c.contacto_nombre, c.contacto_telefono, c.contacto_correo].filter(Boolean).join(" · ")}</p>
+                  </div>
+                  <Button type="button" variant="ghost" className="text-xs" onClick={() => setEditing(c.id)}>Editar</Button>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {editing === "new" && (
+        <div className="rounded-md border border-brand-100 bg-white p-3">
+          <SucursalForm parentId={parent.id} defaultEstado={parent.estado_geo ?? ""} onSaved={saved} onCancel={() => setEditing(null)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Ventana para dar de alta un cliente (fuera de cualquier formulario de la pantalla) y luego sus sucursales. */
+export function CustomerModal({
+  initialName = "",
+  onClose,
+  onPicked,
+}: {
+  initialName?: string;
+  onClose: () => void;
+  /** Si se da, al guardar se ofrece "Usar este cliente". */
+  onPicked?: (c: CustomerRecord) => void;
+}) {
+  const [saved, setSaved] = useState<CustomerRecord | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+  if (!mounted) return null;
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label="Agregar cliente" className="max-h-[92vh] w-full overflow-y-auto rounded-t-2xl bg-white p-4 shadow-2xl sm:max-w-2xl sm:rounded-xl sm:p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">{saved ? "Cliente dado de alta" : "Agregar cliente o prospecto"}</h2>
+          <button type="button" onClick={onClose} aria-label="Cerrar" className="rounded-md p-1 text-slate-500 hover:bg-slate-100">
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" /></svg>
+          </button>
+        </div>
+        {saved ? (
+          <div className="space-y-3">
+            <Alert tone="success">&quot;{saved.nombre}&quot; quedó guardado. Ya lo puedes elegir en ventas, guías, quejas y solicitudes.</Alert>
+            <SucursalesPanel parent={saved} />
+            <div className="flex flex-wrap gap-2">
+              {onPicked ? (
+                <Button type="button" onClick={() => onPicked(saved)}>Usar este cliente</Button>
+              ) : (
+                <Button type="button" onClick={onClose}>Listo</Button>
+              )}
+              <Button type="button" variant="secondary" onClick={() => setSaved(null)}>Agregar otro</Button>
+            </div>
+          </div>
+        ) : (
+          <CustomerForm initialName={initialName} onSaved={onPicked ? (c) => onPicked(c) : setSaved} onCancel={onClose} />
+        )}
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/** Boton "Agregar cliente" de la barra: alta desde cualquier pantalla. */
+export function AddCustomerButton() {
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        title="Agregar cliente"
+        className="inline-flex h-9 items-center gap-1.5 rounded-full border border-brand-600 px-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50 sm:px-3"
+      >
+        <Icon name="plus" className="h-4 w-4" />
+        <span className="hidden sm:inline">Cliente</span>
+      </button>
+      {open && <CustomerModal onClose={close} />}
+    </>
   );
 }
 

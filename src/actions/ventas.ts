@@ -22,18 +22,28 @@ export async function saveVentaAction(id: string | null, input: VentaInput, line
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const ls = z.array(lineaSchema).max(50).safeParse(lineas.filter((l) => l.descripcion.trim()));
   if (!ls.success) return { ok: false, error: ls.error.issues[0].message };
-  if (!ls.data.length && !parsed.data.comentarios) return { ok: false, error: "Agrega al menos un artículo (o escribe qué se vendió en comentarios)." };
+  const visita = parsed.data.tipo === "visita";
+  if (!visita && !id && !ls.data.length) return { ok: false, error: "Agrega el artículo principal de la venta (el de mayor costo)." };
   const supabase = await createClient();
   let ventaId = id;
+  const fila: Record<string, unknown> = visita
+    ? { ...parsed.data, monto: null, pedido: null, factura: null, pago: "contado" as const, dias_credito: null, entregado: false, porcentaje_cobrado: 0 }
+    : { ...parsed.data, motivo_no_venta: null };
   if (id) {
     if (!uuid.safeParse(id).success) return { ok: false, error: "Venta inválida" };
-    const { data, error } = await supabase.from("ventas").update(parsed.data).eq("id", id).select("id");
+    const { tipo: _tipo, ...upd } = fila;
+    void _tipo;
+    const { data, error } = await supabase.from("ventas").update(upd).eq("id", id).select("id");
     if (error) return { ok: false, error: friendlyError(error.message) };
     if (!data?.length) return { ok: false, error: "Ya no puedes editar esta venta." };
   } else {
-    const { data, error } = await supabase.from("ventas").insert(parsed.data).select("id").single();
+    const { data, error } = await supabase.from("ventas").insert(fila).select("id").single();
     if (error) return { ok: false, error: friendlyError(error.message) };
     ventaId = data.id;
+  }
+  if (visita) {
+    refresh(ventaId!);
+    return { ok: true, id: ventaId! };
   }
   // Lineas: se quitan las que ya no estan, se actualizan y se agregan las nuevas.
   const { data: prev } = await supabase.from("venta_lineas").select("id").eq("venta_id", ventaId!);

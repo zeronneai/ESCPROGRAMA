@@ -10,7 +10,7 @@ import { ESTADOS_MX } from "@/lib/validation/customer";
 type F = Record<keyof GuiaInput, string | boolean | null>;
 const EMPTY: F = {
   factura: "", destinatario: "", paqueteria: "", paqueteria_otra: "", servicio: "estandar", customer_id: null, contacto_nombre: "",
-  telefono: "", correo: "", calle_numero: "", colonia: "", cp: "", ciudad: "", estado_geo: "", referencias: "", bultos: "1",
+  telefono: "", correo: "", calle_numero: "", colonia: "", cp: "", ciudad: "", estado_geo: "", referencias: "", empaque: "bulto", bultos: "1",
   peso_kg: "", largo_cm: "", ancho_cm: "", alto_cm: "", contenido: "", valor_declarado: "", asegurar: false, urgente: false, notas: "",
 };
 
@@ -93,10 +93,26 @@ export function GuiaForm({ id, initial, onDone }: { id: string | null; initial?:
 
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-800">Paquete</h3>
+        <div className="space-y-1">
+          <span className="block text-sm font-medium text-slate-700">¿Cómo se manda? *</span>
+          <div className="grid grid-cols-2 gap-2 sm:max-w-md">
+            {(["bulto", "tarima"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setV((x) => ({ ...x, empaque: k }))}
+                className={`rounded-lg border px-3 py-2 text-left text-sm ${v.empaque === k ? "border-brand-600 bg-brand-50 ring-1 ring-brand-600" : "border-slate-200 bg-white"}`}
+              >
+                <span className="block font-semibold">{k === "bulto" ? "Bultos" : "Tarima"}</span>
+                <span className="block text-xs text-slate-500">{k === "bulto" ? "Cajas o paquetes sueltos" : "Mercancía emplayada sobre tarima"}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <Field label="Bultos *"><Input value={s("bultos")} onChange={set("bultos")} inputMode="numeric" /></Field>
+          <Field label={v.empaque === "tarima" ? "Tarimas *" : "Bultos *"}><Input value={s("bultos")} onChange={set("bultos")} inputMode="numeric" /></Field>
           <Field label="Peso total kg *"><Input value={s("peso_kg")} onChange={set("peso_kg")} inputMode="decimal" /></Field>
-          <Field label="Largo cm"><Input value={s("largo_cm")} onChange={set("largo_cm")} inputMode="decimal" /></Field>
+          <Field label={v.empaque === "tarima" ? "Largo cm (tarima)" : "Largo cm"}><Input value={s("largo_cm")} onChange={set("largo_cm")} inputMode="decimal" /></Field>
           <Field label="Ancho cm"><Input value={s("ancho_cm")} onChange={set("ancho_cm")} inputMode="decimal" /></Field>
           <Field label="Alto cm"><Input value={s("alto_cm")} onChange={set("alto_cm")} inputMode="decimal" /></Field>
         </div>

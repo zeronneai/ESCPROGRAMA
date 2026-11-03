@@ -1,7 +1,7 @@
 /**
  * Decision pura de acceso por ruta (se usa en el middleware y se prueba aparte).
  */
-export type Rol = "vendedor" | "comprador" | "jefe_ventas" | "gerente" | "coordinador_iso" | "marketplaces" | "almacen";
+export type Rol = "vendedor" | "comprador" | "jefe_ventas" | "gerente" | "coordinador_iso" | "marketplaces" | "almacen" | "supervisor_almacen" | "supervisor_finanzas";
 
 export interface GuardProfile {
   activo: boolean;
@@ -29,7 +29,10 @@ export function homeFor(rol: Rol): string {
     case "marketplaces":
       return "/guias";
     case "almacen":
+    case "supervisor_almacen":
       return "/evaluaciones/proveedores";
+    case "supervisor_finanzas":
+      return "/minutas";
     default:
       return "/vendedor";
   }
@@ -89,7 +92,7 @@ export function decideRoute(input: {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   // Quejas y acciones correctivas: todos menos Marketplaces.
-  if (under("/calidad") && (profile.rol === "marketplaces" || profile.rol === "almacen")) {
+  if (under("/calidad") && ["marketplaces", "almacen", "supervisor_almacen", "supervisor_finanzas"].includes(profile.rol)) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   if (pathname.startsWith("/api/admin") && profile.rol !== "comprador") {

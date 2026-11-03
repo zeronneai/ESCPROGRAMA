@@ -40,7 +40,8 @@ export default async function VendedorVentas({ params, searchParams }: { params:
   ]);
   const all = (b ?? []) as unknown as BitacoraListRow[];
   const ventas = (vs ?? []) as unknown as VentaListRow[];
-  const vivas = ventas.filter((v) => !v.cancelada_at);
+  const vivas = ventas.filter((v) => !v.cancelada_at && v.tipo !== "visita");
+  const visitasMes = ventas.filter((v) => !v.cancelada_at && v.tipo === "visita" && v.fecha >= now.startOf("month").toISODate()!);
   const prospeccion = all;
   const rows = prospeccion.filter((r) => (ver === "todos" ? true : ver === "cerrados" ? r.resultado !== "abierta" : r.resultado === "abierta"));
   const seguimientos = all.filter((r) => r.resultado === "abierta" && r.proximo_seguimiento && r.proximo_seguimiento < today).length;
@@ -57,7 +58,7 @@ export default async function VendedorVentas({ params, searchParams }: { params:
       <PageHeader title={seller.nombre} subtitle={`${seller.correo}${seller.activo ? "" : " · inactivo"} · solo lectura`} />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <StatCard label="Ventas hoy" value={hoyV.length} tone={hoyV.length || movHoy ? "green" : "amber"} hint={`${movHoy ?? 0} movimiento(s) de prospección`} />
-        <StatCard label="Ventas del mes" value={mesV.length} hint={money(mesV.filter((v) => v.moneda === "MXN").reduce((a, v) => a + Number(v.monto ?? 0), 0))} />
+        <StatCard label="Ventas del mes" value={mesV.length} hint={`${money(mesV.filter((v) => v.moneda === "MXN").reduce((a, v) => a + Number(v.monto ?? 0), 0))} · ${visitasMes.length} visita(s) sin venta`} />
         <StatCard label="Prospectos activos" value={prospeccion.filter((r) => r.resultado === "abierta").length} />
         <StatCard label="Seguimientos vencidos" value={seguimientos} tone={seguimientos ? "red" : "default"} />
         <StatCard label="Cartera vencida" value={money(cartera)} tone={cartera ? "red" : "default"} />

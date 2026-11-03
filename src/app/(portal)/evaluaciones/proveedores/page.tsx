@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 type Row = { id: string; puntaje: number | null; comprador_at: string | null; almacen_at: string | null; suppliers: { nombre: string; giro: string | null } | null };
 
 export default async function EvalProveedores({ searchParams }: { searchParams: Promise<{ periodo?: string; ver?: string }> }) {
-  const u = await requireRoles(["comprador", "almacen", "gerente", "coordinador_iso"]);
+  const u = await requireRoles(["comprador", "almacen", "supervisor_almacen", "gerente", "coordinador_iso"]);
   const sp = await searchParams;
   const supabase = await createClient();
   const { activo, programado, historial, actual } = await loadPeriodos(supabase, "proveedores", sp.periodo);
@@ -18,8 +18,9 @@ export default async function EvalProveedores({ searchParams }: { searchParams: 
     ? await supabase.from("eval_proveedor").select("id, puntaje, comprador_at, almacen_at, suppliers(nombre, giro)").eq("periodo_id", actual.id).limit(2000)
     : { data: [] };
   const all = ((data ?? []) as unknown as Row[]).sort((a, b) => (a.suppliers?.nombre ?? "").localeCompare(b.suppliers?.nombre ?? ""));
-  const mine = u.rol === "almacen" ? "almacen_at" : "comprador_at";
-  const ver = sp.ver ?? (u.rol === "comprador" || u.rol === "almacen" ? "pendientes" : "todos");
+  const esAlm = u.rol === "almacen" || u.rol === "supervisor_almacen";
+  const mine = esAlm ? "almacen_at" : "comprador_at";
+  const ver = sp.ver ?? (u.rol === "comprador" || esAlm ? "pendientes" : "todos");
   const rows = all.filter((r) => (ver === "pendientes" ? !r[mine] : true));
   const completas = all.filter((r) => r.comprador_at && r.almacen_at);
   const prom = completas.length ? Math.round((completas.reduce((a, r) => a + Number(r.puntaje ?? 0), 0) / completas.length) * 10) / 10 : null;
@@ -41,7 +42,7 @@ export default async function EvalProveedores({ searchParams }: { searchParams: 
           {activo ? (
             <p><Chip cls="bg-green-100 text-green-800">Activa</Chip> <strong>{activo.nombre}</strong> desde el {fechaLarga(activo.activado_at)}</p>
           ) : (
-            <p className="text-slate-700">No hay evaluación activa.{u.rol === "almacen" && " Te llegará un aviso cuando el comprador la active."}</p>
+            <p className="text-slate-700">No hay evaluación activa.{esAlm && " Te llegará un aviso cuando el comprador la active."}</p>
           )}
           {programado && <p className="mt-1 text-xs text-slate-500">La siguiente se activa sola el {fechaLarga(programado.programado_para)} y avisa en la campanita.</p>}
         </div>
@@ -85,7 +86,7 @@ export default async function EvalProveedores({ searchParams }: { searchParams: 
                         <td className="px-3 py-2.5 text-right">{cl ? <Chip cls={cl.cls}>{r.puntaje}% · {cl.label}</Chip> : r.puntaje !== null ? <span className="text-xs text-slate-500">{r.puntaje}% parcial</span> : "-"}</td>
                         <td className="px-4 py-2.5 text-right">
                           <Link href={`/evaluaciones/proveedores/${r.id}`} className="font-medium text-brand-700 hover:underline">
-                            {actual.estado === "activo" && (u.rol === "comprador" || u.rol === "almacen") && !r[mine] ? "Evaluar" : "Ver"}
+                            {actual.estado === "activo" && (u.rol === "comprador" || esAlm) && !r[mine] ? "Evaluar" : "Ver"}
                           </Link>
                         </td>
                       </tr>

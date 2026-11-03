@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
 import { friendlyError } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
-import { CUSTOMER_COLS, customerSchema, type CustomerInput, type CustomerRecord } from "@/lib/validation/customer";
+import { CUSTOMER_COLS, customerSchema, sucursalSchema, type CustomerInput, type CustomerRecord, type SucursalInput } from "@/lib/validation/customer";
 import type { Result } from "./requests";
 
 const COLS = CUSTOMER_COLS;
@@ -85,4 +85,46 @@ export async function setCustomerKindAction(id: string, tipo: "cliente" | "prosp
   revalidatePath("/comprador/clientes");
   revalidatePath("/ventas/clientes");
   return { ok: true };
+}
+
+/** Sucursales de un cliente (otras direcciones con titulo). */
+export async function listSucursalesAction(parentId: string): Promise<CustomerRecord[]> {
+  await requireUser();
+  if (!z.string().uuid().safeParse(parentId).success) return [];
+  const supabase = await createClient();
+  const { data } = await supabase.from("customers").select(COLS).eq("parent_id", parentId).order("sucursal");
+  return (data ?? []) as CustomerRecord[];
+}
+
+/** Alta o edicion de una sucursal: cliente aparte que toma razon social, RFC y giro de la matriz. */
+export async function saveSucursalAction(
+  parentId: string,
+  id: string | null,
+  input: SucursalInput,
+): Promise<Result<{ customer: CustomerRecord }> & { fields?: Fields }> {
+  const u = await requireUser();
+  if (!z.string().uuid().safeParse(parentId).success) return { ok: false, error: "Cliente inválido" };
+  const parsed = sucursalSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message, fields: fieldErrors(parsed.error.issues) };
+  const supabase = await createClient();
+  const { data: parent } = await supabase.from("customers").select("id, tipo, giro, parent_id").eq("id", parentId).maybeSingle();
+  if (!parent) return { ok: false, error: "No encontramos el cliente" };
+  if (parent.parent_id) return { ok: false, error: "Una sucursal no puede tener sucursales. Agrégala al cliente principal." };
+  const v = parsed.data;
+  const q = id
+    ? supabase.from("customers").update(v).eq("id", id).eq("parent_id", parentId).select(COLS).single()
+    : supabase
+        .from("customers")
+        .insert({ ...v, parent_id: parentId, nombre: v.sucursal, tipo: parent.tipo, giro: parent.giro ?? "N/A", created_by: u.id })
+        .select(COLS)
+        .single();
+  const { data, error } = await q;
+  if (error) {
+    if (/customers_nombre_key|duplicate/.test(error.message)) return { ok: false, error: "Ese cliente ya tiene una sucursal con ese nombre", fields: { sucursal: "Ya existe" } };
+    return { ok: false, error: friendlyError(error.message) };
+  }
+  revalidatePath("/vendedor/clientes");
+  revalidatePath("/comprador/clientes");
+  revalidatePath("/ventas/clientes");
+  return { ok: true, customer: data as CustomerRecord };
 }

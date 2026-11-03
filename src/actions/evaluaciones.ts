@@ -38,10 +38,24 @@ export async function setSupplierFlagsAction(id: string, flags: { activo?: boole
   return { ok: true };
 }
 
-export async function activarEvaluacionAction(tipo: "proveedores" | "clientes"): Promise<Result> {
+const fechaOk = (d?: string | null) => !d || /^\d{4}-\d{2}-\d{2}$/.test(d);
+
+export async function activarEvaluacionAction(tipo: "proveedores" | "clientes", hasta?: string | null): Promise<Result> {
   await requireUser();
+  if (!fechaOk(hasta)) return { ok: false, error: "Fecha inválida" };
   const supabase = await createClient();
-  const { error } = await supabase.rpc("eval_activar", { p_tipo: tipo });
+  const { error } = await supabase.rpc("eval_activar", { p_tipo: tipo, p_hasta: hasta || null });
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath(`/evaluaciones/${tipo}`);
+  return { ok: true };
+}
+
+/** Cambiar hasta cuando esta abierta la evaluacion activa (vacio = sin fecha de cierre). */
+export async function fechaCierreEvaluacionAction(tipo: "proveedores" | "clientes", hasta: string | null): Promise<Result> {
+  await requireUser();
+  if (!fechaOk(hasta)) return { ok: false, error: "Fecha inválida" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("eval_fecha_cierre", { p_tipo: tipo, p_hasta: hasta || null });
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath(`/evaluaciones/${tipo}`);
   return { ok: true };
@@ -89,10 +103,13 @@ export async function marcarEncuestaEnviadaAction(id: string, medio: "whatsapp" 
 }
 
 /** Publico: el cliente responde con su link (sin sesion). */
-export async function responderEncuestaAction(token: string, resp: Record<string, number>, comentario: string, nombre: string): Promise<Result> {
+export async function responderEncuestaAction(token: string, resp: Record<string, number>, comentario: string, nombre: string, puesto: string): Promise<Result> {
   if (!/^[0-9a-f]{32,64}$/.test(token)) return { ok: false, error: "Link inválido" };
+  if (!puesto.trim()) return { ok: false, error: "Escriba su puesto" };
   const supabase = await createClient();
-  const { error } = await supabase.rpc("encuesta_responder", { p_token: token, p_resp: resp, p_comentario: comentario.trim() || null, p_nombre: nombre.trim() || null });
+  const { error } = await supabase.rpc("encuesta_responder", {
+    p_token: token, p_resp: resp, p_comentario: comentario.trim() || null, p_nombre: nombre.trim() || null, p_puesto: puesto.trim(),
+  });
   if (error) return { ok: false, error: error.message || "No se pudo guardar" };
   return { ok: true };
 }

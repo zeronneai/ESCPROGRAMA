@@ -31,7 +31,7 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
     supabase.from("customers").select("convertido_por").gte("convertido_at", fromIso).lte("convertido_at", toIso).limit(5000),
     supabase.from("bitacora_eventos").select("created_by, created_at").gte("created_at", fromIso).lte("created_at", toIso).limit(20000),
     supabase.from("bitacora_articulos").select("articulo_id, articulos(clave, nombre), bitacora(archived_at)").limit(10000),
-    supabase.from("ventas").select("vendedor_id, fecha, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at, request_id, created_at").limit(20000),
+    supabase.from("ventas").select("vendedor_id, fecha, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at, request_id, created_at").eq("tipo", "venta").limit(20000),
     supabase.from("venta_lineas").select("articulo_id, descripcion, cantidad, articulos(clave), ventas(fecha, cancelada_at)").not("articulo_id", "is", null).limit(20000),
   ]);
   type Top = { nombre: string; clave: string; ventas: number; piezas: number; prospeccion: number };

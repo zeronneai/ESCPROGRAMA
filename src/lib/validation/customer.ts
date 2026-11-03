@@ -64,7 +64,26 @@ export interface CustomerRecord {
   activo: boolean;
   tipo_inicial?: CustomerKind;
   convertido_at?: string | null;
+  parent_id?: string | null;
+  sucursal?: string | null;
 }
+
+/** Sucursal: otra direccion del mismo cliente con su titulo. Se maneja como cliente aparte. */
+export const sucursalSchema = z
+  .object({
+    sucursal: z.string().trim().min(2, "Escribe el nombre de la sucursal (ej. Sucursal Delicias)").max(80),
+    direccion: z.string().trim().min(5, "Escribe la dirección de la sucursal").max(400),
+    estado_geo: z.string().trim().min(2, "Elige el estado").max(60),
+    contacto_nombre: opt(150),
+    contacto_telefono: opt(40).refine((v) => !v || v.replace(/\D/g, "").length >= 7, "Teléfono inválido"),
+    contacto_correo: opt(200).refine((v) => !v || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), "Correo inválido"),
+  })
+  .superRefine((v, ctx) => {
+    if (!v.contacto_telefono && !v.contacto_correo) {
+      ctx.addIssue({ code: "custom", path: ["contacto_telefono"], message: "Agrega teléfono o correo del contacto" });
+    }
+  });
+export type SucursalInput = z.input<typeof sucursalSchema>;
 
 /** Lo que le falta al cliente para poder enviarle una solicitud (vacio = completo). */
 export function customerMissing(c: Pick<CustomerRecord, "nombre" | "rfc" | "direccion" | "contacto_telefono" | "contacto_correo">): string[] {
@@ -86,7 +105,7 @@ export function matchCustomer(c: CustomerRecord, q: string): boolean {
 }
 
 /** Columnas de clientes que usan las pantallas. */
-export const CUSTOMER_COLS = "id, tipo, nombre, razon_social, giro, estado_geo, rfc, direccion, contacto_nombre, contacto_telefono, contacto_correo, activo, tipo_inicial, convertido_at";
+export const CUSTOMER_COLS = "id, tipo, nombre, razon_social, giro, estado_geo, rfc, direccion, contacto_nombre, contacto_telefono, contacto_correo, activo, tipo_inicial, convertido_at, parent_id, sucursal";
 
 /** Lo que falta para la bitacora (formato ESC-VEN-FR-002): giro, estado, direccion y contacto. */
 export function bitacoraMissing(c: Pick<CustomerRecord, "giro" | "estado_geo" | "direccion" | "contacto_telefono" | "contacto_correo">): string[] {

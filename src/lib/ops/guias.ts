@@ -77,7 +77,8 @@ export const guiaSchema = z
     ciudad: z.string().trim().min(2, "Escribe la ciudad").max(120),
     estado_geo: z.string().trim().min(2, "Elige el estado").max(60),
     referencias: txt(300),
-    bultos: z.coerce.number({ message: "Bultos inválidos" }).int("Bultos enteros").min(1, "Mínimo 1 bulto").max(999),
+    empaque: z.enum(["bulto", "tarima"], { message: "Elige bulto o tarima" }).default("bulto"),
+    bultos: z.coerce.number({ message: "Cantidad inválida" }).int("Cantidad entera").min(1, "Mínimo 1").max(999),
     peso_kg: z.coerce.number({ message: "Peso inválido" }).positive("Escribe el peso aproximado"),
     largo_cm: num("Medida inválida"),
     ancho_cm: num("Medida inválida"),
@@ -92,3 +93,7 @@ export const guiaSchema = z
 export type GuiaInput = z.input<typeof guiaSchema>;
 
 export const GUIA_FILE_TYPES = ["application/pdf", "image/png", "image/jpeg"];
+
+/** "3 bultos", "1 tarima". */
+export const empaqueLabel = (empaque: string | null | undefined, n: number) =>
+  `${n} ${empaque === "tarima" ? (n === 1 ? "tarima" : "tarimas") : n === 1 ? "bulto" : "bultos"}`;

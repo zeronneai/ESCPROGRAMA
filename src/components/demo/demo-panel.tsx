@@ -1,6 +1,7 @@
 "use client";
 
-import { demoCargarAction } from "@/actions/demo";
+import { useState } from "react";
+import { demoCargarAction, demoQuitarAction } from "@/actions/demo";
 import { useRun } from "@/components/ops-ui";
 import { Alert, Button, Card } from "@/components/ui";
 
@@ -16,8 +17,9 @@ export const DEMO_SECCIONES = [
 const ROL: Record<string, string> = { vendedor: "Vendedor", comprador: "Comprador", coordinador_iso: "Coordinador ISO", jefe_ventas: "Jefa de ventas", marketplaces: "Marketplaces" };
 
 export function DemoPanel({ cargadas, listos }: { cargadas: { seccion: string; detalle: string | null; cargado_at: string }[]; listos: Record<string, number> }) {
-  const { run, busy, notice } = useRun();
+  const { run, busy, notice, setNotice, router } = useRun();
   const done = new Map(cargadas.map((c) => [c.seccion, c]));
+  const [confirmar, setConfirmar] = useState(false);
   return (
     <Card className="space-y-4 p-4 sm:p-5">
       <div>
@@ -61,7 +63,35 @@ export function DemoPanel({ cargadas, listos }: { cargadas: { seccion: string; d
         <Button loading={busy === "todo"} disabled={!listos.vendedor || !!busy || done.size >= DEMO_SECCIONES.length} onClick={() => run("todo", () => demoCargarAction("todo"), "Listo. Toda la demostración está cargada.")}>
           Activar todo
         </Button>
-        <p className="text-xs text-slate-500">Para quitarla antes de arrancar en serio: corre <code>supabase/borrar-datos-de-prueba.sql</code> (borra también lo demás capturado).</p>
+      </div>
+      <div className="space-y-2 rounded-md border border-red-200 bg-red-50/50 p-3">
+        <p className="text-sm font-medium text-slate-900">Quitar la demostración</p>
+        <p className="text-xs text-slate-600">
+          Borra los clientes con (Demo) en el nombre y todo lo ligado a ellos (solicitudes, bitácora, ventas, quejas, guías, encuestas) más las
+          solicitudes de consumo de ejemplo. Lo que hayan capturado de verdad no se toca.
+        </p>
+        {confirmar ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-red-800">¿Seguro? No se puede deshacer.</span>
+            <Button
+              className="bg-red-600 text-xs hover:bg-red-700"
+              loading={busy === "quitar"}
+              disabled={!!busy}
+              onClick={() => run("quitar", () => demoQuitarAction(), (r) => {
+                setConfirmar(false);
+                setNotice({ tone: "success", text: `Listo. Se quitaron ${(r as unknown as { detalle: string }).detalle}.` });
+                router.refresh();
+              })}
+            >
+              Sí, quitarla
+            </Button>
+            <Button variant="ghost" className="text-xs" onClick={() => setConfirmar(false)} disabled={!!busy}>Cancelar</Button>
+          </div>
+        ) : (
+          <Button variant="secondary" className="text-xs" disabled={!!busy} onClick={() => setConfirmar(true)}>
+            Quitar demostración
+          </Button>
+        )}
       </div>
     </Card>
   );

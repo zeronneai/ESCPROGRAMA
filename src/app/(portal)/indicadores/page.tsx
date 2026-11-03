@@ -40,7 +40,7 @@ export default async function Indicadores() {
   if (rol === "vendedor") grupos.push(...(await ventasGrupos(ctx, u.id)));
   if (rol === "jefe_ventas" || rol === "gerente") grupos.push(...(await ventasGrupos(ctx, null)));
   if (rol === "comprador" || rol === "gerente") grupos.push(await comprasGrupo(ctx));
-  if (rol === "comprador" || rol === "almacen" || rol === "gerente" || rol === "coordinador_iso") grupos.push(await proveedoresGrupo(ctx, rol));
+  if (rol === "comprador" || rol === "almacen" || rol === "supervisor_almacen" || rol === "gerente" || rol === "coordinador_iso") grupos.push(await proveedoresGrupo(ctx, rol));
   if (rol === "coordinador_iso" || rol === "gerente") grupos.push(await calidadGrupo(ctx));
   if (rol === "marketplaces" || rol === "gerente" || rol === "jefe_ventas") grupos.push(await guiasGrupo(ctx));
   if (rol === "coordinador_iso" || rol === "comprador") grupos.push(await clientesGrupo(ctx));
@@ -76,13 +76,13 @@ async function ventasGrupos(c: Ctx, sellerId: string | null): Promise<Grupo[]> {
     return sellerId ? (q as unknown as { eq: (a: string, b: string) => T }).eq(k, sellerId) : q;
   }
   const [{ data: vs }, { data: iss }, { data: bit }, { count: conv }, { data: enc }] = await Promise.all([
-    scope(c.supabase.from("ventas").select("vendedor_id, fecha, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at, request_id, created_at").gte("fecha", c.m1.toISODate()!), "vendedor_id").limit(20000),
+    scope(c.supabase.from("ventas").select("vendedor_id, fecha, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at, request_id, created_at").eq("tipo", "venta").gte("fecha", c.m1.toISODate()!), "vendedor_id").limit(20000),
     scope(c.supabase.from("quote_issues").select("request_id, emitida_at").gte("emitida_at", c.m0.toUTC().toISO()!), "emitida_por").limit(10000),
     scope(c.supabase.from("bitacora").select("resultado, proximo_seguimiento, archived_at"), "vendedor_id").is("archived_at", null).limit(10000),
     scope(c.supabase.from("customers").select("id", { count: "exact", head: true }).gte("convertido_at", c.m0.toUTC().toISO()!), "convertido_por"),
-    scope(c.supabase.from("encuestas_cliente").select("respuestas, respondida_at, eval_periodos!inner(estado)").not("respondida_at", "is", null), "vendedor_id").limit(5000),
+    scope(c.supabase.from("encuestas_cliente").select("respuestas, escala, respondida_at, eval_periodos!inner(estado)").not("respondida_at", "is", null), "vendedor_id").limit(5000),
   ]);
-  const { data: cart } = await scope(c.supabase.from("ventas").select("monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at").is("cancelada_at", null).lt("porcentaje_cobrado", 100), "vendedor_id").limit(20000);
+  const { data: cart } = await scope(c.supabase.from("ventas").select("monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at").eq("tipo", "venta").is("cancelada_at", null).lt("porcentaje_cobrado", 100), "vendedor_id").limit(20000);
   const ventas = (vs ?? []) as unknown as VentaRow[];
   const vivas = ventas.filter((v) => !v.cancelada_at);
   const mes = vivas.filter((v) => v.fecha >= c.m0.toISODate()!);
@@ -98,7 +98,7 @@ async function ventasGrupos(c: Ctx, sellerId: string | null): Promise<Grupo[]> {
   const totalPend = pend.reduce((a, v) => a + saldo(v), 0);
   const vencido = pend.filter((v) => cobroEstado(v, c.today) === "vencida").reduce((a, v) => a + saldo(v), 0);
   const pv = pct(Math.round(vencido), Math.round(totalPend));
-  const sat = satisfaccion(((enc ?? []) as { respuestas: Record<string, number> }[]).map((e) => e.respuestas));
+  const sat = satisfaccion((enc ?? []) as { respuestas: Record<string, number>; escala: number }[]);
   return [
     {
       titulo: sellerId ? "Mis ventas" : "Ventas del equipo",
@@ -114,7 +114,7 @@ async function ventasGrupos(c: Ctx, sellerId: string | null): Promise<Grupo[]> {
       items: [
         { titulo: "Prospectos que se volvieron clientes (mes)", valor: String(conv ?? 0), tono: (conv ?? 0) > 0 ? "green" : "default" },
         { titulo: "Prospectos con seguimiento al día", valor: fmtPct(seg), detalle: `${alDia} de ${abiertos.length} prospectos activos`, tono: toneBy(seg, 90, 70) },
-        { titulo: "Satisfacción de clientes", valor: fmtPct(sat.pct), detalle: "Satisfactorio o muy satisfactorio, todas las evaluaciones respondidas", tono: toneBy(sat.pct, 85, 70) },
+        { titulo: "Satisfacción de clientes", valor: fmtPct(sat.pct), detalle: "Satisfecho o muy satisfecho, todas las evaluaciones respondidas", tono: toneBy(sat.pct, 85, 70) },
       ],
     },
   ];
@@ -145,13 +145,13 @@ async function proveedoresGrupo(c: Ctx, rol: Rol): Promise<Grupo> {
   const comp = rows.filter((r) => r.comprador_at && r.almacen_at);
   const prom = comp.length ? Math.round((comp.reduce((a, r) => a + Number(r.puntaje), 0) / comp.length) * 10) / 10 : null;
   const conf = pct(comp.filter((r) => Number(r.puntaje) >= 85).length, comp.length);
-  const mine = rol === "almacen" ? rows.filter((r) => !r.almacen_at).length : rows.filter((r) => !r.comprador_at).length;
+  const mine = rol === "almacen" || rol === "supervisor_almacen" ? rows.filter((r) => !r.almacen_at).length : rows.filter((r) => !r.comprador_at).length;
   return {
     titulo: `Evaluación de proveedores${per ? ` (${per.nombre}${per.estado === "activo" ? ", activa" : ""})` : ""}`,
     items: [
       { titulo: "Calificación promedio", valor: prom !== null ? `${prom}%` : "-", detalle: `${comp.length} de ${rows.length} proveedores evaluados completos`, tono: toneBy(prom, 85, 70) },
       { titulo: "Proveedores confiables (85% o más)", valor: fmtPct(conf), tono: toneBy(conf, 80, 60) },
-      ...(rol === "comprador" || rol === "almacen"
+      ...(rol === "comprador" || rol === "almacen" || rol === "supervisor_almacen"
         ? [{ titulo: "Me faltan por evaluar", valor: String(per?.estado === "activo" ? mine : 0), tono: (per?.estado === "activo" && mine > 0 ? "amber" : "green") as Tone }]
         : []),
     ],
@@ -199,15 +199,15 @@ async function guiasGrupo(c: Ctx): Promise<Grupo> {
 
 async function clientesGrupo(c: Ctx): Promise<Grupo> {
   const { data: per } = await c.supabase.from("eval_periodos").select("id, nombre, estado").eq("tipo", "clientes").neq("estado", "programado").order("created_at", { ascending: false }).limit(1).maybeSingle();
-  const { data } = per ? await c.supabase.from("encuestas_cliente").select("respuestas, respondida_at, enviada_at").eq("periodo_id", per.id).limit(5000) : { data: [] };
+  const { data } = per ? await c.supabase.from("encuestas_cliente").select("respuestas, escala, respondida_at, enviada_at").eq("periodo_id", per.id).limit(5000) : { data: [] };
   const e = data ?? [];
   const resp = e.filter((x) => x.respondida_at);
-  const sat = satisfaccion(resp.map((x) => x.respuestas as Record<string, number>));
+  const sat = satisfaccion(resp as { respuestas: Record<string, number>; escala: number }[]);
   return {
     titulo: `Satisfacción de clientes${per ? ` (${per.nombre})` : ""}`,
     items: [
-      { titulo: "Clientes satisfechos", valor: fmtPct(sat.pct), detalle: "Satisfactorio o muy satisfactorio", tono: toneBy(sat.pct, 85, 70) },
-      { titulo: "Índice de satisfacción", valor: fmtPct(sat.indice), detalle: "0% todo no satisfactorio, 100% todo muy satisfactorio", tono: toneBy(sat.indice, 70, 50) },
+      { titulo: "Clientes satisfechos", valor: fmtPct(sat.pct), detalle: "Satisfecho o muy satisfecho", tono: toneBy(sat.pct, 85, 70) },
+      { titulo: "Índice de satisfacción", valor: fmtPct(sat.indice), detalle: "0% todo insatisfecho, 100% todo muy satisfecho", tono: toneBy(sat.indice, 70, 50) },
       { titulo: "Respuesta a la encuesta", valor: fmtPct(pct(resp.length, e.filter((x) => x.enviada_at).length)), detalle: `${resp.length} respondidas de ${e.filter((x) => x.enviada_at).length} enviadas` },
     ],
   };

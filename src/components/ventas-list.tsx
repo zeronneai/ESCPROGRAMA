@@ -28,12 +28,13 @@ export function VentasList({ rows, today, basePath, editable, showSeller = false
       {notice && <div className="p-3"><Alert tone={notice.tone}>{notice.text}</Alert></div>}
       {days.map((d) => {
         const list = rows.filter((r) => r.fecha === d);
-        const total = list.filter((r) => !r.cancelada_at && r.moneda === "MXN").reduce((a, r) => a + Number(r.monto ?? 0), 0);
+        const nVis = list.filter((r) => r.tipo === "visita").length;
+        const total = list.filter((r) => !r.cancelada_at && r.tipo !== "visita" && r.moneda === "MXN").reduce((a, r) => a + Number(r.monto ?? 0), 0);
         return (
           <section key={d}>
             <div className="flex items-center justify-between border-y border-slate-100 bg-slate-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 first:border-t-0">
               <span>{dayLabel(d, today)}</span>
-              <span className="normal-case tracking-normal">{list.length} venta(s){total ? ` · ${money(total)}` : ""}</span>
+              <span className="normal-case tracking-normal">{list.length - nVis} venta(s){nVis ? ` · ${nVis} visita(s)` : ""}{total ? ` · ${money(total)}` : ""}</span>
             </div>
             <ul className="divide-y divide-slate-100">
               {list.map((r) => {
@@ -43,20 +44,25 @@ export function VentasList({ rows, today, basePath, editable, showSeller = false
                     <Link href={`${basePath}/${r.id}`} className="min-w-0 flex-1 hover:opacity-80">
                       <p className="flex flex-wrap items-center gap-2 font-medium text-slate-900">
                         <span className="truncate">{r.customers?.nombre ?? "Cliente"}</span>
+                        {r.tipo === "visita" && <Chip cls="bg-amber-100 text-amber-900">Visita sin venta</Chip>}
                         {r.monto != null && <span className="text-sm font-semibold text-slate-700">{money(Number(r.monto), r.moneda)}</span>}
                         {r.origen === "portal" && !r.factura && <Chip cls="bg-brand-100 text-brand-900">Del portal: complétala</Chip>}
                       </p>
+                      {r.tipo === "visita" ? (
+                        <p className="truncate text-xs text-slate-600">No compró: {r.motivo_no_venta}{showSeller && r.profiles?.nombre ? ` · ${r.profiles.nombre}` : ""}</p>
+                      ) : (<>
                       <p className="truncate text-xs text-slate-500">
                         {r.venta_lineas.map((l) => `${l.cantidad ? `${Number(l.cantidad).toLocaleString("es-MX")} × ` : ""}${l.descripcion.split(",")[0]}`).join(" · ") || "Sin artículos"}
                       </p>
                       <p className="text-xs text-slate-500">
                         {[r.factura && `Factura ${r.factura}`, r.pedido, r.pago === "credito" ? `Crédito ${r.dias_credito} días` : "Contado", showSeller && r.profiles?.nombre].filter(Boolean).join(" · ")}
                       </p>
+                      </>)}
                     </Link>
                     <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-xs">
                       {r.cancelada_at ? (
                         <Chip cls="bg-slate-200 text-slate-700">Cancelada</Chip>
-                      ) : (
+                      ) : r.tipo === "visita" ? null : (
                         <>
                           {editable && !r.entregado ? (
                             <button type="button" disabled={!!busy} onClick={() => run(`e${r.id}`, () => quickVentaAction(r.id, { entregado: true }))} className="rounded-full border border-slate-300 px-2.5 py-1 text-slate-700 hover:bg-slate-100">

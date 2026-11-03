@@ -11,7 +11,7 @@ import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 import { cobroEstado, money, saldo, VENTA_COLS } from "@/lib/ventas";
 
-const VENTA_VIEWS = { hoy: "Hoy", semana: "Esta semana", mes: "Este mes", por_cobrar: "Por cobrar", vencidas: "Vencidas", por_entregar: "Por entregar", todas: "Todas" } as const;
+const VENTA_VIEWS = { hoy: "Hoy", semana: "Esta semana", mes: "Este mes", por_cobrar: "Por cobrar", vencidas: "Vencidas", por_entregar: "Por entregar", visitas: "Visitas sin venta", todas: "Todas" } as const;
 type VentaView = keyof typeof VENTA_VIEWS;
 
 export default async function Bitacora({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
@@ -33,7 +33,8 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
   ]);
   const error = ventasQ.error ?? bitQ.error;
   const ventas = (ventasQ.data ?? []) as unknown as VentaListRow[];
-  const vivas = ventas.filter((v) => !v.cancelada_at);
+  const vivas = ventas.filter((v) => !v.cancelada_at && v.tipo !== "visita");
+  const visitas = ventas.filter((v) => !v.cancelada_at && v.tipo === "visita");
   const allBit = ((bitQ.data ?? []) as unknown as BitacoraListRow[]).filter((r) => !r.archived_at);
   const unassigned = allBit.filter((r) => !r.vendedor_id);
   const prospectos = allBit.filter((r) => r.vendedor_id === user.id);
@@ -55,6 +56,7 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
     : vv === "por_cobrar" ? porCobrar
     : vv === "vencidas" ? vencidas
     : vv === "por_entregar" ? porEntregar
+    : vv === "visitas" ? visitas
     : ventas;
 
   // Prospeccion: filtro
@@ -84,9 +86,14 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
         subtitle={tab === "ventas" ? "Ventas diarias: registra cada venta a tus clientes. Formato ESC-VEN-FR-002." : "Prospección: seguimiento por etapas de empresas que aún no nos compran."}
         actions={
           tab === "ventas" ? (
-            <Link href="/vendedor/bitacora/venta/nueva" className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
-              <Icon name="plus" className="h-4 w-4" /> Registrar venta
-            </Link>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/vendedor/bitacora/venta/nueva?tipo=visita" className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                Visita sin venta
+              </Link>
+              <Link href="/vendedor/bitacora/venta/nueva" className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
+                <Icon name="plus" className="h-4 w-4" /> Registrar venta
+              </Link>
+            </div>
           ) : (
             <Link href="/vendedor/bitacora/nuevo?tipo=prospecto" className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
               <Icon name="plus" className="h-4 w-4" /> Nuevo prospecto
@@ -109,7 +116,7 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <StatCard label="Ventas hoy" value={hoy.length} tone={ventasHoyMov ? "green" : "amber"} hint={hoy.length ? money(sum(hoy)) : "Aún no registras ventas hoy"} />
-            <StatCard label="Ventas del mes" value={mes.length} hint={money(sum(mes))} />
+            <StatCard label="Ventas del mes" value={mes.length} hint={`${money(sum(mes))} · ${visitas.filter((v) => v.fecha >= monthStart).length} visita(s) sin venta`} />
             <StatCard label="Por cobrar" value={money(porCobrar.reduce((a, v) => a + saldo(v), 0))} hint={`${porCobrar.length} venta(s)`} />
             <StatCard label="Cartera vencida" value={money(vencidas.reduce((a, v) => a + saldo(v), 0))} tone={vencidas.length ? "red" : "default"} hint={`${vencidas.length} venta(s)`} />
             <StatCard label="Por entregar" value={porEntregar.length} tone={porEntregar.length ? "amber" : "default"} />
@@ -118,7 +125,7 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
             {(Object.keys(VENTA_VIEWS) as VentaView[]).map((k) => (
               <FilterChip key={k} href={k === "mes" ? "/vendedor/bitacora" : `/vendedor/bitacora?ver=${k}`} active={vv === k}>
                 {VENTA_VIEWS[k]}
-                {k === "vencidas" && vencidas.length ? ` ${vencidas.length}` : k === "por_entregar" && porEntregar.length ? ` ${porEntregar.length}` : ""}
+                {k === "vencidas" && vencidas.length ? ` ${vencidas.length}` : k === "visitas" && visitas.length ? ` ${visitas.length}` : k === "por_entregar" && porEntregar.length ? ` ${porEntregar.length}` : ""}
               </FilterChip>
             ))}
           </div>

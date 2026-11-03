@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState, useTransition } from "react";
+import { useCallback, useRef, useState, useTransition } from "react";
 import type { Result } from "@/actions/requests";
-import { useCustomerSearch } from "@/components/customers";
+import { CustomerModal, useCustomerSearch } from "@/components/customers";
 import { Icon } from "@/components/icons";
 import { Alert, Button, Input, Spinner } from "@/components/ui";
 import type { CustomerRecord } from "@/lib/validation/customer";
@@ -152,18 +152,18 @@ export function FileUpload({
 /** Buscar un cliente registrado para llenar datos (los vendedores no ven la lista completa). */
 export function CustomerLookup({ onPick, placeholder = "Buscar cliente registrado para llenar los datos" }: { onPick: (c: CustomerRecord) => void; placeholder?: string }) {
   const { q, setQ, results, loading } = useCustomerSearch();
+  const [alta, setAlta] = useState<string | null>(null);
+  const close = useCallback(() => setAlta(null), []);
   return (
-    <div className="relative">
-      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-        {loading ? <Spinner className="h-4 w-4" /> : <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>}
-      </span>
-      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} className="pl-9" autoComplete="off" />
-      {q.trim().length >= 2 && !loading && (
-        <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
-          {results.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-slate-500">Sin resultados. Llena los datos a mano.</p>
-          ) : (
-            results.map((c) => (
+    <div className="flex gap-2">
+      <div className="relative min-w-0 flex-1">
+        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+          {loading ? <Spinner className="h-4 w-4" /> : <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>}
+        </span>
+        <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder} className="pl-9" autoComplete="off" />
+        {q.trim().length >= 2 && !loading && (
+          <div className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
+            {results.map((c) => (
               <button
                 key={c.id}
                 type="button"
@@ -176,9 +176,26 @@ export function CustomerLookup({ onPick, placeholder = "Buscar cliente registrad
                 <span className="font-medium text-slate-900">{c.nombre}</span>
                 <span className="block text-xs text-slate-500">{[c.contacto_nombre, c.contacto_telefono, c.estado_geo].filter(Boolean).join(" · ")}</span>
               </button>
-            ))
-          )}
-        </div>
+            ))}
+            <button type="button" onClick={() => setAlta(q.trim())} className="flex w-full items-center gap-1.5 border-t border-slate-100 px-3 py-2 text-left text-sm font-medium text-brand-700 hover:bg-brand-50">
+              <Icon name="plus" className="h-4 w-4" /> {results.length === 0 ? `No existe. Dar de alta "${q.trim()}"` : `Dar de alta "${q.trim()}"`}
+            </button>
+          </div>
+        )}
+      </div>
+      <Button type="button" variant="secondary" className="shrink-0 text-xs" onClick={() => setAlta(q.trim())} title="Dar de alta un cliente nuevo">
+        <Icon name="plus" className="h-4 w-4" /> <span className="hidden sm:inline">Nuevo cliente</span><span className="sm:hidden">Nuevo</span>
+      </Button>
+      {alta !== null && (
+        <CustomerModal
+          initialName={alta}
+          onClose={close}
+          onPicked={(c) => {
+            onPick(c);
+            setQ("");
+            setAlta(null);
+          }}
+        />
       )}
     </div>
   );

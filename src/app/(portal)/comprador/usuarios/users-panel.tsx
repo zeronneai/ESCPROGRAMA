@@ -123,6 +123,8 @@ export function UsersPanel({ users, meId }: { users: UserRow[]; meId: string }) 
               <option value="coordinador_iso">Coordinador ISO (quejas y acciones correctivas)</option>
               <option value="marketplaces">Marketplaces (genera las guías de paquetería)</option>
               <option value="almacen">Almacén (evalúa lo que recibe de los proveedores)</option>
+              <option value="supervisor_almacen">Supervisor de almacén (evalúa proveedores y hace minutas)</option>
+              <option value="supervisor_finanzas">Supervisor de finanzas (hace minutas)</option>
               <option value="comprador">Comprador (administrador del sistema)</option>
             </Select>
           </Field>

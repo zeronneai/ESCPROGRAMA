@@ -30,3 +30,14 @@ describe("sugerencias por pagina", () => {
     expect(suggestions("vendedor", "/vendedor").map((f) => f.id)).toContain("nueva-solicitud");
   });
 });
+
+describe("ayuda de lo nuevo", () => {
+  it("visita sin venta, sucursales, minutas y quitar demo", () => {
+    expect(searchFaq("fui con el cliente y no compro", "vendedor").best?.id).toBe("visita");
+    expect(searchFaq("agregar sucursal", "vendedor").best?.id).toBe("sucursal");
+    expect(searchFaq("como hago una minuta", "supervisor_finanzas").best?.id).toBe("minuta-crear");
+    expect(searchFaq("firmar minuta", "vendedor").best?.id).toBe("minuta-firmar");
+    expect(searchFaq("quitar demostracion", "comprador").best?.id).toBe("demo");
+    expect(searchFaq("guia para tarima", "vendedor").best?.id).toBe("tarima");
+  });
+});

@@ -114,6 +114,16 @@ curl -X POST https://<portal>/api/leads/entrada \
 - Listas como tarjetas en celular y tablas en escritorio.
 - **Historial del comprador**: ahora muestra por defecto todas las partidas que ya respondió (antes salía vacío hasta buscar), con contadores de hoy, semana, mes y total, filtros por estado y paginación. La búsqueda por producto o proveedor sigue igual.
 
+## Sucursales, visitas, encuesta y minutas (migraciones 0027 y 0028)
+
+- **Agregar cliente desde cualquier pantalla**: botón "+ Cliente" en la barra (vendedor, jefa de ventas, comprador) y "Nuevo cliente" al elegir cliente en ventas, guías y quejas.
+- **Sucursales**: al editar un cliente, "Agregar sucursal" (título, dirección, estado y contacto). Es un cliente aparte llamado "Cliente · Sucursal" que hereda razón social, RFC y giro.
+- **Ventas diarias**: solo el artículo principal (el de mayor costo) y su cantidad; el monto es el total. **Visita sin venta** con motivo; no cuenta en montos ni cartera.
+- **Guías**: bultos o tarima, con cantidad, peso y medidas.
+- **Encuesta de satisfacción** (ESC-VEN-FR-002): 10 preguntas con Insatisfecho, Poco satisfecho, Satisfecho, Muy satisfecho; el link del cliente trae sus datos y solo pide nombre, puesto y recomendaciones. "Copiar link" lo deja como Enviada; al contestar queda Recibida. Gráficas por pregunta y por cliente. Activa hasta el 1 de marzo de 2027 (fecha editable).
+- **Quitar la demostración**: Configuración > Demostración > Quitar demostración (solo borra lo que creó la demo).
+- **Minutas** (`/minutas`): jefa de ventas, gerente, comprador, supervisor de almacén y supervisor de finanzas las hacen por pasos (reunión, puntos con tema, explicación, lo que hay que hacer, a quién aplica y fecha, firmantes, revisar). Al enviarla a firmas cada firmante recibe aviso y firma de enterado. Versión para imprimir en `/imprimir/minuta/<id>` con líneas de firma para quien no usa el portal.
+
 ## Evaluaciones e indicadores (migraciones 0025 y 0026)
 
 - **Proveedores**: el comprador los da de alta con sus datos y marca cuáles se evalúan.
@@ -135,7 +145,7 @@ curl -X POST https://<portal>/api/leads/entrada \
 ## Catálogo de artículos y demostración (migraciones 0022 y 0023)
 
 - **Artículos**: catálogo de ESC con estatus. En la bitácora (ventas y prospección) se ligan los artículos vendidos u ofrecidos, con cantidad opcional. La jefa ve los artículos más movidos en el Resumen. Página `/articulos` para buscar.
-- **Demostración**: Configuración > Demostración. El comprador activa ejemplos por sección o todo junto; se crean con los usuarios reales. Para quitarlos: `supabase/borrar-datos-de-prueba.sql`.
+- **Demostración**: Configuración > Demostración. El comprador activa ejemplos por sección o todo junto; se crean con los usuarios reales. Para quitarlos: botón "Quitar demostración" en la misma sección.
 
 ## Quejas, acciones correctivas, consumo interno y guías (migraciones 0020 y 0021)
 

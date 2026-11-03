@@ -8,13 +8,14 @@ import { KindBadgeStatic } from "@/components/kind-badge";
 import { areaCls, CustomerLookup, useRun } from "@/components/ops-ui";
 import { Alert, Button, Card, Input, Select } from "@/components/ui";
 import type { CustomerRecord } from "@/lib/validation/customer";
-import { cobroEstado, diasVencidos, money, saldo, type VentaInput, type VentaLinea, type VentaRow } from "@/lib/ventas";
+import { cobroEstado, diasVencidos, money, MOTIVOS_NO_VENTA, saldo, type VentaInput, type VentaLinea, type VentaRow } from "@/lib/ventas";
 
 type Cust = Pick<CustomerRecord, "id" | "nombre" | "tipo" | "contacto_nombre" | "contacto_telefono" | "giro" | "estado_geo">;
 
 export function VentaForm({
-  venta, lineas: initialLineas, customer: initialCustomer, today, readOnly = false, backHref = "/vendedor/bitacora", requestFolio,
+  venta, lineas: initialLineas, customer: initialCustomer, today, readOnly = false, backHref = "/vendedor/bitacora", requestFolio, initialTipo = "venta",
 }: {
+  initialTipo?: "venta" | "visita";
   venta: VentaRow | null;
   lineas: VentaLinea[];
   customer: Cust | null;
@@ -26,6 +27,12 @@ export function VentaForm({
   const [customer, setCustomer] = useState<Cust | null>(initialCustomer);
   const [lineas, setLineas] = useState<VentaLinea[]>(initialLineas);
   const [libre, setLibre] = useState("");
+  const [tipo, setTipo] = useState<"venta" | "visita">(venta?.tipo ?? initialTipo);
+  const motivoIni = venta?.motivo_no_venta ?? "";
+  const motivoBase = MOTIVOS_NO_VENTA.find((m) => motivoIni === m || motivoIni.startsWith(`${m}:`)) ?? (motivoIni ? "Otro" : "");
+  const [motivo, setMotivo] = useState<string>(motivoBase);
+  const [motivoTxt, setMotivoTxt] = useState(motivoIni && motivoBase ? motivoIni.slice(motivoBase.length).replace(/^:\s*/, "") : motivoIni);
+  const visita = tipo === "visita";
   const [v, setV] = useState({
     fecha: venta?.fecha ?? today,
     pedido: venta?.pedido ?? "",
@@ -45,7 +52,15 @@ export function VentaForm({
 
   function save() {
     if (!customer) return;
-    const input: VentaInput = { ...v, customer_id: customer.id, monto: v.monto, dias_credito: v.pago === "credito" ? v.dias_credito : null };
+    const motivoFinal = motivo ? (motivoTxt.trim() ? `${motivo}: ${motivoTxt.trim()}` : motivo) : "";
+    const input: VentaInput = {
+      ...v,
+      tipo,
+      motivo_no_venta: visita ? motivoFinal : "",
+      customer_id: customer.id,
+      monto: v.monto,
+      dias_credito: v.pago === "credito" ? v.dias_credito : null,
+    };
     run("save", () => saveVentaAction(venta?.id ?? null, input, lineas), (r) => {
       if (r.ok) router.push(backHref);
     });
@@ -63,6 +78,22 @@ export function VentaForm({
       )}
 
       <Card className="space-y-4 p-4 sm:p-5">
+        {!venta && !ro && (
+          <div className="grid grid-cols-2 gap-2 sm:max-w-md">
+            {(["venta", "visita"] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => setTipo(k)}
+                className={`rounded-lg border px-3 py-2 text-left text-sm transition ${tipo === k ? (k === "venta" ? "border-green-600 bg-green-50 ring-1 ring-green-600" : "border-amber-500 bg-amber-50 ring-1 ring-amber-500") : "border-slate-200 bg-white"}`}
+              >
+                <span className="block font-semibold">{k === "venta" ? "Venta" : "Visita sin venta"}</span>
+                <span className="block text-xs text-slate-500">{k === "venta" ? "El cliente compró" : "Fui con el cliente y no compró"}</span>
+              </button>
+            ))}
+          </div>
+        )}
+        {venta?.tipo === "visita" && <p className="text-sm font-semibold text-amber-800">Visita sin venta</p>}
         <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
           <label className="space-y-1">
             <span className="block text-xs font-medium text-slate-600">Fecha</span>
@@ -80,15 +111,27 @@ export function VentaForm({
             ) : (
               <CustomerLookup placeholder="Busca al cliente (nombre, RFC o contacto)" onPick={(c) => setCustomer(c)} />
             )}
-            {customer?.tipo === "prospecto" && !venta && (
+            {customer?.tipo === "prospecto" && !venta && !visita && (
               <p className="text-xs text-green-700">Era prospecto: al guardar esta venta pasa a cliente y cuenta como prospecto convertido.</p>
             )}
           </div>
         </div>
 
+        {visita ? (
+          <div className="space-y-2">
+            <span className="block text-xs font-medium text-slate-600">¿Por qué no se concretó la venta? *</span>
+            <div className="flex flex-wrap gap-1.5">
+              {MOTIVOS_NO_VENTA.map((m) => (
+                <button key={m} type="button" disabled={ro} onClick={() => setMotivo(m)} className={`rounded-full px-3 py-1.5 text-xs ${motivo === m ? "bg-amber-600 text-white" : "bg-slate-100 text-slate-700"}`}>{m}</button>
+              ))}
+            </div>
+            <Input value={motivoTxt} onChange={(e) => setMotivoTxt(e.target.value)} disabled={ro} maxLength={250} placeholder={motivo === "Otro" ? "Escribe el motivo" : "Detalle (opcional). Ej. el de la competencia le da 10% menos"} />
+          </div>
+        ) : (
+          <>
         <div className="space-y-2">
-          <span className="block text-xs font-medium text-slate-600">Artículos vendidos</span>
-          {lineas.length > 0 && (
+          <span className="block text-xs font-medium text-slate-600">Artículo principal (el de mayor costo) *</span>
+          {lineas.length > 0 ? (
             <ul className="divide-y divide-slate-100 rounded-md border border-slate-200 bg-white">
               {lineas.map((l, i) => (
                 <li key={l.id ?? `n${i}`} className="flex items-center gap-2 px-3 py-2">
@@ -100,27 +143,28 @@ export function VentaForm({
                     value={l.cantidad ?? ""}
                     disabled={ro}
                     inputMode="decimal"
-                    placeholder="Cant."
+                    placeholder="Cantidad"
+                    aria-label="Cantidad"
                     onChange={(e) => setLineas((x) => x.map((y, j) => (j === i ? { ...y, cantidad: e.target.value.trim() ? Number(e.target.value) || null : null } : y)))}
-                    className="w-20 rounded border border-slate-300 px-2 py-1 text-sm disabled:bg-slate-50"
+                    className="w-24 rounded border border-slate-300 px-2 py-1 text-sm disabled:bg-slate-50"
                   />
-                  {!ro && <button type="button" onClick={() => setLineas((x) => x.filter((_, j) => j !== i))} className="px-1 text-lg leading-none text-slate-400 hover:text-red-600" aria-label="Quitar">×</button>}
+                  {!ro && <button type="button" onClick={() => setLineas((x) => x.filter((_, j) => j !== i))} className="px-1 text-xs text-brand-700 underline">Cambiar</button>}
                 </li>
               ))}
             </ul>
-          )}
-          {!ro && (
+          ) : ro ? (
+            <p className="text-sm text-slate-500">Sin artículo.</p>
+          ) : (
             <>
-              <ArticuloSearch exclude={lineas.map((l) => l.articulo_id ?? "")} onPick={(a) => setLineas((x) => [...x, { id: null, articulo_id: a.id, descripcion: a.nombre, clave: a.clave, cantidad: null }])} />
+              <ArticuloSearch exclude={[]} onPick={(a) => setLineas([{ id: null, articulo_id: a.id, descripcion: a.nombre, clave: a.clave, cantidad: null }])} />
               <div className="flex gap-2">
                 <Input value={libre} onChange={(e) => setLibre(e.target.value)} placeholder="¿No está en el catálogo? Escríbelo aquí" />
-                <Button type="button" variant="secondary" disabled={libre.trim().length < 2} onClick={() => { setLineas((x) => [...x, { id: null, articulo_id: null, descripcion: libre.trim(), cantidad: null }]); setLibre(""); }}>Agregar</Button>
+                <Button type="button" variant="secondary" disabled={libre.trim().length < 2} onClick={() => { setLineas([{ id: null, articulo_id: null, descripcion: libre.trim(), cantidad: null }]); setLibre(""); }}>Usar</Button>
               </div>
+              <p className="text-xs text-slate-500">Solo registra el artículo de mayor costo de la venta. El monto sí es el total.</p>
             </>
           )}
-          {ro && lineas.length === 0 && <p className="text-sm text-slate-500">Sin artículos.</p>}
         </div>
-
         <div className="grid gap-3 sm:grid-cols-3">
           <label className="space-y-1">
             <span className="block text-xs font-medium text-slate-600">Pedido / OC</span>
@@ -178,6 +222,9 @@ export function VentaForm({
           </div>
         </div>
 
+          </>
+        )}
+
         <label className="block space-y-1">
           <span className="block text-xs font-medium text-slate-600">Comentarios</span>
           <textarea value={v.comentarios} onChange={set("comentarios")} disabled={ro} rows={2} className={areaCls} placeholder="Algo a tomar en cuenta: acuerdos de pago, entrega parcial, etc." />
@@ -186,11 +233,11 @@ export function VentaForm({
 
       {!ro && (
         <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50/95 px-4 py-3 backdrop-blur md:static md:mx-0 md:border-0 md:bg-transparent md:p-0">
-          <Button onClick={save} loading={busy === "save"} disabled={!customer} className="flex-1 sm:flex-none">{venta ? "Guardar cambios" : "Registrar venta"}</Button>
+          <Button onClick={save} loading={busy === "save"} disabled={!customer || (visita && !motivo) || (!visita && !venta && lineas.length === 0)} className="flex-1 sm:flex-none">{venta ? "Guardar cambios" : visita ? "Registrar visita" : "Registrar venta"}</Button>
           <Link href={backHref} className="px-3 py-2 text-sm text-slate-600">Volver</Link>
           {venta && (
-            <Button variant="ghost" className="ml-auto text-xs text-red-700" loading={busy === "x"} onClick={() => { if (window.confirm("¿Cancelar esta venta? Queda registrada como cancelada.")) run("x", () => cancelarVentaAction(venta.id), () => router.push(backHref)); }}>
-              Cancelar venta
+            <Button variant="ghost" className="ml-auto text-xs text-red-700" loading={busy === "x"} onClick={() => { if (window.confirm(visita ? "¿Cancelar esta visita?" : "¿Cancelar esta venta? Queda registrada como cancelada.")) run("x", () => cancelarVentaAction(venta.id), () => router.push(backHref)); }}>
+              {visita ? "Cancelar visita" : "Cancelar venta"}
             </Button>
           )}
         </div>

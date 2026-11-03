@@ -8,6 +8,7 @@ export interface EvalPeriodo {
   programado_para: string | null;
   activado_at: string | null;
   cerrado_at: string | null;
+  cierra_el?: string | null;
 }
 export interface Pregunta {
   id: string;
@@ -27,12 +28,22 @@ export const ESCALA_PROVEEDOR = [
   { v: 5, label: "Excelente" },
 ] as const;
 
-/** Escala del cliente (3 valores). */
+/** Escala del cliente (ESC-VEN-FR-002): 4 valores. */
 export const ESCALA_CLIENTE = [
-  { v: 1, label: "No satisfactorio", cls: "border-red-300 bg-red-50 text-red-800" },
-  { v: 2, label: "Satisfactorio", cls: "border-amber-300 bg-amber-50 text-amber-900" },
-  { v: 3, label: "Muy satisfactorio", cls: "border-green-400 bg-green-50 text-green-800" },
+  { v: 1, label: "Insatisfecho", cls: "border-red-300 bg-red-50 text-red-800", bar: "bg-red-500" },
+  { v: 2, label: "Poco satisfecho", cls: "border-orange-300 bg-orange-50 text-orange-900", bar: "bg-orange-400" },
+  { v: 3, label: "Satisfecho", cls: "border-lime-400 bg-lime-50 text-lime-900", bar: "bg-lime-500" },
+  { v: 4, label: "Muy satisfecho", cls: "border-green-400 bg-green-50 text-green-800", bar: "bg-green-600" },
 ] as const;
+
+/** Escala anterior (encuestas contestadas antes de noviembre 2026). */
+export const ESCALA_CLIENTE_3 = [
+  { v: 1, label: "No satisfactorio", bar: "bg-red-500" },
+  { v: 2, label: "Satisfactorio", bar: "bg-amber-400" },
+  { v: 3, label: "Muy satisfactorio", bar: "bg-green-600" },
+] as const;
+
+export type RespuestaCliente = { respuestas: Record<string, number>; escala?: number | null };
 
 /** Clasificacion del proveedor por puntaje (0 a 100). Rangos provisionales: se ajustan cuando ESC los defina. */
 export function clasificacionProveedor(p: number | string | null): { label: string; cls: string } | null {
@@ -43,15 +54,40 @@ export function clasificacionProveedor(p: number | string | null): { label: stri
   return { label: "No confiable", cls: "bg-red-100 text-red-800" };
 }
 
-/** Satisfaccion del cliente: % de respuestas Satisfactorio o Muy satisfactorio. */
-export function satisfaccion(resps: Record<string, number>[]): { pct: number | null; indice: number | null } {
-  const vals = resps.flatMap((r) => Object.values(r).map(Number));
-  if (!vals.length) return { pct: null, indice: null };
-  return {
-    pct: Math.round((vals.filter((v) => v >= 2).length / vals.length) * 100),
-    indice: Math.round(((vals.reduce((a, v) => a + v, 0) / vals.length - 1) / 2) * 100),
-  };
+/**
+ * Satisfaccion del cliente.
+ * pct: % de respuestas Satisfecho o Muy satisfecho (en la escala anterior de 3: Satisfactorio o mas).
+ * indice: 0 = todo en lo mas bajo, 100 = todo en lo mas alto.
+ */
+export function satisfaccion(rows: RespuestaCliente[]): { pct: number | null; indice: number | null } {
+  let n = 0;
+  let ok = 0;
+  let idx = 0;
+  for (const r of rows) {
+    const esc = r.escala === 3 ? 3 : 4;
+    for (const raw of Object.values(r.respuestas ?? {})) {
+      const v = Number(raw);
+      if (!v) continue;
+      n++;
+      if (v >= esc - 1) ok++;
+      idx += (v - 1) / (esc - 1);
+    }
+  }
+  if (!n) return { pct: null, indice: null };
+  return { pct: Math.round((ok / n) * 100), indice: Math.round((idx / n) * 100) };
 }
+
+/** Estado del link de un cliente: sin enviar, enviada o recibida. */
+export function encuestaEstado(e: { enviada_at: string | null; respondida_at: string | null } | null): "sin_enviar" | "enviada" | "recibida" {
+  if (e?.respondida_at) return "recibida";
+  if (e?.enviada_at) return "enviada";
+  return "sin_enviar";
+}
+export const ENCUESTA_ESTADO = {
+  sin_enviar: { label: "Sin enviar", cls: "bg-amber-100 text-amber-900" },
+  enviada: { label: "Enviada", cls: "bg-sky-100 text-sky-800" },
+  recibida: { label: "Recibida", cls: "bg-green-100 text-green-800" },
+} as const;
 
 export const supplierSchema = z.object({
   nombre: z.string().trim().min(2, "Escribe el nombre").max(200),

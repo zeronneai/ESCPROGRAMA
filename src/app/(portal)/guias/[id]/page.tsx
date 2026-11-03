@@ -4,7 +4,7 @@ import { GuiaPanel } from "@/components/guias/guia-panel";
 import { Chip, Dl } from "@/components/ops-ui";
 import { Card } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guards";
-import { elapsedText, GUIA_ESTADOS, guiaAlert, guiaTitle, hoursPending, SERVICIOS, type GuiaEstado, type Servicio } from "@/lib/ops/guias";
+import { elapsedText, empaqueLabel, GUIA_ESTADOS, guiaAlert, guiaTitle, hoursPending, SERVICIOS, type GuiaEstado, type Servicio } from "@/lib/ops/guias";
 import { fmtDate, signedUrl } from "@/lib/ops/server";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
@@ -37,7 +37,7 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
   const form = {
     factura: g.factura, destinatario: g.destinatario, paqueteria: g.paqueteria, paqueteria_otra: g.paqueteria_otra ?? "", servicio: g.servicio,
     customer_id: g.customer_id, contacto_nombre: g.contacto_nombre ?? "", telefono: g.telefono, correo: g.correo ?? "", calle_numero: g.calle_numero,
-    colonia: g.colonia ?? "", cp: g.cp, ciudad: g.ciudad, estado_geo: g.estado_geo, referencias: g.referencias ?? "", bultos: String(g.bultos),
+    colonia: g.colonia ?? "", cp: g.cp, ciudad: g.ciudad, estado_geo: g.estado_geo, referencias: g.referencias ?? "", empaque: g.empaque ?? "bulto", bultos: String(g.bultos),
     peso_kg: n(g.peso_kg), largo_cm: n(g.largo_cm), ancho_cm: n(g.ancho_cm), alto_cm: n(g.alto_cm), contenido: g.contenido ?? "",
     valor_declarado: n(g.valor_declarado), asegurar: g.asegurar, urgente: g.urgente, notas: g.notas ?? "",
   };
@@ -86,7 +86,7 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
             ["Correo", g.correo],
             ["Dirección", [g.calle_numero, g.colonia && `Col. ${g.colonia}`, `CP ${g.cp}`, `${g.ciudad}, ${g.estado_geo}`].filter(Boolean).join(", ")],
             ["Referencias", g.referencias],
-            ["Bultos y peso", `${g.bultos} bulto(s) · ${n(g.peso_kg)} kg`],
+            ["Paquete y peso", `${empaqueLabel(g.empaque, g.bultos)} · ${n(g.peso_kg)} kg`],
             ["Medidas", medidas],
             ["Contenido", g.contenido],
             ["Valor declarado", g.valor_declarado !== null ? `$${Number(g.valor_declarado).toLocaleString("es-MX")} MXN` : ""],

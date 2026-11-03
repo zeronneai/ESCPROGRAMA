@@ -36,6 +36,8 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 19 | `0024_ventas_diarias.sql` | **Ventas diarias** separadas de la **Prospección**: registro sencillo por venta (cliente, artículos, pedido, factura, monto, contado o crédito, entrega y cobranza) con cartera vencida calculada sola. Paqueterías de guías: Paquete Express, Estafeta, Tinypack, Porteo, DHL u Otra. |
 | 20 | `0025_rol_almacen.sql` | Agrega el puesto **Almacén**. Córrelo **solo**, en su propia ejecución, antes del 21. |
 | 21 | `0026_evaluaciones.sql` | **Proveedores** con datos completos, **evaluación de proveedores** (comprador + almacén, escala 1 a 5) y **evaluación de clientes** (link único por cliente, 3 respuestas). Dos veces al año: la siguiente se activa sola a los 6 meses. |
+| 22 | `0027_roles_supervisores.sql` | Agrega los puestos **Supervisor de almacén** y **Supervisor de finanzas**. Córrelo **solo**, en su propia ejecución, antes del 23. |
+| 23 | `0028_sucursales_visitas_minutas.sql` | **Sucursales** de clientes (otra dirección con título, cuenta como cliente aparte), **visita sin venta** con motivo, guías en **bultos o tarima**, **encuesta de satisfacción** ESC-VEN-FR-002 (10 preguntas, 4 respuestas, puesto de quien contesta) activa hasta el 1 de marzo de 2027, botón para **quitar la demostración** y **minutas de reunión** con firmas. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

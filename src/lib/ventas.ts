@@ -29,10 +29,23 @@ export interface VentaRow {
   origen: "vendedor" | "portal";
   cancelada_at: string | null;
   created_at: string;
+  tipo: "venta" | "visita";
+  motivo_no_venta: string | null;
 }
 
+/** Motivos por los que no se concreto la venta en una visita. */
+export const MOTIVOS_NO_VENTA = [
+  "Precio",
+  "Ya tiene proveedor",
+  "No tiene necesidad por ahora",
+  "Sin presupuesto",
+  "Tiempo de entrega",
+  "No estaba el comprador",
+  "Otro",
+] as const;
+
 export const VENTA_COLS =
-  "id, vendedor_id, customer_id, fecha, request_id, pedido, factura, monto, moneda, pago, dias_credito, vence, entregado, fecha_entrega, porcentaje_cobrado, fecha_cobro, comentarios, origen, cancelada_at, created_at";
+  "id, vendedor_id, customer_id, fecha, request_id, pedido, factura, monto, moneda, pago, dias_credito, vence, entregado, fecha_entrega, porcentaje_cobrado, fecha_cobro, comentarios, origen, cancelada_at, created_at, tipo, motivo_no_venta";
 
 /** Lo que falta por cobrar (0 si esta cobrada o cancelada). */
 export function saldo(v: Pick<VentaRow, "monto" | "porcentaje_cobrado" | "cancelada_at">): number {
@@ -56,6 +69,8 @@ export function diasVencidos(v: Pick<VentaRow, "vence">, today: string): number 
 const txt = (max: number) => z.string().trim().max(max).optional().transform((v) => v || null);
 
 export const ventaSchema = z.object({
+  tipo: z.enum(["venta", "visita"]).default("venta"),
+  motivo_no_venta: txt(300),
   customer_id: z.string().uuid("Elige el cliente"),
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
   pedido: txt(80),
@@ -67,6 +82,8 @@ export const ventaSchema = z.object({
   entregado: z.boolean(),
   porcentaje_cobrado: z.coerce.number({ message: "Cobranza inválida" }).min(0).max(100),
   comentarios: txt(2000),
+}).superRefine((v, ctx) => {
+  if (v.tipo === "visita" && !v.motivo_no_venta) ctx.addIssue({ code: "custom", path: ["motivo_no_venta"], message: "Elige por qué no se concretó la venta" });
 });
 export type VentaInput = z.input<typeof ventaSchema>;
 

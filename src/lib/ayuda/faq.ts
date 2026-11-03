@@ -86,7 +86,7 @@ export const FAQ: Faq[] = [
   {
     id: "alta-cliente", q: "¿Cómo doy de alta un cliente o prospecto?", roles: V, paths: ["/vendedor/clientes", "/vendedor/bitacora"],
     keys: ["alta", "cliente", "nuevo", "registrar", "prospecto", "empresa", "agregar"],
-    a: ["En Clientes (o al elegir cliente en una solicitud o en la bitácora) busca primero: si ya existe, sus datos salen solos.", "Si no aparece, toca \"Nuevo\" y elige si ya es Cliente (ya nos compra) o Prospecto (aún no).", "Obligatorio: nombre, giro, estado y teléfono o correo. Para cotizarle también RFC y dirección."],
+    a: ["Desde cualquier pantalla toca el botón \"+ Cliente\" de arriba (junto a la campanita).", "También al elegir cliente en una venta, guía o queja: si no aparece, toca \"Nuevo cliente\".", "Elige si ya es Cliente (ya nos compra) o Prospecto (aún no). Obligatorio: nombre, giro, estado, dirección y teléfono o correo. Para cotizarle también RFC."],
     links: [{ label: "Clientes", href: "/vendedor/clientes" }],
   },
   {
@@ -100,12 +100,24 @@ export const FAQ: Faq[] = [
     a: ["Cliente: ya nos compra. Sus ventas van en Ventas diarias.", "Prospecto: aún no nos compra. Se le da seguimiento en Prospección.", "Cuando un prospecto compra, registra su primera venta: pasa a cliente solo y cuenta como prospecto convertido."],
   },
 
+  {
+    id: "sucursal", q: "¿Cómo agrego otra dirección o sucursal de un cliente?", roles: [...V, ...C, ...J], paths: ["/vendedor/clientes", "/comprador/clientes", "/ventas/clientes"],
+    keys: ["sucursal", "sucursales", "direccion", "otra direccion", "planta", "domicilio", "ciudad"],
+    a: ["Abre el cliente (Editar) y abajo toca \"Agregar sucursal\".", "Ponle título (por ejemplo \"Sucursal Delicias\"), su dirección y su contacto.", "La sucursal se maneja como cliente aparte en ventas, bitácora y encuesta; la razón social, RFC y giro son los de la matriz."],
+  },
+
   // ----- Vendedor: bitacora
   {
     id: "venta-diaria", q: "¿Cómo registro una venta del día?", roles: V, paths: ["/vendedor/bitacora"],
     keys: ["venta", "ventas", "diaria", "diarias", "registrar", "vendi", "bitacora", "hoy", "factura"],
-    a: ["Ve a Bitácora > Ventas diarias y toca \"Registrar venta\".", "Busca al cliente, agrega los artículos y su cantidad.", "Llena pedido u OC, factura, monto sin IVA y si es contado o crédito (días).", "Marca si ya se entregó y cuánto se ha cobrado. Guarda."],
+    a: ["Ve a Bitácora > Ventas diarias y toca \"Registrar venta\".", "Busca al cliente y pon solo el artículo principal (el de mayor costo) con su cantidad.", "Llena pedido u OC, factura, monto sin IVA y si es contado o crédito (días).", "Marca si ya se entregó y cuánto se ha cobrado. Guarda."],
     links: [{ label: "Registrar venta", href: "/vendedor/bitacora/venta/nueva" }],
+  },
+  {
+    id: "visita", q: "Fui con un cliente y no compró: ¿cómo lo registro?", roles: V, paths: ["/vendedor/bitacora"],
+    keys: ["visita", "visite", "no compro", "sin venta", "no se concreto", "motivo", "porque no", "fui con", "fui a ver"],
+    a: ["En Bitácora > Ventas diarias toca \"Visita sin venta\".", "Elige al cliente y por qué no se concretó (precio, ya tiene proveedor, etc.) y agrega el detalle.", "Queda en tu bitácora de ventas, no cuenta como venta ni en los montos."],
+    links: [{ label: "Visita sin venta", href: "/vendedor/bitacora/venta/nueva?tipo=visita" }],
   },
   {
     id: "entregada-cobrada", q: "¿Cómo marco una venta como entregada o cobrada?", roles: V, paths: ["/vendedor/bitacora"],
@@ -150,6 +162,11 @@ export const FAQ: Faq[] = [
     id: "faltan-datos", q: "Mi guía dice \"Faltan datos\"", roles: V,
     keys: ["faltan", "datos", "corregir", "falta", "requiere"],
     a: ["Marketplaces necesita algo más: abre la guía y lee su mensaje.", "Toca \"Corregir datos\", ajusta y guarda. Vuelve sola a la fila de Marketplaces."],
+  },
+  {
+    id: "tarima", q: "¿Puedo pedir la guía para una tarima?", roles: [...V, ...MKT],
+    keys: ["tarima", "tarimas", "bulto", "bultos", "pallet", "medidas", "peso", "dimensiones"],
+    a: ["Sí. En el paquete elige \"Bultos\" o \"Tarima\".", "Pon cuántos, el peso total y las medidas (largo, ancho y alto en cm)."],
   },
   {
     id: "asegurar", q: "¿Qué es asegurar el envío?",
@@ -225,8 +242,8 @@ export const FAQ: Faq[] = [
   },
   {
     id: "demo", q: "¿Cómo activo la demostración?", roles: C,
-    keys: ["demo", "demostracion", "ejemplo", "ejemplos", "presentar", "mostrar", "prueba"],
-    a: ["Ve a Más > Configuración > Demostración.", "Activa por sección o \"Activar todo\". Cada usuario debe haber entrado al menos una vez.", "Para quitarla antes de arrancar se corre el script de borrar datos de prueba."],
+    keys: ["demo", "demostracion", "ejemplo", "ejemplos", "presentar", "mostrar", "prueba", "quitar", "desactivar", "borrar"],
+    a: ["Ve a Más > Configuración > Demostración.", "Activa por sección o \"Activar todo\". Cada usuario debe haber entrado al menos una vez.", "Para quitarla toca \"Quitar demostración\": borra solo los clientes (Demo) y todo lo ligado a ellos."],
     links: [{ label: "Configuración", href: "/comprador/configuracion" }],
   },
   {
@@ -239,11 +256,11 @@ export const FAQ: Faq[] = [
   {
     id: "eval-clientes", q: "¿Cómo mando la evaluación a mis clientes?", roles: V, paths: ["/evaluaciones/clientes", "/vendedor/clientes"],
     keys: ["evaluacion", "encuesta", "satisfaccion", "link", "calificar", "evaluar cliente", "clientes"],
-    a: ["Cuando la evaluación está activa, ve a Clientes > Evaluación de clientes.", "En cada cliente toca \"Generar link\" y luego WhatsApp, Correo o Copiar link.", "Ahí ves si ya se envió y si ya respondió. Son 5 preguntas y el cliente no necesita cuenta."],
+    a: ["Ve a Más > Evaluación de clientes. Está abierta hasta la fecha que aparece arriba.", "En cada cliente toca \"Copiar link\" (o WhatsApp o Correo). Cada cliente tiene su propio link con sus datos ya llenos.", "Al copiarlo queda como Enviada; cuando el cliente contesta cambia a Recibida. Son 10 preguntas, el cliente solo escribe su nombre y puesto."],
     links: [{ label: "Evaluación de clientes", href: "/evaluaciones/clientes" }],
   },
   {
-    id: "eval-proveedores", q: "¿Cómo evalúo a un proveedor?", roles: ["comprador", "almacen"], paths: ["/evaluaciones/proveedores"],
+    id: "eval-proveedores", q: "¿Cómo evalúo a un proveedor?", roles: ["comprador", "almacen", "supervisor_almacen"], paths: ["/evaluaciones/proveedores"],
     keys: ["evaluacion", "evaluar", "proveedor", "proveedores", "calificar", "almacen", "recibido", "golpeado", "incompleto"],
     a: ["Ve a Evaluación de proveedores (solo aparece para calificar cuando está activa).", "En \"Me faltan\" abre el proveedor y califica cada punto del 1 (malo) al 5 (excelente).", "El comprador califica comunicación, entrega, precio, documentos y atención; Almacén califica estado, cantidades, empaque, especificación y documentos de entrega."],
     links: [{ label: "Evaluación de proveedores", href: "/evaluaciones/proveedores" }],
@@ -258,6 +275,18 @@ export const FAQ: Faq[] = [
     keys: ["proveedor", "alta", "nuevo proveedor", "datos", "contacto"],
     a: ["Ve a Más > Proveedores > \"Nuevo proveedor\".", "Llena nombre, razón social, RFC, qué surte, contacto, teléfono y correo.", "Deja marcado \"Incluir en la evaluación\" si se debe evaluar."],
     links: [{ label: "Proveedores", href: "/comprador/proveedores" }],
+  },
+  {
+    id: "minuta-crear", q: "¿Cómo hago una minuta de reunión?", roles: ["jefe_ventas", "gerente", "comprador", "supervisor_almacen", "supervisor_finanzas"], paths: ["/minutas"],
+    keys: ["minuta", "minutas", "reunion", "junta", "acuerdos", "compromisos", "acta"],
+    a: ["Ve a Minutas > \"Nueva minuta\". Se llena por pasos.", "1) Datos de la reunión. 2) Puntos: tema, explicación, lo que hay que hacer, a quién le aplica y para cuándo. 3) Quién firma (y asistentes que no usan el portal). 4) Revisar.", "Al \"Enviar a firmas\" a cada persona le llega un aviso. Con \"Imprimir\" sale el formato para firmar en papel."],
+    links: [{ label: "Nueva minuta", href: "/minutas/nueva" }],
+  },
+  {
+    id: "minuta-firmar", q: "¿Cómo firmo una minuta?", paths: ["/minutas"],
+    keys: ["firmar", "firma", "minuta", "enterado", "reunion"],
+    a: ["Cuando te toca firmar te llega un aviso en la campanita.", "Abre la minuta, revísala y toca \"Firmar de enterado\". Queda con fecha y hora."],
+    links: [{ label: "Minutas", href: "/minutas" }],
   },
   {
     id: "indicadores", q: "¿Qué son los indicadores?",

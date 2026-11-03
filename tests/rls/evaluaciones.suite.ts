@@ -29,7 +29,7 @@ export function evaluacionesSuite() {
       expect((await q(alm, "select id from public.suppliers where id=$1", [sid.id])).rowCount).toBe(1);
       expect(await failure(q(alm, "select public.eval_activar('proveedores')"))).toMatch(/No autorizado/);
       await q(w.buyer1, "select public.eval_activar('proveedores')");
-      const per = (await q("postgres", "select estado, programado_para - current_date as dias from public.eval_periodos where tipo='proveedores' order by created_at")).rows;
+      const per = (await q("postgres", "select estado, programado_para - current_date as dias from public.eval_periodos where tipo='proveedores' order by estado")).rows;
       expect(per.map((p) => p.estado)).toEqual(["activo", "programado"]);
       expect(Number(per[1].dias)).toBeGreaterThan(170);
       expect(Number((await q("postgres", "select count(*) from public.notifications where user_id=$1 and tipo='evaluacion_activa'", [almId])).rows[0].count)).toBe(1);
@@ -46,15 +46,19 @@ export function evaluacionesSuite() {
       // Activacion automatica cuando llega la fecha
       await q("postgres", "update public.eval_periodos set programado_para = current_date where tipo='proveedores' and estado='programado'");
       expect((await q("postgres", "select public.eval_activar_programados() as n")).rows[0].n).toBe(1);
-      expect((await q("postgres", "select estado from public.eval_periodos where tipo='proveedores' order by created_at")).rows.map((p) => p.estado)).toEqual(["cerrado", "activo", "programado"]);
+      expect((await q("postgres", "select estado from public.eval_periodos where tipo='proveedores' order by estado")).rows.map((p) => p.estado)).toEqual(["activo", "cerrado", "programado"]);
       expect(await failure(q(w.buyer1, "select public.eval_proveedor_guardar($1,$2::jsonb)", [ev, JSON.stringify(await preguntas("comprador"))]))).toMatch(/cerrado/);
     });
 
     it("clientes: el vendedor genera un link unico, lo marca enviado y el cliente responde sin sesion", async () => {
       // seller1 ve al cliente porque tiene una venta con el
       await q(w.seller1, "insert into public.ventas (customer_id, monto) values ($1, 10)", [w.customerId]);
+      // 0028 deja la encuesta activa hasta el 1 de marzo de 2027
+      expect((await q("postgres", "select cierra_el::text from public.eval_periodos where tipo='clientes' and estado='activo'")).rows[0].cierra_el).toBe("2027-03-01");
+      await q("postgres", "update public.eval_periodos set estado='cerrado' where tipo='clientes' and estado='activo'");
       expect(await failure(q(w.seller1, "select * from public.encuesta_generar($1)", [w.customerId]))).toMatch(/no esta activa/);
-      await q(w.buyer1, "select public.eval_activar('clientes')");
+      expect(await failure(q(w.buyer1, "select public.eval_activar('clientes', current_date - 1)"))).toMatch(/futura/);
+      await q(w.buyer1, "select public.eval_activar('clientes', current_date + 30)");
       expect(await failure(q(w.seller2, "select * from public.encuesta_generar($1)", [w.customerId]))).toMatch(/No autorizado/);
       const e = (await q(w.seller1, "select id, token from public.encuesta_generar($1)", [w.customerId])).rows[0];
       expect(e.token).toHaveLength(40);
@@ -63,18 +67,25 @@ export function evaluacionesSuite() {
       await q(w.seller1, "select public.encuesta_marcar_enviada($1,'whatsapp')", [e.id]);
       expect(await failure(q(w.seller2, "select public.encuesta_marcar_enviada($1,'correo')", [e.id]))).toMatch(/No autorizado/);
       const pub = (await q(anon, "select public.encuesta_publica($1) as j", [e.token])).rows[0].j;
-      expect(pub.preguntas).toHaveLength(5);
-      expect(pub.respondida).toBe(false);
+      expect(pub.preguntas).toHaveLength(10);
+      expect(pub).toMatchObject({ respondida: false, cerrada: false, escala: 4 });
+      expect(pub.cliente).toBeTruthy();
       expect((await q(anon, "select public.encuesta_publica('x') as j")).rows[0].j).toBeNull();
-      const resp = Object.fromEntries(pub.preguntas.map((p: { id: string }, i: number) => [p.id, i < 3 ? 3 : 2]));
-      expect(await failure(q(anon, "select public.encuesta_responder($1,$2::jsonb)", [e.token, JSON.stringify({ ...resp, [pub.preguntas[0].id]: 4 })]))).toMatch(/invalida/);
-      await q(anon, "select public.encuesta_responder($1,$2::jsonb,'Muy buen servicio','Laura')", [e.token, JSON.stringify(resp)]);
-      expect(await failure(q(anon, "select public.encuesta_responder($1,$2::jsonb)", [e.token, JSON.stringify(resp)]))).toMatch(/ya fue respondida/);
-      const row = (await q(w.seller1, "select puntaje, contesto_nombre, respondida_at is not null as r from public.encuestas_cliente where id=$1", [e.id])).rows[0];
-      expect(row).toMatchObject({ r: true, contesto_nombre: "Laura", puntaje: "80.0" });
+      const resp = Object.fromEntries(pub.preguntas.map((p: { id: string }, i: number) => [p.id, i < 3 ? 4 : 3]));
+      expect(await failure(q(anon, "select public.encuesta_responder($1,$2::jsonb,null,null,'Compras')", [e.token, JSON.stringify({ ...resp, [pub.preguntas[0].id]: 5 })]))).toMatch(/invalida/);
+      expect(await failure(q(anon, "select public.encuesta_responder($1,$2::jsonb,null,'Laura')", [e.token, JSON.stringify(resp)]))).toMatch(/puesto/);
+      await q(anon, "select public.encuesta_responder($1,$2::jsonb,'Muy buen servicio','Laura','Jefa de compras')", [e.token, JSON.stringify(resp)]);
+      expect(await failure(q(anon, "select public.encuesta_responder($1,$2::jsonb,null,null,'X')", [e.token, JSON.stringify(resp)]))).toMatch(/ya fue respondida/);
+      const row = (await q(w.seller1, "select puntaje, contesto_nombre, contesto_puesto, respondida_at is not null as r from public.encuestas_cliente where id=$1", [e.id])).rows[0];
+      expect(row).toMatchObject({ r: true, contesto_nombre: "Laura", contesto_puesto: "Jefa de compras", puntaje: "76.7" });
       expect((await q(w.seller2, "select id from public.encuestas_cliente where id=$1", [e.id])).rowCount).toBe(0);
       expect(Number((await q("postgres", "select count(*) from public.notifications where user_id=$1 and tipo='encuesta_respondida'", [w.ids.s1])).rows[0].count)).toBe(1);
       expect(await failure(q(anon, "select id from public.encuestas_cliente"))).toMatch(/permission denied/);
+      // Al pasar la fecha de cierre se cierra sola
+      await q("postgres", "update public.eval_periodos set cierra_el = current_date - 1 where tipo='clientes' and estado='activo'");
+      expect((await q(anon, "select public.encuesta_publica($1) as j", [e.token])).rows[0].j.cerrada).toBe(true);
+      await q("postgres", "select public.eval_activar_programados()");
+      expect((await q("postgres", "select count(*)::int as n from public.eval_periodos where tipo='clientes' and estado='activo'")).rows[0].n).toBe(0);
     });
   });
 }
