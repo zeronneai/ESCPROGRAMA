@@ -2,8 +2,10 @@ import { Suspense } from "react";
 import { Logo } from "@/components/logo";
 import { NavigationProgress } from "@/components/navigation-progress";
 import { HelpChat } from "@/components/help-chat";
+import { PagosAviso } from "@/components/pagos/pagos-aviso";
 import { NotificationBell } from "@/components/notification-bell";
 import { AddCustomerButton } from "@/components/customers";
+import { AddSupplierButton } from "@/components/eval/supplier-tools";
 import { PortalNav, type NavItem } from "@/components/portal-nav";
 import { requireUser } from "@/lib/auth/guards";
 import type { Rol } from "@/lib/auth/route-guard";
@@ -14,6 +16,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/comprador/historial", label: "Historial", icon: "history" },
     { href: "/comprador/por-comprar", label: "Por comprar", short: "Comprar", icon: "cart" },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
+    { href: "/pagos", label: "Pagos", icon: "dollar" },
     { href: "/comprador/estadisticas", label: "Estadísticas", short: "Stats", icon: "chart", secondary: true },
     { href: "/ventas", label: "Ventas", icon: "target", secondary: true },
     { href: "/calidad", label: "Quejas y acciones correctivas", icon: "alert", secondary: true },
@@ -105,6 +108,11 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/indicadores", label: "Indicadores", icon: "chart", secondary: true },
   ],
+  ceo: [
+    { href: "/pagos", label: "Pagos a proveedores", short: "Pagos", icon: "dollar" },
+    { href: "/minutas", label: "Minutas", icon: "list" },
+    { href: "/documentos", label: "Documentos", icon: "list", secondary: true },
+  ],
   supervisor_finanzas: [
     { href: "/minutas", label: "Minutas", icon: "list" },
     { href: "/documentos", label: "Documentos", icon: "list", secondary: true },
@@ -121,12 +129,16 @@ export default async function PortalLayout({ children }: { children: React.React
       </Suspense>
       <PortalNav items={NAV[user.rol]} user={{ nombre: user.nombre, rol: user.rol }} bell={
           <>
+            {user.rol === "comprador" && <AddSupplierButton />}
             {(user.rol === "vendedor" || user.rol === "jefe_ventas" || user.rol === "comprador") && <AddCustomerButton />}
             <NotificationBell />
           </>
         } logo={<Logo className="h-7 sm:h-8" />} />
       <main className="pb-safe-nav mx-auto max-w-6xl px-4 pt-5 sm:pt-6">{children}</main>
       <HelpChat rol={user.rol} nombre={user.nombre} />
+      <Suspense fallback={null}>
+        <PagosAviso rol={user.rol} />
+      </Suspense>
     </div>
   );
 }

@@ -1,10 +1,10 @@
 -- =============================================================================
 -- BORRAR DATOS DE PRUEBA  (correlo SOLO cuando quieras empezar en limpio; NO se puede deshacer)
--- Requiere 0028 ya aplicado.
+-- Requiere 0031 ya aplicado.
 --
 -- BORRA: solicitudes y partidas, cotizaciones y envios al cliente, PDFs registrados, aclaraciones,
 --        compras, clientes y prospectos, bitacora de ventas/prospeccion, leads, quejas, acciones
---        correctivas, consumo interno, guias, ventas diarias, evaluaciones, minutas, avisos de la campanita y la bitacora de auditoria.
+--        correctivas, consumo interno, guias, ventas diarias, evaluaciones, minutas, ordenes de compra y pagos a proveedores, avisos de la campanita y la bitacora de auditoria.
 --        Los folios vuelven a empezar en 1 (COT, QC, SAC, CI y G).
 -- CONSERVA: usuarios (todos), configuracion, dias festivos, datos de la empresa, tabulador de
 --        precios, proveedores, el catalogo de articulos, los documentos y el control de cambios.
@@ -17,6 +17,7 @@ begin;
 alter table public.audit_log disable trigger audit_log_no_truncate;
 
 truncate table
+  public.pagos, public.ordenes_compra,
   public.minuta_firmas, public.minutas,
   public.encuestas_cliente, public.eval_proveedor, public.eval_periodos,
   public.venta_lineas, public.ventas,

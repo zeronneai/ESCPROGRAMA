@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
 import { SUPPLIER_COLS, supplierSchema, type SupplierInput, type SupplierRow } from "@/lib/evaluaciones";
+import { CAMPOS_IMPORT, filaAProveedor, normTxt, parseCsv, type ProveedorImport } from "@/lib/proveedores-import";
 import { friendlyError } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Result } from "./requests";
@@ -112,4 +113,71 @@ export async function responderEncuestaAction(token: string, resp: Record<string
   });
   if (error) return { ok: false, error: error.message || "No se pudo guardar" };
   return { ok: true };
+}
+
+/** Lee un Excel (.xlsx) o CSV de proveedores y regresa encabezados y filas (sin guardar nada). */
+export async function leerArchivoProveedoresAction(fd: FormData): Promise<Result<{ headers: string[]; rows: string[][]; existentes: string[] }>> {
+  const u = await requireUser();
+  if (u.rol !== "comprador") return { ok: false, error: "Solo el comprador importa proveedores." };
+  const file = fd.get("file");
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Elige el archivo" };
+  if (file.size > 5 * 1024 * 1024) return { ok: false, error: "El archivo pesa más de 5 MB" };
+  const name = file.name.toLowerCase();
+  let table: string[][] = [];
+  try {
+    if (name.endsWith(".csv") || name.endsWith(".txt")) {
+      table = parseCsv(await file.text());
+    } else if (name.endsWith(".xlsx")) {
+      const ExcelJS = (await import("exceljs")).default;
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(Buffer.from(await file.arrayBuffer()) as never);
+      const ws = wb.worksheets.find((w) => w.rowCount > 0);
+      ws?.eachRow({ includeEmpty: false }, (r) => {
+        const vals: string[] = [];
+        r.eachCell({ includeEmpty: true }, (c, col) => {
+          vals[col - 1] = (c.text ?? "").toString().trim();
+        });
+        table.push(Array.from(vals, (v) => v ?? ""));
+      });
+      table = table.filter((r) => r.some(Boolean));
+    } else {
+      return { ok: false, error: "Sube un Excel (.xlsx) o un CSV. Si es .xls viejo, guárdalo como .xlsx." };
+    }
+  } catch {
+    return { ok: false, error: "No se pudo leer el archivo. Revisa que no esté protegido o dañado." };
+  }
+  if (table.length < 2) return { ok: false, error: "El archivo no tiene filas (la primera fila deben ser los encabezados)." };
+  const width = Math.max(...table.map((r) => r.length));
+  const pad = (r: string[]) => Array.from({ length: width }, (_, i) => r[i] ?? "");
+  const supabase = await createClient();
+  const { data } = await supabase.from("suppliers").select("nombre").limit(10000);
+  return { ok: true, headers: pad(table[0]).map((h, i) => h || `Columna ${i + 1}`), rows: table.slice(1, 2001).map(pad), existentes: (data ?? []).map((s) => s.nombre) };
+}
+
+/** Da de alta los proveedores del archivo. Los que ya existen (mismo nombre) se omiten. */
+export async function importarProveedoresAction(items: ProveedorImport[], evaluar: boolean): Promise<Result<{ creados: number; omitidos: number }>> {
+  const u = await requireUser();
+  if (u.rol !== "comprador") return { ok: false, error: "Solo el comprador importa proveedores." };
+  if (!Array.isArray(items) || items.length === 0) return { ok: false, error: "No hay proveedores para importar" };
+  if (items.length > 2000) return { ok: false, error: "Máximo 2000 proveedores por archivo" };
+  const supabase = await createClient();
+  const { data } = await supabase.from("suppliers").select("nombre").limit(10000);
+  const ya = new Set((data ?? []).map((s) => normTxt(s.nombre)));
+  const nuevos: Record<string, unknown>[] = [];
+  for (const raw of items) {
+    const row = filaAProveedor(
+      CAMPOS_IMPORT.map((c) => String((raw as unknown as Record<string, unknown>)[c.k] ?? "")),
+      Object.fromEntries(CAMPOS_IMPORT.map((c, i) => [c.k, i])),
+    );
+    if (!row || ya.has(normTxt(row.nombre))) continue;
+    ya.add(normTxt(row.nombre));
+    nuevos.push({ ...row, evaluar });
+  }
+  for (let i = 0; i < nuevos.length; i += 200) {
+    const { error } = await supabase.from("suppliers").insert(nuevos.slice(i, i + 200));
+    if (error) return { ok: false, error: friendlyError(error.message) };
+  }
+  revalidatePath("/comprador/proveedores");
+  revalidatePath("/evaluaciones/proveedores");
+  return { ok: true, creados: nuevos.length, omitidos: items.length - nuevos.length };
 }

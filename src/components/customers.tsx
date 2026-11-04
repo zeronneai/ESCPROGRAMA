@@ -355,7 +355,7 @@ export function AddCustomerButton() {
         className="inline-flex h-9 items-center gap-1.5 rounded-full border border-brand-600 px-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50 sm:px-3"
       >
         <Icon name="plus" className="h-4 w-4" />
-        <span className="hidden sm:inline">Cliente</span>
+        <span className="hidden xl:inline">Cliente</span>
       </button>
       {open && <CustomerModal onClose={close} />}
     </>

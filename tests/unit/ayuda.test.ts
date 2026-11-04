@@ -49,3 +49,11 @@ describe("documentos y control de cambios", () => {
     expect(searchFaq("control de cambios", "gerente").best?.id).toBe("control-cambios");
   });
 });
+
+describe("pagos y proveedores", () => {
+  it("responde a comprador y CEO", () => {
+    expect(searchFaq("registrar oc y facturas", "comprador").best?.id).toBe("pagos-comprador");
+    expect(searchFaq("marcar pagado", "ceo").best?.id).toBe("pagos-ceo");
+    expect(searchFaq("importar proveedores de excel", "comprador").best?.id).toBe("proveedores-importar");
+  });
+});

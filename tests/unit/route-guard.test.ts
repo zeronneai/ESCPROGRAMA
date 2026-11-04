@@ -112,3 +112,13 @@ describe("supervisores", () => {
     expect(decideRoute({ pathname: "/minutas/nueva", hasUser: true, profile: p("supervisor_finanzas") })).toEqual({ type: "next" });
   });
 });
+
+describe("ceo y pagos", () => {
+  const p = (rol: GuardProfile["rol"]): GuardProfile => ({ activo: true, must_change_password: false, rol });
+  it("el CEO entra a pagos; un vendedor no", () => {
+    expect(decideRoute({ pathname: "/", hasUser: true, profile: p("ceo") })).toEqual({ type: "redirect", to: "/pagos" });
+    expect(decideRoute({ pathname: "/pagos/oc/x", hasUser: true, profile: p("ceo") })).toEqual({ type: "next" });
+    expect(decideRoute({ pathname: "/pagos", hasUser: true, profile: p("comprador") })).toEqual({ type: "next" });
+    expect(decideRoute({ pathname: "/pagos", hasUser: true, profile: p("vendedor") })).toEqual({ type: "redirect", to: "/vendedor" });
+  });
+});

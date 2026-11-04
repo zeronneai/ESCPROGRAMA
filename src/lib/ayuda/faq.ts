@@ -307,6 +307,24 @@ export const FAQ: Faq[] = [
     links: [{ label: "Control de cambios", href: "/calidad/cambios" }],
   },
   {
+    id: "pagos-comprador", q: "¿Cómo registro una OC y sus facturas para pago?", roles: C, paths: ["/pagos"],
+    keys: ["pago", "pagos", "oc", "orden de compra", "factura", "facturas", "anticipo", "extranjero", "liberar", "ceo", "comprobante"],
+    a: ["En Pagos, primero agrega el proveedor con \"Agregar o quitar\" (sale de tu lista de Proveedores).", "Toca \"Nueva OC\": proveedor, número, moneda y, si ya las tienes, facturas o anticipos. Lo que falte (número de factura o monto) lo completas después.", "Cuando esté listo para pagar toca \"Liberar para pago\": al CEO le llega aviso. Si falta algo usa \"Poner en espera\" con el motivo.", "Cuando el CEO pague, descarga el comprobante y mándalo al proveedor: al descargarlo pasa al historial."],
+    links: [{ label: "Pagos", href: "/pagos" }],
+  },
+  {
+    id: "pagos-ceo", q: "¿Cómo marco un pago como hecho?", roles: ["ceo"], paths: ["/pagos"],
+    keys: ["pago", "pagos", "pagar", "pagado", "comprobante", "transferencia", "swift", "pendiente"],
+    a: ["En Pagos > Por pagar están los que compras liberó, por proveedor.", "Abre la OC y toca \"Marcar como pagado\": fecha, monto, referencia y sube el comprobante (PDF o imagen).", "A compras le llega aviso para descargarlo y mandarlo al proveedor. Si te equivocaste, \"Deshacer pago\" mientras compras no lo descargue."],
+    links: [{ label: "Pagos", href: "/pagos" }],
+  },
+  {
+    id: "proveedores-importar", q: "¿Puedo subir mis proveedores desde Excel?", roles: C, paths: ["/comprador/proveedores"],
+    keys: ["importar", "excel", "csv", "subir", "proveedores", "lista", "archivo", "masivo"],
+    a: ["Sí. En Proveedores toca \"Importar Excel o CSV\" y elige el archivo (la primera fila con encabezados).", "Revisa qué columna es cada dato (nombre, contacto, teléfono, correo, país...) y toca \"Dar de alta\".", "Los que ya existen con el mismo nombre se omiten. Después completas cada proveedor con \"Completar\"."],
+    links: [{ label: "Proveedores", href: "/comprador/proveedores" }],
+  },
+  {
     id: "indicadores", q: "¿Qué son los indicadores?",
     keys: ["indicadores", "kpi", "metas", "desempeño", "medicion", "resultados"],
     a: ["En Más > Indicadores ves los números de tu puesto que salen solos del portal (ventas, tiempos, satisfacción, evaluaciones).", "Verde va bien, ámbar a vigilar y rojo hay que atender. Cuando se definan las metas oficiales se ajustan."],

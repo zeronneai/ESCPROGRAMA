@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { saveSupplierAction, setSupplierFlagsAction } from "@/actions/evaluaciones";
+import { SupplierImport } from "@/components/eval/supplier-tools";
 import { Icon } from "@/components/icons";
 import { Chip, useRun } from "@/components/ops-ui";
 import { Alert, Button, Card, EmptyState, Field, Input, Select } from "@/components/ui";
@@ -14,7 +15,7 @@ const toF = (s: SupplierRow | null): F => ({
   direccion: s?.direccion ?? "", sitio_web: s?.sitio_web ?? "", condiciones_pago: s?.condiciones_pago ?? "", notas: s?.notas ?? "", evaluar: s?.evaluar ?? true,
 });
 
-function SupplierForm({ s, onSaved, onCancel }: { s: SupplierRow | null; onSaved: (x: SupplierRow) => void; onCancel: () => void }) {
+export function SupplierForm({ s, onSaved, onCancel }: { s: SupplierRow | null; onSaved: (x: SupplierRow) => void; onCancel: () => void }) {
   const [v, setV] = useState<F>(toF(s));
   const { run, busy, notice } = useRun();
   const set = (k: keyof F) => (e: { target: { value: string } }) => setV((x) => ({ ...x, [k]: e.target.value }));
@@ -82,7 +83,10 @@ export function SuppliersPanel({ suppliers: initial, scores, cotizaciones }: { s
           <h1 className="text-xl font-semibold tracking-tight">Proveedores</h1>
           <p className="text-sm text-slate-500">Alta y datos de proveedores. Los que tienen "Evaluar" entran a la evaluación semestral.</p>
         </div>
-        <Button onClick={() => setEditing("new")}><Icon name="plus" className="h-4 w-4" /> Nuevo proveedor</Button>
+        <div className="flex flex-wrap gap-2">
+          <SupplierImport onDone={() => window.location.reload()} />
+          <Button onClick={() => setEditing("new")}><Icon name="plus" className="h-4 w-4" /> Nuevo proveedor</Button>
+        </div>
       </div>
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
       {editing === "new" && <Card className="p-4 sm:p-5"><SupplierForm s={null} onSaved={upsert} onCancel={() => setEditing(null)} /></Card>}

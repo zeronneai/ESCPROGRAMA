@@ -1,7 +1,7 @@
 /**
  * Decision pura de acceso por ruta (se usa en el middleware y se prueba aparte).
  */
-export type Rol = "vendedor" | "comprador" | "jefe_ventas" | "gerente" | "coordinador_iso" | "marketplaces" | "almacen" | "supervisor_almacen" | "supervisor_finanzas";
+export type Rol = "vendedor" | "comprador" | "jefe_ventas" | "gerente" | "coordinador_iso" | "marketplaces" | "almacen" | "supervisor_almacen" | "supervisor_finanzas" | "ceo";
 
 export interface GuardProfile {
   activo: boolean;
@@ -33,6 +33,8 @@ export function homeFor(rol: Rol): string {
       return "/evaluaciones/proveedores";
     case "supervisor_finanzas":
       return "/minutas";
+    case "ceo":
+      return "/pagos";
     default:
       return "/vendedor";
   }
@@ -92,7 +94,11 @@ export function decideRoute(input: {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   // Quejas y acciones correctivas: todos menos Marketplaces.
-  if (under("/calidad") && ["marketplaces", "almacen", "supervisor_almacen", "supervisor_finanzas"].includes(profile.rol)) {
+  if (under("/calidad") && ["marketplaces", "almacen", "supervisor_almacen", "supervisor_finanzas", "ceo"].includes(profile.rol)) {
+    return { type: "redirect", to: homeFor(profile.rol) };
+  }
+  // Pagos a proveedores extranjeros: comprador y CEO.
+  if (under("/pagos") && profile.rol !== "comprador" && profile.rol !== "ceo") {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   if (pathname.startsWith("/api/admin") && profile.rol !== "comprador") {

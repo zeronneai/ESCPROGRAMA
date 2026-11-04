@@ -125,6 +125,7 @@ export function UsersPanel({ users, meId }: { users: UserRow[]; meId: string }) 
               <option value="almacen">Almacén (evalúa lo que recibe de los proveedores)</option>
               <option value="supervisor_almacen">Supervisor de almacén (evalúa proveedores y hace minutas)</option>
               <option value="supervisor_finanzas">Supervisor de finanzas (hace minutas)</option>
+              <option value="ceo">CEO (paga a proveedores extranjeros)</option>
               <option value="comprador">Comprador (administrador del sistema)</option>
             </Select>
           </Field>

@@ -16,7 +16,7 @@ const createSchema = z.object({
   nombre: z.string().trim().min(2, "Escribe el nombre"),
   correo: z.string().trim().toLowerCase().email("Correo invalido"),
   password: passwordSchema,
-  rol: z.enum(["vendedor", "comprador", "jefe_ventas", "gerente", "coordinador_iso", "marketplaces", "almacen", "supervisor_almacen", "supervisor_finanzas"]).default("vendedor"),
+  rol: z.enum(["vendedor", "comprador", "jefe_ventas", "gerente", "coordinador_iso", "marketplaces", "almacen", "supervisor_almacen", "supervisor_finanzas", "ceo"]).default("vendedor"),
 });
 
 const BAN_FOREVER = "876000h";

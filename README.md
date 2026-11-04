@@ -114,6 +114,14 @@ curl -X POST https://<portal>/api/leads/entrada \
 - Listas como tarjetas en celular y tablas en escritorio.
 - **Historial del comprador**: ahora muestra por defecto todas las partidas que ya respondió (antes salía vacío hasta buscar), con contadores de hoy, semana, mes y total, filtros por estado y paginación. La búsqueda por producto o proveedor sigue igual.
 
+## Pagos a proveedores extranjeros y puesto CEO (migraciones 0030 y 0031)
+
+- El comprador elige en **Pagos** qué proveedores entran a la sección (de su lista de Proveedores) y registra cada **OC** con su moneda (USD, MXN, CNY o EUR). A cada OC le agrega sus **facturas o anticipos**; el número de factura, el monto, la fecha límite y el PDF se pueden completar después.
+- Estatus que pone el comprador: Por liberar, En espera (con nota) o **Liberado**. Al liberar, el CEO recibe aviso.
+- El **CEO** ve lo liberado por proveedor, marca **Pagado** (fecha, monto, referencia) y sube el comprobante (PDF o imagen). Al entrar al portal le sale una ventana con los pagos pendientes; la tarea diaria le recuerda los que vencen en 2 días o menos.
+- El comprador recibe aviso, **descarga el comprobante** y el pago pasa al **Historial** (deja de verse como pendiente; nada se borra).
+- Proveedores: botón "Proveedor" en la barra del comprador e **Importar Excel o CSV** en Proveedores (se eligen las columnas; los que ya existen se omiten).
+
 ## Documentos y control de cambios (migración 0029)
 
 - **Documentos** (`/documentos`): el Coordinador ISO sube cada PDF con código, título, categoría (política, valores, manual, procedimiento, instructivo, formato, organigrama, registro u otro), versión y fecha. Todos los usuarios los consultan y descargan. "Nueva versión" deja la anterior en el historial; "Dar de baja" la quita de los vigentes sin borrarla.
