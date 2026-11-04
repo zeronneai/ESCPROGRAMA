@@ -8,7 +8,7 @@ import { clasificacionProveedor, type Pregunta } from "@/lib/evaluaciones";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function EvalProveedor({ params }: { params: Promise<{ id: string }> }) {
-  const u = await requireRoles(["comprador", "almacen", "supervisor_almacen", "gerente", "coordinador_iso"]);
+  const u = await requireRoles(["comprador", "almacen", "supervisor_almacen", "gerente", "ceo", "coordinador_iso"]);
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const supabase = await createClient();

@@ -1,5 +1,6 @@
 /** Iconos lineales (24x24, trazo). Se colorean con currentColor. */
 const PATHS = {
+  home: "M3 11l9-7 9 7M5 9.5V20h5v-6h4v6h5V9.5",
   inbox: "M4 13h4l1.5 3h5L16 13h4M5 5h14l1 8v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-5z",
   history: "M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 7v5l3 2",
   dollar: "M12 2v20M17 6.5C16.2 5 14.4 4 12 4 9 4 7 5.5 7 7.75S9 11 12 11.5s5 1.75 5 4-2 3.75-5 3.75c-2.4 0-4.2-1-5-2.5",

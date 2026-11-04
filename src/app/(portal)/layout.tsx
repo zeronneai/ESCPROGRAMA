@@ -13,7 +13,7 @@ import type { Rol } from "@/lib/auth/route-guard";
 const NAV: Record<Rol, NavItem[]> = {
   comprador: [
     { href: "/comprador", label: "Pendientes", icon: "inbox", match: ["/comprador/solicitudes"] },
-    { href: "/comprador/historial", label: "Historial", icon: "history" },
+    { href: "/comprador/historial", label: "Historial", icon: "history", secondary: true },
     { href: "/comprador/por-comprar", label: "Por comprar", short: "Comprar", icon: "cart" },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/pagos", label: "Pagos", icon: "dollar" },
@@ -78,8 +78,8 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/documentos", label: "Documentos", short: "Docs", icon: "list" },
     { href: "/calidad/cambios", label: "Control de cambios", short: "Cambios", icon: "history", secondary: true },
     { href: "/ventas", label: "Ventas", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
-    { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
-    { href: "/guias", label: "Guías", icon: "package" },
+    { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard", secondary: true },
+    { href: "/guias", label: "Guías", icon: "package", secondary: true },
     { href: "/ventas/clientes", label: "Clientes", icon: "building", secondary: true },
     { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
     { href: "/evaluaciones/proveedores", label: "Evaluación de proveedores", icon: "truck", secondary: true },
@@ -110,8 +110,18 @@ const NAV: Record<Rol, NavItem[]> = {
   ],
   ceo: [
     { href: "/pagos", label: "Pagos a proveedores", short: "Pagos", icon: "dollar" },
-    { href: "/minutas", label: "Minutas", icon: "list" },
+    { href: "/ventas", label: "Ventas", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
+    { href: "/calidad", label: "Calidad", icon: "alert" },
+    { href: "/minutas", label: "Minutas", icon: "list", secondary: true },
+    { href: "/consumo", label: "Consumo interno", icon: "clipboard", secondary: true },
+    { href: "/guias", label: "Guías", icon: "package", secondary: true },
+    { href: "/ventas/clientes", label: "Clientes", icon: "building", secondary: true },
+    { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
+    { href: "/evaluaciones/proveedores", label: "Evaluación de proveedores", icon: "truck", secondary: true },
+    { href: "/evaluaciones/clientes", label: "Evaluación de clientes", icon: "users", secondary: true },
+    { href: "/indicadores", label: "Indicadores", icon: "chart", secondary: true },
     { href: "/documentos", label: "Documentos", icon: "list", secondary: true },
+    { href: "/calidad/cambios", label: "Control de cambios", icon: "history", secondary: true },
   ],
   supervisor_finanzas: [
     { href: "/minutas", label: "Minutas", icon: "list" },
@@ -127,7 +137,7 @@ export default async function PortalLayout({ children }: { children: React.React
       <Suspense fallback={null}>
         <NavigationProgress />
       </Suspense>
-      <PortalNav items={NAV[user.rol]} user={{ nombre: user.nombre, rol: user.rol }} bell={
+      <PortalNav items={[{ href: "/inicio", label: "Inicio", icon: "home" }, ...NAV[user.rol]]} user={{ nombre: user.nombre, rol: user.rol }} bell={
           <>
             {user.rol === "comprador" && <AddSupplierButton />}
             {(user.rol === "vendedor" || user.rol === "jefe_ventas" || user.rol === "comprador") && <AddCustomerButton />}

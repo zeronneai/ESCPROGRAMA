@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 type Enc = { id: string; customer_id: string; vendedor_id: string; token: string; enviada_at: string | null; medio: string | null; respondida_at: string | null; puntaje: number | null; respuestas: Record<string, number>; escala: number; comentario: string | null; contesto_nombre: string | null; contesto_puesto: string | null; customers: { nombre: string } | null };
 
 export default async function EvalClientes({ searchParams }: { searchParams: Promise<{ periodo?: string; vista?: string }> }) {
-  const u = await requireRoles(["vendedor", "comprador", "jefe_ventas", "gerente", "coordinador_iso"]);
+  const u = await requireRoles(["vendedor", "comprador", "jefe_ventas", "gerente", "ceo", "coordinador_iso"]);
   const sp = await searchParams;
   const supabase = await createClient();
   const h = await headers();

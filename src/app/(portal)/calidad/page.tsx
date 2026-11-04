@@ -34,7 +34,7 @@ export default async function Calidad({ searchParams }: { searchParams: Promise<
         subtitle="Formatos ESC-SGC-FR-002 (queja de cliente) y ESC-SGC-FR-001 (solicitud de acción correctiva)."
         actions={
           <div className="flex flex-wrap gap-2">
-            {(iso || u.rol === "gerente" || u.rol === "comprador") && (
+            {(iso || u.rol === "gerente" || u.rol === "ceo" || u.rol === "comprador") && (
               <Link href="/calidad/cambios" className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
                 Control de cambios
               </Link>

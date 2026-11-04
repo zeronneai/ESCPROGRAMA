@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 type Row = { id: string; puntaje: number | null; comprador_at: string | null; almacen_at: string | null; suppliers: { nombre: string; giro: string | null } | null };
 
 export default async function EvalProveedores({ searchParams }: { searchParams: Promise<{ periodo?: string; ver?: string }> }) {
-  const u = await requireRoles(["comprador", "almacen", "supervisor_almacen", "gerente", "coordinador_iso"]);
+  const u = await requireRoles(["comprador", "almacen", "supervisor_almacen", "gerente", "ceo", "coordinador_iso"]);
   const sp = await searchParams;
   const supabase = await createClient();
   const { activo, programado, historial, actual } = await loadPeriodos(supabase, "proveedores", sp.periodo);

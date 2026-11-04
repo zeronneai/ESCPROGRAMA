@@ -20,4 +20,4 @@ export const ALMACEN_ROLES: Rol[] = ["almacen", "supervisor_almacen"];
 export const MINUTA_CREATORS: Rol[] = ["jefe_ventas", "gerente", "comprador", "supervisor_almacen", "supervisor_finanzas", "ceo"];
 
 /** Puestos que leen ventas, clientes y bitacora de todos (sin editar). */
-export const SALES_READERS: Rol[] = ["jefe_ventas", "gerente", "coordinador_iso", "comprador"];
+export const SALES_READERS: Rol[] = ["jefe_ventas", "gerente", "coordinador_iso", "comprador", "ceo"];

@@ -38,11 +38,11 @@ export default async function Indicadores() {
   const rol = u.rol as Rol;
 
   if (rol === "vendedor") grupos.push(...(await ventasGrupos(ctx, u.id)));
-  if (rol === "jefe_ventas" || rol === "gerente") grupos.push(...(await ventasGrupos(ctx, null)));
-  if (rol === "comprador" || rol === "gerente") grupos.push(await comprasGrupo(ctx));
-  if (rol === "comprador" || rol === "almacen" || rol === "supervisor_almacen" || rol === "gerente" || rol === "coordinador_iso") grupos.push(await proveedoresGrupo(ctx, rol));
-  if (rol === "coordinador_iso" || rol === "gerente") grupos.push(await calidadGrupo(ctx));
-  if (rol === "marketplaces" || rol === "gerente" || rol === "jefe_ventas") grupos.push(await guiasGrupo(ctx));
+  if (rol === "jefe_ventas" || (rol === "gerente" || rol === "ceo")) grupos.push(...(await ventasGrupos(ctx, null)));
+  if (rol === "comprador" || (rol === "gerente" || rol === "ceo")) grupos.push(await comprasGrupo(ctx));
+  if (rol === "comprador" || rol === "almacen" || rol === "supervisor_almacen" || (rol === "gerente" || rol === "ceo") || rol === "coordinador_iso") grupos.push(await proveedoresGrupo(ctx, rol));
+  if (rol === "coordinador_iso" || (rol === "gerente" || rol === "ceo")) grupos.push(await calidadGrupo(ctx));
+  if (rol === "marketplaces" || (rol === "gerente" || rol === "ceo") || rol === "jefe_ventas") grupos.push(await guiasGrupo(ctx));
   if (rol === "coordinador_iso" || rol === "comprador") grupos.push(await clientesGrupo(ctx));
 
   return (

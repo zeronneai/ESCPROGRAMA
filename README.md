@@ -114,6 +114,11 @@ curl -X POST https://<portal>/api/leads/entrada \
 - Listas como tarjetas en celular y tablas en escritorio.
 - **Historial del comprador**: ahora muestra por defecto todas las partidas que ya respondió (antes salía vacío hasta buscar), con contadores de hoy, semana, mes y total, filtros por estado y paginación. La búsqueda por producto o proveedor sigue igual.
 
+## Inicio (tablero por puesto) y CEO con lectura de todo (migración 0033)
+
+- Todos entran a **Inicio** (`/inicio`): arriba "Requiere tu atención" (rojo urgente, amarillo pendiente) y abajo tarjetas por sección según el puesto, con liga al detalle. Las reglas están en `src/lib/inicio.ts`.
+- El **CEO** ve todo lo que ve la gerente (sin editar) además de Pagos: ventas, clientes, cotizaciones, calidad, consumo, guías, evaluaciones, minutas y control de cambios.
+
 ## Pagos a proveedores extranjeros y puesto CEO (migraciones 0030 y 0031)
 
 - El comprador elige en **Pagos** qué proveedores entran a la sección (de su lista de Proveedores) y registra cada **OC** con su moneda (USD, MXN, CNY o EUR). A cada OC le agrega sus **facturas o anticipos**; el número de factura, el monto, la fecha límite y el PDF se pueden completar después.

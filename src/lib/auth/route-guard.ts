@@ -17,27 +17,10 @@ export type GuardDecision =
 export const CHANGE_PASSWORD_PATH = "/cambiar-password";
 export const LOGIN_PATH = "/login";
 
-export function homeFor(rol: Rol): string {
-  switch (rol) {
-    case "comprador":
-      return "/comprador";
-    case "jefe_ventas":
-    case "gerente":
-      return "/ventas";
-    case "coordinador_iso":
-      return "/calidad";
-    case "marketplaces":
-      return "/guias";
-    case "almacen":
-    case "supervisor_almacen":
-      return "/evaluaciones/proveedores";
-    case "supervisor_finanzas":
-      return "/minutas";
-    case "ceo":
-      return "/pagos";
-    default:
-      return "/vendedor";
-  }
+export function homeFor(_rol: Rol): string {
+  // Todos los puestos entran a su tablero de inicio.
+  void _rol;
+  return "/inicio";
 }
 
 const isApi = (p: string) => p === "/api" || p.startsWith("/api/");
@@ -90,11 +73,11 @@ export function decideRoute(input: {
   }
   const under = (p: string) => pathname === p || pathname.startsWith(`${p}/`);
   // Resumen de ventas: jefa de ventas, gerente, coordinador ISO y comprador (solo lectura salvo la jefa).
-  if (under("/ventas") && !["jefe_ventas", "gerente", "coordinador_iso", "comprador"].includes(profile.rol)) {
+  if (under("/ventas") && !["jefe_ventas", "gerente", "coordinador_iso", "comprador", "ceo"].includes(profile.rol)) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   // Quejas y acciones correctivas: todos menos Marketplaces.
-  if (under("/calidad") && ["marketplaces", "almacen", "supervisor_almacen", "supervisor_finanzas", "ceo"].includes(profile.rol)) {
+  if (under("/calidad") && ["marketplaces", "almacen", "supervisor_almacen", "supervisor_finanzas"].includes(profile.rol)) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   // Pagos a proveedores extranjeros: comprador y CEO.

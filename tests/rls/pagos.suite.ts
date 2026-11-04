@@ -18,8 +18,9 @@ export function pagosSuite() {
       const w = await createWorld();
       const ceo = await user("ceo");
       const sid = (await q(w.buyer1, "insert into public.suppliers (nombre, tipo, pais) values ($1,'extranjero','China') returning id", [`Shenzhen ${randomUUID().slice(0, 6)}`])).rows[0].id;
-      // El CEO no ve proveedores que no estan en pagos
-      expect((await q(ceo.a, "select id from public.suppliers where id=$1", [sid])).rowCount).toBe(0);
+      // El CEO ve todos los proveedores (lectura, como la gerente) pero no los edita
+      expect((await q(ceo.a, "select id from public.suppliers where id=$1", [sid])).rowCount).toBe(1);
+      expect((await q(ceo.a, "update public.suppliers set nombre='x' where id=$1", [sid])).rowCount).toBe(0);
       expect(await failure(q(w.buyer1, "insert into public.ordenes_compra (supplier_id, numero) values ($1,'OC-1')", [sid]))).toMatch(/row-level security/);
       await q(w.buyer1, "update public.suppliers set en_pagos=true where id=$1", [sid]);
       expect((await q(ceo.a, "select id from public.suppliers where id=$1", [sid])).rowCount).toBe(1);

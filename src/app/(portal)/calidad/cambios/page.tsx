@@ -8,7 +8,7 @@ import { fmtDay } from "@/lib/ops/server";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function ControlCambios({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
-  const u = await requireRoles(["coordinador_iso", "gerente", "comprador"]);
+  const u = await requireRoles(["coordinador_iso", "gerente", "ceo", "comprador"]);
   const sp = await searchParams;
   const supabase = await createClient();
   const { data, error } = await supabase.from("control_cambios").select(CAMBIO_COLS).order("fecha", { ascending: false }).order("created_at", { ascending: false }).limit(1000);

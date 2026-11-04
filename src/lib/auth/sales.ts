@@ -12,5 +12,5 @@ export async function requireRoles(roles: Rol[]): Promise<SessionUser> {
 
 /** Jefa de ventas, gerente, coordinador ISO o comprador para las paginas de /ventas. */
 export async function requireSalesViewer(): Promise<SessionUser> {
-  return requireRoles(["jefe_ventas", "gerente", "coordinador_iso", "comprador"]);
+  return requireRoles(["jefe_ventas", "gerente", "coordinador_iso", "comprador", "ceo"]);
 }

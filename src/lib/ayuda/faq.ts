@@ -23,6 +23,12 @@ const MKT: Rol[] = ["marketplaces"];
 export const FAQ: Faq[] = [
   // ----- General
   {
+    id: "inicio", q: "¿Qué es la página de Inicio?",
+    keys: ["inicio", "tablero", "dashboard", "pendientes", "urgente", "resumen", "atencion"],
+    a: ["Es tu tablero: arriba, en \"Requiere tu atención\", lo urgente (en rojo) y lo pendiente (en amarillo).", "Abajo, un resumen de cada sección que te toca. Toca cualquier dato o \"Ver detalle\" para entrar."],
+    links: [{ label: "Inicio", href: "/inicio" }],
+  },
+  {
     id: "password", q: "Olvidé mi contraseña o quiero cambiarla",
     keys: ["contraseña", "password", "clave", "olvide", "entrar", "acceso", "login", "sesion"],
     a: ["El comprador (administrador) te genera una contraseña temporal desde Usuarios > Restablecer.", "Al entrar con ella el sistema te pide crear una nueva.", "Si no puedes entrar, pídeselo al comprador."],

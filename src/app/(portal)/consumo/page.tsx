@@ -36,7 +36,7 @@ export default async function Consumo({ searchParams }: { searchParams: Promise<
             { id: "en_proceso", label: "Pedidas / agendadas", rows: all.filter((r) => r.estado === "en_proceso") },
             { id: "todas", label: "Todas", rows: all },
           ]
-        : u.rol === "gerente" || u.rol === "coordinador_iso"
+        : u.rol === "gerente" || u.rol === "ceo" || u.rol === "coordinador_iso"
           ? [
               { id: "abiertas", label: "En curso", rows: all.filter((r) => ["por_aprobar", "aprobada", "en_proceso"].includes(r.estado)) },
               { id: "mias", label: "Mías", rows: mine },
