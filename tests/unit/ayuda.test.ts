@@ -41,3 +41,11 @@ describe("ayuda de lo nuevo", () => {
     expect(searchFaq("guia para tarima", "vendedor").best?.id).toBe("tarima");
   });
 });
+
+describe("documentos y control de cambios", () => {
+  it("responde segun el puesto", () => {
+    expect(searchFaq("subir documento pdf", "coordinador_iso").best?.id).toBe("documentos-subir");
+    expect(searchFaq("donde veo la politica de calidad", "vendedor").best?.id).toBe("documentos-ver");
+    expect(searchFaq("control de cambios", "gerente").best?.id).toBe("control-cambios");
+  });
+});

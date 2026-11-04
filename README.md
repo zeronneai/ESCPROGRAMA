@@ -114,6 +114,11 @@ curl -X POST https://<portal>/api/leads/entrada \
 - Listas como tarjetas en celular y tablas en escritorio.
 - **Historial del comprador**: ahora muestra por defecto todas las partidas que ya respondió (antes salía vacío hasta buscar), con contadores de hoy, semana, mes y total, filtros por estado y paginación. La búsqueda por producto o proveedor sigue igual.
 
+## Documentos y control de cambios (migración 0029)
+
+- **Documentos** (`/documentos`): el Coordinador ISO sube cada PDF con código, título, categoría (política, valores, manual, procedimiento, instructivo, formato, organigrama, registro u otro), versión y fecha. Todos los usuarios los consultan y descargan. "Nueva versión" deja la anterior en el historial; "Dar de baja" la quita de los vigentes sin borrarla.
+- **Control de cambios** (`/calidad/cambios`): solo el Coordinador ISO lo llena (folio CC-AAAA-NNN, documento, tipo de cambio, descripción, motivo, versiones, quién solicita y aprueba, implementación). La gerente y el comprador lo consultan y reciben aviso de cada cambio. Es una versión base: se ajusta cuando esté el formato oficial.
+
 ## Sucursales, visitas, encuesta y minutas (migraciones 0027 y 0028)
 
 - **Agregar cliente desde cualquier pantalla**: botón "+ Cliente" en la barra (vendedor, jefa de ventas, comprador) y "Nuevo cliente" al elegir cliente en ventas, guías y quejas.

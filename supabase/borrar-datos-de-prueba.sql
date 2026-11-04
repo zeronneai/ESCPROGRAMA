@@ -7,7 +7,7 @@
 --        correctivas, consumo interno, guias, ventas diarias, evaluaciones, minutas, avisos de la campanita y la bitacora de auditoria.
 --        Los folios vuelven a empezar en 1 (COT, QC, SAC, CI y G).
 -- CONSERVA: usuarios (todos), configuracion, dias festivos, datos de la empresa, tabulador de
---        precios, proveedores y el catalogo de articulos.
+--        precios, proveedores, el catalogo de articulos, los documentos y el control de cambios.
 -- Los archivos ya subidos (imagenes, guias, evidencias) quedan en Storage sin uso; si quieres
 -- borrarlos, vacia los buckets desde Supabase > Storage.
 -- Como aplicarlo: pega este archivo COMPLETO en SQL Editor y presiona Run.

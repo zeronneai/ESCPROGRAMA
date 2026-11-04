@@ -289,6 +289,24 @@ export const FAQ: Faq[] = [
     links: [{ label: "Minutas", href: "/minutas" }],
   },
   {
+    id: "documentos-subir", q: "¿Cómo subo un documento (política, valores, procedimiento)?", roles: ISO, paths: ["/documentos"],
+    keys: ["documento", "documentos", "subir", "politica", "valores", "manual", "procedimiento", "pdf", "version"],
+    a: ["Ve a Documentos > \"Subir documento\".", "Pon el código, título, categoría, versión y fecha, y elige el PDF.", "Para actualizarlo usa \"Nueva versión\": la anterior queda en el historial. Todos los usuarios lo pueden consultar."],
+    links: [{ label: "Documentos", href: "/documentos" }],
+  },
+  {
+    id: "documentos-ver", q: "¿Dónde veo la política de calidad y los documentos?",
+    keys: ["documento", "documentos", "politica", "calidad", "valores", "manual", "procedimiento", "formato"],
+    a: ["En el menú Más > Documentos.", "Busca por título o código y toca \"Ver PDF\" o \"Descargar\"."],
+    links: [{ label: "Documentos", href: "/documentos" }],
+  },
+  {
+    id: "control-cambios", q: "¿Qué es el control de cambios?", roles: [...ISO, "gerente", ...C], paths: ["/calidad/cambios"],
+    keys: ["control", "cambios", "cambio", "modificacion", "version", "documento"],
+    a: ["Es el registro de cada cambio a un documento o proceso: qué cambió, por qué, versión anterior y nueva, y quién lo aprobó.", "Solo lo llena el Coordinador ISO; la gerente y el comprador lo consultan y reciben aviso de cada cambio."],
+    links: [{ label: "Control de cambios", href: "/calidad/cambios" }],
+  },
+  {
     id: "indicadores", q: "¿Qué son los indicadores?",
     keys: ["indicadores", "kpi", "metas", "desempeño", "medicion", "resultados"],
     a: ["En Más > Indicadores ves los números de tu puesto que salen solos del portal (ventas, tiempos, satisfacción, evaluaciones).", "Verde va bien, ámbar a vigilar y rojo hay que atender. Cuando se definan las metas oficiales se ajustan."],

@@ -27,6 +27,8 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/comprador/configuracion", label: "Configuración", icon: "settings", secondary: true },
     { href: "/comprador/auditoria", label: "Auditoría", icon: "shield", secondary: true },
     { href: "/minutas", label: "Minutas", icon: "clipboard", secondary: true },
+    { href: "/documentos", label: "Documentos", icon: "list", secondary: true },
+    { href: "/calidad/cambios", label: "Control de cambios", icon: "history", secondary: true },
   ],
   vendedor: [
     { href: "/vendedor", label: "Mis solicitudes", short: "Solicitudes", icon: "list", match: ["/vendedor/solicitudes"] },
@@ -40,6 +42,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/evaluaciones/clientes", label: "Evaluación de clientes", icon: "users", secondary: true },
     { href: "/indicadores", label: "Indicadores", icon: "chart", secondary: true },
     { href: "/minutas", label: "Minutas", icon: "clipboard", secondary: true },
+    { href: "/documentos", label: "Documentos", icon: "list", secondary: true },
   ],
   jefe_ventas: [
     { href: "/ventas", label: "Resumen", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
@@ -51,6 +54,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/evaluaciones/clientes", label: "Evaluación de clientes", icon: "users", secondary: true },
     { href: "/indicadores", label: "Indicadores", icon: "chart", secondary: true },
     { href: "/minutas", label: "Minutas", icon: "clipboard", secondary: true },
+    { href: "/documentos", label: "Documentos", icon: "list", secondary: true },
   ],
   gerente: [
     { href: "/ventas", label: "Ventas", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
@@ -63,9 +67,13 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/evaluaciones/clientes", label: "Evaluación de clientes", icon: "users", secondary: true },
     { href: "/indicadores", label: "Indicadores", icon: "chart", secondary: true },
     { href: "/minutas", label: "Minutas", icon: "clipboard", secondary: true },
+    { href: "/documentos", label: "Documentos", icon: "list", secondary: true },
+    { href: "/calidad/cambios", label: "Control de cambios", icon: "history", secondary: true },
   ],
   coordinador_iso: [
     { href: "/calidad", label: "Quejas y acciones correctivas", short: "Calidad", icon: "alert" },
+    { href: "/documentos", label: "Documentos", short: "Docs", icon: "list" },
+    { href: "/calidad/cambios", label: "Control de cambios", short: "Cambios", icon: "history", secondary: true },
     { href: "/ventas", label: "Ventas", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/guias", label: "Guías", icon: "package" },
@@ -81,21 +89,25 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/indicadores", label: "Indicadores", icon: "chart", secondary: true },
     { href: "/minutas", label: "Minutas", icon: "clipboard", secondary: true },
+    { href: "/documentos", label: "Documentos", icon: "list", secondary: true },
   ],
   almacen: [
     { href: "/evaluaciones/proveedores", label: "Evaluación de proveedores", short: "Evaluación", icon: "truck" },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/indicadores", label: "Indicadores", icon: "chart" },
     { href: "/minutas", label: "Minutas", icon: "clipboard", secondary: true },
+    { href: "/documentos", label: "Documentos", icon: "list", secondary: true },
   ],
   supervisor_almacen: [
     { href: "/evaluaciones/proveedores", label: "Evaluación de proveedores", short: "Evaluación", icon: "truck" },
     { href: "/minutas", label: "Minutas", icon: "list" },
+    { href: "/documentos", label: "Documentos", icon: "list", secondary: true },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/indicadores", label: "Indicadores", icon: "chart", secondary: true },
   ],
   supervisor_finanzas: [
     { href: "/minutas", label: "Minutas", icon: "list" },
+    { href: "/documentos", label: "Documentos", icon: "list", secondary: true },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
   ],
 };
