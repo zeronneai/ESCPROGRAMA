@@ -308,14 +308,14 @@ export const FAQ: Faq[] = [
   },
   {
     id: "pagos-comprador", q: "¿Cómo registro una OC y sus facturas para pago?", roles: C, paths: ["/pagos"],
-    keys: ["pago", "pagos", "oc", "orden de compra", "factura", "facturas", "anticipo", "extranjero", "liberar", "ceo", "comprobante"],
-    a: ["En Pagos, primero agrega el proveedor con \"Agregar o quitar\" (sale de tu lista de Proveedores).", "Toca \"Nueva OC\": proveedor, número, moneda y, si ya las tienes, facturas o anticipos. Lo que falte (número de factura o monto) lo completas después.", "Cuando esté listo para pagar toca \"Liberar para pago\": al CEO le llega aviso. Si falta algo usa \"Poner en espera\" con el motivo.", "Cuando el CEO pague, descarga el comprobante y mándalo al proveedor: al descargarlo pasa al historial."],
+    keys: ["pago", "pagos", "oc", "orden de compra", "factura", "facturas", "anticipo", "extranjero", "liberar", "liberada", "urgente", "ceo", "comprobante"],
+    a: ["En Pagos, primero agrega el proveedor con \"Agregar o quitar\" (sale de tu lista de Proveedores).", "Toca \"Nueva OC\": proveedor, número, moneda y, si ya las tienes, facturas o anticipos. Lo que falte (número de factura o monto) lo completas después.", "Al CEO le llega aviso de cada factura con monto. En cada factura marca si la carga ya se liberó, toca \"Marcar urgente\" si urge (por ejemplo, fechas vencidas) y deja un comentario para el CEO como \"Pendiente de pago para liberación\".", "Cuando el CEO pague, descarga el comprobante y mándalo al proveedor: al descargarlo pasa al historial."],
     links: [{ label: "Pagos", href: "/pagos" }],
   },
   {
     id: "pagos-ceo", q: "¿Cómo marco un pago como hecho?", roles: ["ceo"], paths: ["/pagos"],
-    keys: ["pago", "pagos", "pagar", "pagado", "comprobante", "transferencia", "swift", "pendiente"],
-    a: ["En Pagos > Por pagar están los que compras liberó, por proveedor.", "Abre la OC y toca \"Marcar como pagado\": fecha, monto, referencia y sube el comprobante (PDF o imagen).", "A compras le llega aviso para descargarlo y mandarlo al proveedor. Si te equivocaste, \"Deshacer pago\" mientras compras no lo descargue."],
+    keys: ["pago", "pagos", "pagar", "pagado", "comprobante", "transferencia", "swift", "pendiente", "urgente"],
+    a: ["En Pagos > Por pagar están todas las facturas pendientes, por proveedor. Primero salen las URGENTES, las vencidas y las que tienen la carga sin liberar (el proveedor puede no soltarla hasta que se pague). Lee el comentario de compras.", "Abre la OC y toca \"Marcar como pagado\": fecha, monto, referencia y sube el comprobante (PDF o imagen).", "A compras le llega aviso para descargarlo y mandarlo al proveedor. Si te equivocaste, \"Deshacer pago\" mientras compras no lo descargue."],
     links: [{ label: "Pagos", href: "/pagos" }],
   },
   {

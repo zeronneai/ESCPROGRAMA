@@ -5,7 +5,7 @@ import { Chip } from "@/components/ops-ui";
 import { ProveedoresPagos, type ProvPagos } from "@/components/pagos/proveedores-pagos";
 import { Card, EmptyState, FilterChip, PageHeader, StatCard } from "@/components/ui";
 import { requireRoles } from "@/lib/auth/sales";
-import { ESTADO_PAGO, fmtMonto, fmtTotales, OC_COLS, PAGO_COLS, pagoVencido, TIPO_PAGO, totalesPorMoneda, type OcRow, type PagoRow } from "@/lib/pagos";
+import { CARGA, ESTADO_PAGO, fmtMonto, fmtTotales, OC_COLS, ordenPagos, PAGO_COLS, prioridadPago, pagoVencido, TIPO_PAGO, totalesPorMoneda, type OcRow, type PagoRow } from "@/lib/pagos";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -31,8 +31,9 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
   const conMoneda = (l: PagoRow[]) => l.map((p) => ({ monto: p.monto, moneda: ocMap.get(p.oc_id)?.moneda ?? "USD" }));
   const enPagos = (sups ?? []).filter((s) => s.en_pagos);
 
-  const liberados = pagos.filter((p) => p.estado === "liberado");
-  const porLiberar = pagos.filter((p) => p.estado === "por_liberar" || p.estado === "en_espera");
+  const porPagar = pagos.filter((p) => p.estado === "pendiente");
+  const urgentes = porPagar.filter((p) => p.urgente);
+  const sinLiberar = porPagar.filter((p) => p.carga === "sin_liberar");
   const pagadosSinBajar = pagos.filter((p) => p.estado === "pagado");
   const mesIni = today.slice(0, 7);
   const pagadosMes = pagos.filter((p) => (p.estado === "pagado" || p.estado === "cerrado") && p.pago_fecha?.startsWith(mesIni));
@@ -41,8 +42,8 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
   const ver: Vista = sp.ver && sp.ver in VISTAS ? (sp.ver as Vista) : comprador ? "pendientes" : "por_pagar";
   const prov = sp.prov && enPagos.some((s) => s.id === sp.prov) ? sp.prov : "";
   const filtro = (p: PagoRow) =>
-    ver === "pendientes" ? p.estado !== "cerrado" : ver === "por_pagar" ? p.estado === "liberado" : ver === "comprobantes" ? p.estado === "pagado" : p.estado === "cerrado";
-  const visibles = pagos.filter((p) => filtro(p) && (!prov || ocMap.get(p.oc_id)?.supplier_id === prov));
+    ver === "pendientes" ? p.estado !== "cerrado" : ver === "por_pagar" ? p.estado === "pendiente" : ver === "comprobantes" ? p.estado === "pagado" : p.estado === "cerrado";
+  const visibles = ordenPagos(pagos, today).filter((p) => filtro(p) && (!prov || ocMap.get(p.oc_id)?.supplier_id === prov));
   // OCs sin facturas todavia (solo en pendientes)
   const ocSinPagos = ver === "pendientes" ? ordenes.filter((o) => !o.cerrada_at && !pagos.some((p) => p.oc_id === o.id) && (!prov || o.supplier_id === prov)) : [];
   const grupos = enPagos
@@ -51,7 +52,8 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
       pagos: visibles.filter((p) => ocMap.get(p.oc_id)?.supplier_id === s.id),
       sinPagos: ocSinPagos.filter((o) => o.supplier_id === s.id),
     }))
-    .filter((g) => g.pagos.length || g.sinPagos.length);
+    .filter((g) => g.pagos.length || g.sinPagos.length)
+    .sort((a, b) => Math.min(9, ...a.pagos.map((p) => prioridadPago(p, today))) - Math.min(9, ...b.pagos.map((p) => prioridadPago(p, today))));
   const href = (o: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
     for (const [k, v] of Object.entries({ ver: sp.ver, prov: prov || undefined, ...o })) if (v) p.set(k, v);
@@ -63,7 +65,7 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
     <div className="space-y-5">
       <PageHeader
         title="Pagos a proveedores extranjeros"
-        subtitle={comprador ? "Registra cada OC con sus facturas o anticipos y libéralos para que el CEO pague. Al descargar el comprobante pasa al historial." : "Lo que compras liberó para pago. Marca cada pago y sube el comprobante."}
+        subtitle={comprador ? "Registra cada OC con sus facturas o anticipos; el CEO las ve para pagar. Marca si la carga ya se liberó, lo urgente y comentarios. Al descargar el comprobante pasa al historial." : "Facturas por pagar a proveedores extranjeros. Primero lo urgente y lo que tiene la carga detenida. Marca cada pago y sube el comprobante."}
         actions={comprador ? (
           <Link href={`/pagos/oc/nueva${prov ? `?prov=${prov}` : ""}`} className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
             <Icon name="plus" className="h-4 w-4" /> Nueva OC
@@ -71,8 +73,8 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
         ) : undefined}
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Liberados por pagar" value={liberados.length} tone={liberados.length ? "red" : "green"} hint={fmtTotales(totalesPorMoneda(conMoneda(liberados)))} />
-        <StatCard label="Por liberar o en espera" value={porLiberar.length} hint={fmtTotales(totalesPorMoneda(conMoneda(porLiberar)))} />
+        <StatCard label="Por pagar" value={porPagar.length} tone={porPagar.length ? "red" : "green"} hint={fmtTotales(totalesPorMoneda(conMoneda(porPagar)))} />
+        <StatCard label="Urgentes" value={urgentes.length} tone={urgentes.length ? "red" : "default"} hint={`${sinLiberar.length} con la carga sin liberar`} />
         <StatCard label={comprador ? "Comprobantes por descargar" : "Pagados, compras no ha descargado"} value={pagadosSinBajar.length} tone={pagadosSinBajar.length && comprador ? "amber" : "default"} />
         <StatCard label="Pagado este mes" value={pagadosMes.length} tone="green" hint={fmtTotales(totalesPorMoneda(pagadosMes.map((p) => ({ monto: p.pago_monto ?? p.monto, moneda: ocMap.get(p.oc_id)?.moneda ?? "USD" }))))} />
       </div>
@@ -85,7 +87,7 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
         {(Object.keys(VISTAS) as Vista[]).map((k) => (
           <FilterChip key={k} href={href({ ver: k })} active={ver === k}>
             {VISTAS[k]}
-            {k === "por_pagar" && liberados.length ? ` ${liberados.length}` : k === "comprobantes" && pagadosSinBajar.length ? ` ${pagadosSinBajar.length}` : ""}
+            {k === "por_pagar" && porPagar.length ? ` ${porPagar.length}` : k === "comprobantes" && pagadosSinBajar.length ? ` ${pagadosSinBajar.length}` : ""}
           </FilterChip>
         ))}
       </div>
@@ -100,7 +102,7 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
 
       {grupos.length === 0 ? (
         <Card className="p-0">
-          <EmptyState title={enPagos.length === 0 ? "Aún no hay proveedores en pagos" : ver === "por_pagar" ? "No hay pagos liberados pendientes" : "Nada en esta vista"}>
+          <EmptyState title={enPagos.length === 0 ? "Aún no hay proveedores en pagos" : ver === "por_pagar" ? "No hay pagos pendientes" : "Nada en esta vista"}>
             {enPagos.length === 0 && (comprador ? "Agrega tus proveedores extranjeros con \"Agregar o quitar\"." : "Compras todavía no agrega proveedores.")}
           </EmptyState>
         </Card>
@@ -130,11 +132,14 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
                           <p className="text-xs text-slate-500">
                             {p.estado === "pagado" || p.estado === "cerrado"
                               ? `Pagado el ${fecha(p.pago_fecha)}${p.pago_referencia ? ` · Ref. ${p.pago_referencia}` : ""}${p.comprobante_path ? "" : " · sin comprobante"}`
-                              : [p.fecha_limite && `Pagar antes del ${fecha(p.fecha_limite)}`, p.estado_nota].filter(Boolean).join(" · ") || st.hint}
+                              : [p.fecha_limite && `Pagar antes del ${fecha(p.fecha_limite)}`].filter(Boolean).join(" · ") || st.hint}
                           </p>
+                          {p.estado === "pendiente" && p.estado_nota && <p className="text-xs font-medium text-amber-900">Compras: {p.estado_nota}</p>}
                         </div>
-                        <div className="flex shrink-0 gap-1.5">
+                        <div className="flex shrink-0 flex-wrap gap-1.5">
+                          {p.estado === "pendiente" && p.urgente && <Chip cls="bg-red-600 text-white">URGENTE</Chip>}
                           {venc && <Chip cls="bg-red-600 text-white">Vencido</Chip>}
+                          <Chip cls={CARGA[p.carga].cls}>{CARGA[p.carga].label}</Chip>
                           <Chip cls={st.cls}>{st.label}</Chip>
                         </div>
                       </Link>

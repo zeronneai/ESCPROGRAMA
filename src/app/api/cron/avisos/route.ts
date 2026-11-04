@@ -13,7 +13,7 @@ type Pause = { clarification_requested_at: string; resumed_at: string | null };
  *  - comprador: solicitud por vencer o vencida, y actualizaciones por vencer o vencidas;
  *  - vendedor: cotizaciones enviadas con mas de 15 dias sin resultado;
  *  - evaluaciones de proveedores y clientes programadas a 6 meses: se activan solas;
- *  - CEO: pagos a proveedores extranjeros liberados que vencen en 2 dias o menos.
+ *  - CEO: pagos a proveedores extranjeros urgentes o que vencen en 2 dias o menos.
  * "Vencida" como estado NO depende de esto: se calcula al consultar.
  * Vercel envia  Authorization: Bearer <CRON_SECRET>.
  */
@@ -129,7 +129,7 @@ export async function GET(request: NextRequest) {
   const { data: evaluaciones, error: evalErr } = await admin.rpc("eval_activar_programados");
   if (evalErr) console.error("cron evaluaciones:", evalErr.message);
 
-  // 5. Pagos a proveedores extranjeros liberados que vencen en 2 dias o menos: aviso al CEO.
+  // 5. Pagos a proveedores extranjeros urgentes o que vencen en 2 dias o menos: aviso al CEO.
   const { data: pagosAviso, error: pagosErr } = await admin.rpc("pagos_recordatorio");
   if (pagosErr) console.error("cron pagos:", pagosErr.message);
 

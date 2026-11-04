@@ -117,8 +117,8 @@ curl -X POST https://<portal>/api/leads/entrada \
 ## Pagos a proveedores extranjeros y puesto CEO (migraciones 0030 y 0031)
 
 - El comprador elige en **Pagos** qué proveedores entran a la sección (de su lista de Proveedores) y registra cada **OC** con su moneda (USD, MXN, CNY o EUR). A cada OC le agrega sus **facturas o anticipos**; el número de factura, el monto, la fecha límite y el PDF se pueden completar después.
-- Estatus que pone el comprador: Por liberar, En espera (con nota) o **Liberado**. Al liberar, el CEO recibe aviso.
-- El **CEO** ve lo liberado por proveedor, marca **Pagado** (fecha, monto, referencia) y sube el comprobante (PDF o imagen). Al entrar al portal le sale una ventana con los pagos pendientes; la tarea diaria le recuerda los que vencen en 2 días o menos.
+- El CEO puede pagar en cuanto hay factura (aviso de cada factura nueva). "Carga liberada / sin liberar" es el **seguimiento de la importación** que pone el comprador y no depende del pago; el comprador también puede marcar **Urgente** y dejar un **comentario para el CEO** (ej. "Pendiente de pago para liberación"). Al CEO se le ordena primero lo urgente, lo vencido y lo que tiene la carga sin liberar (migración 0032).
+- El **CEO** ve lo pendiente por proveedor, marca **Pagado** (fecha, monto, referencia) y sube el comprobante (PDF o imagen). Al entrar al portal le sale una ventana con los pagos pendientes; la tarea diaria le recuerda lo urgente y lo que vence en 2 días o menos.
 - El comprador recibe aviso, **descarga el comprobante** y el pago pasa al **Historial** (deja de verse como pendiente; nada se borra).
 - Proveedores: botón "Proveedor" en la barra del comprador e **Importar Excel o CSV** en Proveedores (se eligen las columnas; los que ya existen se omiten).
 

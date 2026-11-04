@@ -132,13 +132,23 @@ export async function deletePagoAction(id: string, ocId: string): Promise<Result
   return { ok: true };
 }
 
-/** Comprador: Por liberar, En espera o Liberado para pago. */
-export async function pagoEstadoAction(id: string, ocId: string, estado: "por_liberar" | "en_espera" | "liberado", nota = ""): Promise<Result> {
-  await requireUser();
+/** Comprador: seguimiento de la importacion (carga liberada o no), urgente y comentario para el CEO. */
+export async function seguimientoPagoAction(
+  id: string,
+  ocId: string,
+  patch: { carga?: "sin_liberar" | "liberada"; urgente?: boolean; comentario?: string },
+): Promise<Result> {
+  if (!(await rol("comprador"))) return { ok: false, error: "Solo el comprador cambia el seguimiento." };
   if (!uuid.safeParse(id).success) return { ok: false, error: "Pago inválido" };
+  const p: Record<string, unknown> = {};
+  if (patch.carga === "sin_liberar" || patch.carga === "liberada") p.carga = patch.carga;
+  if (typeof patch.urgente === "boolean") p.urgente = patch.urgente;
+  if (typeof patch.comentario === "string") p.estado_nota = patch.comentario.trim().slice(0, 300) || null;
+  if (!Object.keys(p).length) return { ok: true };
   const supabase = await createClient();
-  const { error } = await supabase.rpc("pago_estado", { p_id: id, p_estado: estado, p_nota: nota || null });
+  const { data, error } = await supabase.from("pagos").update(p).eq("id", id).select("id");
   if (error) return { ok: false, error: friendlyError(error.message) };
+  if (!data?.length) return { ok: false, error: "No se pudo guardar." };
   refresh(ocId);
   return { ok: true };
 }

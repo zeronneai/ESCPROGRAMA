@@ -2,14 +2,18 @@ import { z } from "zod";
 
 export const MONEDAS = ["USD", "MXN", "CNY", "EUR"] as const;
 export type Moneda = (typeof MONEDAS)[number];
-export type EstadoPago = "por_liberar" | "en_espera" | "liberado" | "pagado" | "cerrado";
+export type EstadoPago = "pendiente" | "pagado" | "cerrado";
+export type Carga = "sin_liberar" | "liberada";
 
 export const ESTADO_PAGO: Record<EstadoPago, { label: string; cls: string; hint: string }> = {
-  por_liberar: { label: "Por liberar", cls: "bg-slate-100 text-slate-700", hint: "Compras aún no lo libera para pago" },
-  en_espera: { label: "En espera", cls: "bg-amber-100 text-amber-900", hint: "Detenido por compras (falta algo)" },
-  liberado: { label: "Liberado para pago", cls: "bg-red-100 text-red-800", hint: "Listo para que el CEO pague" },
+  pendiente: { label: "Por pagar", cls: "bg-red-100 text-red-800", hint: "Pendiente de pago" },
   pagado: { label: "Pagado", cls: "bg-sky-100 text-sky-800", hint: "Falta que compras descargue el comprobante" },
   cerrado: { label: "Pagado y enviado", cls: "bg-green-100 text-green-800", hint: "Comprobante descargado por compras" },
+};
+/** Seguimiento de la importacion: si el proveedor ya libero la carga (no depende del pago). */
+export const CARGA: Record<Carga, { label: string; cls: string }> = {
+  sin_liberar: { label: "Carga sin liberar", cls: "bg-amber-100 text-amber-900" },
+  liberada: { label: "Carga liberada", cls: "bg-green-100 text-green-800" },
 };
 export const TIPO_PAGO = { anticipo: "Anticipo", factura: "Factura" } as const;
 
@@ -36,6 +40,9 @@ export interface PagoRow {
   notas: string | null;
   estado: EstadoPago;
   estado_nota: string | null;
+  carga: Carga;
+  carga_at: string | null;
+  urgente: boolean;
   factura_path: string | null;
   factura_nombre: string | null;
   liberado_at: string | null;
@@ -52,7 +59,7 @@ export interface PagoRow {
 }
 export const OC_COLS = "id, supplier_id, numero, fecha, moneda, monto, descripcion, cerrada_at, created_at, suppliers(nombre, pais)";
 export const PAGO_COLS =
-  "id, oc_id, tipo, numero_factura, fecha_factura, monto, fecha_limite, notas, estado, estado_nota, factura_path, factura_nombre, liberado_at, pago_fecha, pago_monto, pago_referencia, pago_notas, comprobante_path, comprobante_nombre, pagado_at, pagado_nombre, cerrado_at, created_at";
+  "id, oc_id, tipo, numero_factura, fecha_factura, monto, fecha_limite, notas, estado, estado_nota, carga, carga_at, urgente, factura_path, factura_nombre, liberado_at, pago_fecha, pago_monto, pago_referencia, pago_notas, comprobante_path, comprobante_nombre, pagado_at, pagado_nombre, cerrado_at, created_at";
 
 const txt = (max: number) => z.string().trim().max(max, `Máximo ${max} caracteres`).optional().nullable().transform((v) => v || null);
 const fecha = z.union([z.literal(""), z.null(), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida")]).optional().transform((v) => v || null);
@@ -96,4 +103,15 @@ export const fmtTotales = (t: Record<string, number>) =>
 /** Pendientes: lo que aun no se archiva. */
 export const pagoPendiente = (p: Pick<PagoRow, "estado">) => p.estado !== "cerrado";
 export const pagoVencido = (p: Pick<PagoRow, "estado" | "fecha_limite">, today: string) =>
-  (p.estado === "liberado" || p.estado === "por_liberar" || p.estado === "en_espera") && !!p.fecha_limite && p.fecha_limite < today;
+  p.estado === "pendiente" && !!p.fecha_limite && p.fecha_limite < today;
+
+/** Orden para el CEO: urgente, vencido, carga sin liberar y luego por fecha limite. */
+export function prioridadPago(p: Pick<PagoRow, "estado" | "fecha_limite" | "urgente" | "carga">, today: string): number {
+  if (p.estado !== "pendiente") return 9;
+  if (p.urgente) return 0;
+  if (pagoVencido(p, today)) return 1;
+  if (p.carga === "sin_liberar") return 2;
+  return 3;
+}
+export const ordenPagos = <T extends Pick<PagoRow, "estado" | "fecha_limite" | "urgente" | "carga" | "created_at">>(l: T[], today: string) =>
+  [...l].sort((a, b) => prioridadPago(a, today) - prioridadPago(b, today) || (a.fecha_limite ?? "9999").localeCompare(b.fecha_limite ?? "9999") || a.created_at.localeCompare(b.created_at));

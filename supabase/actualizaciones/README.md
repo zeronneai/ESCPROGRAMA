@@ -41,6 +41,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 24 | `0029_documentos_control_cambios.sql` | **Documentos** (el Coordinador ISO sube los PDF con código, título, categoría y versión; todos los consultan; versiones anteriores en historial) y **control de cambios** (lo llena el Coordinador ISO; la gerente y el comprador lo consultan y reciben aviso). |
 | 25 | `0030_rol_ceo.sql` | Agrega el puesto **CEO**. Córrelo **solo**, en su propia ejecución, antes del 26. |
 | 26 | `0031_pagos_extranjeros.sql` | **Pagos a proveedores extranjeros**: el comprador registra OC con sus facturas o anticipos y las libera; el CEO marca pagado y sube el comprobante; al descargarlo el comprador pasa al historial. |
+| 27 | `0032_pagos_seguimiento.sql` | Pagos: el CEO paga en cuanto hay factura; "carga liberada" pasa a ser seguimiento de la importación; botón **Urgente** y **comentario para el CEO**. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

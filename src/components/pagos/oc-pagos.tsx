@@ -2,12 +2,12 @@
 
 import { useRef, useState } from "react";
 import {
-  archivarPagoAction, comprobanteAction, deletePagoAction, deshacerPagoAction, facturaArchivoAction, marcarPagadoAction, pagoEstadoAction, savePagoAction,
+  archivarPagoAction, comprobanteAction, deletePagoAction, deshacerPagoAction, facturaArchivoAction, marcarPagadoAction, savePagoAction, seguimientoPagoAction,
 } from "@/actions/pagos";
 import { Icon } from "@/components/icons";
 import { Chip, useRun } from "@/components/ops-ui";
 import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
-import { ESTADO_PAGO, fmtMonto, pagoVencido, TIPO_PAGO, type PagoInput, type PagoRow } from "@/lib/pagos";
+import { CARGA, ESTADO_PAGO, fmtMonto, ordenPagos, pagoVencido, TIPO_PAGO, type PagoInput, type PagoRow } from "@/lib/pagos";
 
 const fecha = (d: string | null) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }) : "");
 type Rol = "comprador" | "ceo";
@@ -20,7 +20,7 @@ export function OcPagos({ ocId, moneda, pagos, rol, today, cerrada }: { ocId: st
       {pagos.length === 0 && !nuevo && (
         <Card className="p-4 text-sm text-slate-600">Esta OC aún no tiene facturas ni anticipos.{rol === "comprador" && " Agrégalos cuando el proveedor los mande."}</Card>
       )}
-      {pagos.map((p) => <PagoCard key={p.id} p={p} ocId={ocId} moneda={moneda} rol={rol} today={today} />)}
+      {ordenPagos(pagos, today).map((p) => <PagoCard key={p.id} p={p} ocId={ocId} moneda={moneda} rol={rol} today={today} />)}
       {rol === "comprador" && !cerrada && (nuevo ? (
         <Card className="space-y-3 border-brand-100 p-4">
           <p className="text-sm font-semibold text-slate-800">Agregar factura o anticipo</p>
@@ -77,7 +77,6 @@ function FileBtn({ label, accept = "application/pdf,image/png,image/jpeg,image/w
 
 function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; moneda: string; rol: Rol; today: string }) {
   const [edit, setEdit] = useState(false);
-  const [espera, setEspera] = useState(false);
   const [nota, setNota] = useState(p.estado_nota ?? "");
   const [pagar, setPagar] = useState(false);
   const [pv, setPv] = useState({ fecha: today, monto: p.monto != null ? String(Number(p.monto)) : "", referencia: "", notas: "" });
@@ -85,7 +84,7 @@ function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; m
   const [compName, setCompName] = useState("");
   const { run, busy, notice, router } = useRun();
   const st = ESTADO_PAGO[p.estado];
-  const abierto = p.estado === "por_liberar" || p.estado === "en_espera" || p.estado === "liberado";
+  const abierto = p.estado === "pendiente";
   const vencido = pagoVencido(p, today);
   const fd = (extra: Record<string, string>, file?: File | null) => {
     const f = new FormData();
@@ -98,7 +97,7 @@ function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; m
   const go = (key: string, fn: () => Promise<{ ok: boolean; error?: string }>, ok: string) => run(key, fn as never, ok);
 
   return (
-    <Card className={`space-y-3 p-4 ${p.estado === "liberado" && rol === "ceo" ? "border-red-300 ring-1 ring-red-200" : ""}`}>
+    <Card className={`space-y-3 p-4 ${abierto && p.urgente ? "border-red-400 ring-2 ring-red-200" : abierto && rol === "ceo" ? "border-amber-200" : ""}`}>
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
       {edit ? (
         <PagoForm ocId={ocId} moneda={moneda} p={p} onDone={() => setEdit(false)} />
@@ -113,7 +112,7 @@ function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; m
               {[p.fecha_factura && `Factura del ${fecha(p.fecha_factura)}`, p.fecha_limite && `Pagar antes del ${fecha(p.fecha_limite)}`, p.notas].filter(Boolean).join(" · ") || "Sin fechas"}
             </p>
             {vencido && <p className="text-xs font-semibold text-red-700">Fecha límite vencida</p>}
-            {p.estado_nota && <p className="text-xs text-amber-800">Nota de compras: {p.estado_nota}</p>}
+            {p.estado_nota && <p className="rounded bg-amber-50 px-2 py-1 text-xs font-medium text-amber-900">Comentario de compras: {p.estado_nota}</p>}
             {(p.estado === "pagado" || p.estado === "cerrado") && (
               <p className="text-xs text-sky-800">
                 Pagado el {fecha(p.pago_fecha)} · {fmtMonto(p.pago_monto, moneda)}{p.pago_referencia ? ` · Ref. ${p.pago_referencia}` : ""}{p.pagado_nombre ? ` · ${p.pagado_nombre}` : ""}
@@ -126,7 +125,11 @@ function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; m
               {p.comprobante_path && rol === "comprador" && p.estado === "cerrado" && <a href={`/api/pagos/${p.id}/archivo?descargar=1`} className="text-brand-700 underline">Descargar comprobante otra vez</a>}
             </div>
           </div>
-          <Chip cls={st.cls}>{st.label}</Chip>
+          <div className="flex shrink-0 flex-wrap gap-1.5 sm:justify-end">
+            {abierto && p.urgente && <Chip cls="bg-red-600 text-white">URGENTE</Chip>}
+            <Chip cls={CARGA[p.carga].cls}>{CARGA[p.carga].label}</Chip>
+            <Chip cls={st.cls}>{st.label}</Chip>
+          </div>
         </div>
       )}
 
@@ -145,27 +148,44 @@ function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; m
               <button type="button" className="ml-auto text-xs text-slate-600 underline" disabled={!!busy} onClick={() => go("arch", () => archivarPagoAction(p.id, ocId), "Pasó al historial.")}>Archivar sin descargar</button>
             </div>
           )}
-          {abierto && (
+          <div className="space-y-2 rounded-md bg-slate-50 p-2">
             <div className="flex flex-wrap items-center gap-1.5">
-              {p.estado !== "liberado" && (
-                <Button className="bg-red-600 text-xs hover:bg-red-700" loading={busy === "lib"} disabled={!!busy} onClick={() => go("lib", () => pagoEstadoAction(p.id, ocId, "liberado"), "Liberado. Se avisó al CEO.")}>
-                  Liberar para pago
-                </Button>
+              <span className="text-xs font-medium text-slate-600">Seguimiento de la carga:</span>
+              {(["sin_liberar", "liberada"] as const).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  disabled={!!busy}
+                  onClick={() => p.carga !== c && go(`c${c}`, () => seguimientoPagoAction(p.id, ocId, { carga: c }), c === "liberada" ? "Carga marcada como liberada." : "Carga marcada sin liberar.")}
+                  className={`rounded-full border px-3 py-1 text-xs font-medium ${p.carga === c ? (c === "liberada" ? "border-green-600 bg-green-600 text-white" : "border-amber-500 bg-amber-500 text-white") : "border-slate-300 bg-white text-slate-700"}`}
+                >
+                  {c === "liberada" ? "Liberada" : "Sin liberar"}
+                </button>
+              ))}
+              {abierto && (
+                <button
+                  type="button"
+                  disabled={!!busy}
+                  onClick={() => go("urg", () => seguimientoPagoAction(p.id, ocId, { urgente: !p.urgente }), p.urgente ? "Ya no está marcado como urgente." : "Marcado URGENTE. Se avisó al CEO.")}
+                  className={`ml-auto rounded-full border px-3 py-1 text-xs font-semibold ${p.urgente ? "border-red-600 bg-red-600 text-white" : "border-red-300 bg-white text-red-700 hover:bg-red-50"}`}
+                >
+                  {p.urgente ? "Urgente (quitar)" : "Marcar urgente"}
+                </button>
               )}
-              {p.estado !== "en_espera" && <Button variant="secondary" className="text-xs" disabled={!!busy} onClick={() => setEspera((x) => !x)}>Poner en espera</Button>}
-              {p.estado !== "por_liberar" && <Button variant="ghost" className="text-xs" disabled={!!busy} onClick={() => go("pl", () => pagoEstadoAction(p.id, ocId, "por_liberar"), "Regresó a Por liberar.")}>Regresar a por liberar</Button>}
             </div>
-          )}
-          {espera && (
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Motivo (ej. falta el BL, mercancía incompleta)" />
-              <Button className="text-xs" loading={busy === "esp"} onClick={() => go("esp", async () => { const r = await pagoEstadoAction(p.id, ocId, "en_espera", nota); if (r.ok) setEspera(false); return r; }, "Quedó en espera.")}>Guardar</Button>
-            </div>
-          )}
+            {abierto && (
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Input value={nota} onChange={(e) => setNota(e.target.value)} maxLength={300} placeholder="Comentario para el CEO (ej. Pendiente de pago para liberación)" />
+                <Button variant="secondary" className="shrink-0 text-xs" loading={busy === "nota"} disabled={!!busy || nota.trim() === (p.estado_nota ?? "")} onClick={() => go("nota", () => seguimientoPagoAction(p.id, ocId, { comentario: nota }), nota.trim() ? "Comentario guardado. Se avisó al CEO." : "Comentario borrado.")}>
+                  Guardar comentario
+                </Button>
+              </div>
+            )}
+          </div>
           <div className="flex flex-wrap gap-1.5">
             <Button variant="ghost" className="text-xs" onClick={() => setEdit(true)}>{p.numero_factura && p.monto ? "Editar" : "Completar factura y monto"}</Button>
             <FileBtn label={p.factura_path ? "Cambiar PDF de factura" : "Adjuntar factura"} loading={busy === "fac"} onFile={(f) => go("fac", () => facturaArchivoAction(fd({}, f)), "Factura adjunta.")} />
-            {(p.estado === "por_liberar" || p.estado === "en_espera") && (
+            {abierto && (
               <Button variant="ghost" className="text-xs text-red-700" disabled={!!busy} onClick={() => { if (window.confirm("¿Borrar esta factura o anticipo?")) go("del", () => deletePagoAction(p.id, ocId), "Borrado."); }}>Borrar</Button>
             )}
           </div>
@@ -174,12 +194,11 @@ function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; m
 
       {rol === "ceo" && (
         <div className="space-y-2 border-t border-slate-100 pt-3">
-          {p.estado === "liberado" && !pagar && (
+          {abierto && !pagar && (
             <Button className="bg-green-600 hover:bg-green-700" onClick={() => setPagar(true)}>Marcar como pagado</Button>
           )}
           {abierto && pagar && (
             <div className="space-y-3 rounded-md border border-green-200 bg-green-50/50 p-3">
-              {p.estado !== "liberado" && <Alert tone="info">Compras aún no lo libera ({st.label.toLowerCase()}). Puedes marcarlo pagado de todos modos.</Alert>}
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Field label="Fecha del pago *"><Input type="date" value={pv.fecha} onChange={(e) => setPv((s) => ({ ...s, fecha: e.target.value }))} /></Field>
                 <Field label={`Monto pagado (${moneda})`}><Input value={pv.monto} onChange={(e) => setPv((s) => ({ ...s, monto: e.target.value }))} inputMode="decimal" /></Field>
@@ -205,7 +224,7 @@ function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; m
             <div className="flex flex-wrap items-center gap-2">
               <FileBtn label={p.comprobante_path ? "Cambiar comprobante" : "Subir comprobante"} loading={busy === "comp"} onFile={(f) => go("comp", () => comprobanteAction(fd({}, f)), "Comprobante subido. Se avisó a compras.")} />
               {p.estado === "pagado" && (
-                <Button variant="ghost" className="text-xs" disabled={!!busy} onClick={() => { if (window.confirm("¿Deshacer este pago? Regresa a Liberado.")) go("undo", () => deshacerPagoAction(p.id, ocId), "Pago deshecho."); }}>Deshacer pago</Button>
+                <Button variant="ghost" className="text-xs" disabled={!!busy} onClick={() => { if (window.confirm("¿Deshacer este pago? Regresa a Por pagar.")) go("undo", () => deshacerPagoAction(p.id, ocId), "Pago deshecho."); }}>Deshacer pago</Button>
               )}
               {p.estado === "cerrado" && <span className="text-xs text-green-700">Compras ya descargó el comprobante.</span>}
             </div>
