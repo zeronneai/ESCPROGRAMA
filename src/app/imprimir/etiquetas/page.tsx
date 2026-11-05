@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import QRCode from "qrcode";
+import Link from "next/link";
+import { AutoPrint } from "@/components/almacen/auto-print";
 import { PrintButton } from "@/components/minutas/minuta-acciones";
 import { requireUser } from "@/lib/auth/guards";
 import { qrEtiqueta } from "@/lib/almacen";
@@ -16,10 +18,9 @@ const FORMATOS = {
   "100x50": { label: "Etiquetadora 100 x 50 mm" },
 } as const;
 type Formato = keyof typeof FORMATOS;
-const fecha = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" });
 
-/** Etiquetas con QR para imprimir: hoja carta para pruebas o etiquetadora termica (una etiqueta por pagina). */
-export default async function ImprimirEtiquetas({ searchParams }: { searchParams: Promise<{ recepcion?: string; linea?: string; codigos?: string; formato?: string }> }) {
+/** Etiquetas con QR para imprimir (sin fecha ni folio de recepcion: la caja llega al cliente; esos datos se ven al escanear dentro del portal): hoja carta para pruebas o etiquetadora termica (una etiqueta por pagina). */
+export default async function ImprimirEtiquetas({ searchParams }: { searchParams: Promise<{ recepcion?: string; linea?: string; codigos?: string; formato?: string; auto?: string }> }) {
   await requireUser();
   const sp = await searchParams;
   const formato: Formato = sp.formato && sp.formato in FORMATOS ? (sp.formato as Formato) : "carta";
@@ -35,7 +36,7 @@ export default async function ImprimirEtiquetas({ searchParams }: { searchParams
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
   const qrs = await Promise.all(ets.map((e) => QRCode.toString(qrEtiqueta(origin, e.codigo), { type: "svg", margin: 0, errorCorrectionLevel: "M" })));
-  const base = Object.entries(sp).filter(([k]) => k !== "formato").map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join("&");
+  const base = Object.entries(sp).filter(([k]) => k !== "formato" && k !== "auto").map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join("&");
 
   const css =
     formato === "carta"
@@ -63,6 +64,7 @@ export default async function ImprimirEtiquetas({ searchParams }: { searchParams
         @media print { .no-print { display: none !important; } body { background: #fff; } main { padding: 0 !important; } }
         @media screen { main { padding: 16px; } .hoja-screen { display: flex; flex-wrap: wrap; gap: 8px; } .et { border: 1px dashed #94a3b8; } }`}</style>
       <div className="no-print mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+        {sp.recepcion && <Link href={`/almacen/recepciones/${sp.recepcion}`} className="rounded-md border border-slate-300 bg-white px-3 py-1 text-slate-700">← Volver a la recepción</Link>}
         <span className="font-semibold">{ets.length} etiqueta(s)</span>
         <span className="text-slate-600">Formato:</span>
         {(Object.keys(FORMATOS) as Formato[]).map((f) => (
@@ -75,6 +77,7 @@ export default async function ImprimirEtiquetas({ searchParams }: { searchParams
             : "En la ventana de impresión elige la etiquetadora y el tamaño de papel de la etiqueta, márgenes: ninguno, escala: 100%."}
         </p>
       </div>
+      {ets.length > 0 && <AutoPrint />}
       <div className={formato === "carta" ? "hoja" : "hoja-screen"}>
         {ets.map((e, i) => (
           <div key={e.codigo} className="et">
@@ -83,7 +86,6 @@ export default async function ImprimirEtiquetas({ searchParams }: { searchParams
               <span className="cod">{e.codigo}</span>
               <span className="clave">{e.articulos?.clave}</span>
               <span className="nom">{e.articulos?.nombre}</span>
-              <span className="meta">Recibido {fecha(e.recibida)} · {e.recepciones?.folio}</span>
             </div>
           </div>
         ))}

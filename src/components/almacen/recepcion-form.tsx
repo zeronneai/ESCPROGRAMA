@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { crearRecepcionAction } from "@/actions/almacen";
 import { ArticuloSearch } from "@/components/articulos-picker";
 import { useRun } from "@/components/ops-ui";
@@ -12,12 +12,24 @@ type Linea = { articulo_id: string; clave: string; nombre: string; cantidad: str
 /** Nueva recepcion: articulos del catalogo y cantidad; al guardar se generan las etiquetas. */
 export function RecepcionForm({ today, proveedores }: { today: string; proveedores: string[] }) {
   const [tipo, setTipo] = useState<TipoRecepcion>("compra");
-  const [fecha, setFecha] = useState(today);
   const [oc, setOc] = useState("");
   const [prov, setProv] = useState("");
   const [notas, setNotas] = useState("");
   const [lineas, setLineas] = useState<Linea[]>([]);
   const { run, busy, notice, router } = useRun();
+  const [formato, setFormato] = useState("carta");
+  useEffect(() => {
+    try {
+      const f = localStorage.getItem("esc_formato_etiqueta");
+      if (f) setFormato(f);
+    } catch {}
+  }, []);
+  const elegirFormato = (f: string) => {
+    setFormato(f);
+    try {
+      localStorage.setItem("esc_formato_etiqueta", f);
+    } catch {}
+  };
   const total = lineas.reduce((a, l) => a + (Number(l.cantidad) || 0), 0);
   const set = (i: number, k: keyof Linea, v: string) => setLineas((x) => x.map((l, j) => (j === i ? { ...l, [k]: v } : l)));
 
@@ -31,7 +43,12 @@ export function RecepcionForm({ today, proveedores }: { today: string; proveedor
               {(Object.keys(TIPOS_RECEPCION) as TipoRecepcion[]).map((k) => <option key={k} value={k}>{TIPOS_RECEPCION[k]}</option>)}
             </Select>
           </Field>
-          <Field label="Fecha de recepción"><Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} /></Field>
+          <Field label="Fecha de recepción">
+            <div className="flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-slate-100 px-3 text-sm text-slate-700" title="La fecha es siempre el día en que se registra">
+              {new Date(`${today}T12:00:00`).toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short", year: "numeric" })}
+              <span className="ml-auto text-xs text-slate-500">Hoy (fija)</span>
+            </div>
+          </Field>
         </div>
         {tipo === "compra" && (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -75,6 +92,16 @@ export function RecepcionForm({ today, proveedores }: { today: string; proveedor
         )}
       </Card>
 
+      <Card className="space-y-2 p-4 sm:p-5">
+        <p className="font-semibold text-slate-900">¿Dónde vas a imprimir?</p>
+        <div className="flex flex-wrap gap-2">
+          {[["carta", "Hoja carta (recortar)"], ["50x25", "Etiquetadora 50 x 25 mm"], ["100x50", "Etiquetadora 100 x 50 mm"]].map(([k, label]) => (
+            <button key={k} type="button" onClick={() => elegirFormato(k)} className={`rounded-full px-3 py-1.5 text-sm ${formato === k ? "bg-slate-900 text-white" : "border border-slate-300 bg-white text-slate-700"}`}>{label}</button>
+          ))}
+        </div>
+        <p className="text-xs text-slate-500">Al guardar se abre la impresión de las etiquetas. Pega una en cada caja.</p>
+      </Card>
+
       <div className="flex flex-wrap items-center gap-3">
         <Button
           loading={busy === "s"}
@@ -82,12 +109,12 @@ export function RecepcionForm({ today, proveedores }: { today: string; proveedor
           onClick={() =>
             run(
               "s",
-              () => crearRecepcionAction({ tipo, fecha, orden_compra: oc, proveedor: prov, notas, lineas: lineas.map((l) => ({ articulo_id: l.articulo_id, cantidad: Number(l.cantidad), lote: l.lote })) }),
-              (r) => r.ok && router.push(`/almacen/recepciones/${r.id}?nueva=1`),
+              () => crearRecepcionAction({ tipo, orden_compra: oc, proveedor: prov, notas, lineas: lineas.map((l) => ({ articulo_id: l.articulo_id, cantidad: Number(l.cantidad), lote: l.lote })) }),
+              (r) => r.ok && router.push(`/imprimir/etiquetas?recepcion=${r.id}&formato=${formato}&auto=1`),
             )
           }
         >
-          Guardar y generar {total || ""} etiqueta(s)
+          Guardar e imprimir {total || ""} etiqueta(s)
         </Button>
         <span className="text-sm text-slate-500">{lineas.length} artículo(s)</span>
       </div>

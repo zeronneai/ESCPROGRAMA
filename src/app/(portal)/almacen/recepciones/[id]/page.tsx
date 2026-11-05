@@ -26,7 +26,7 @@ export default async function Recepcion({ params, searchParams }: { params: Prom
   const rec = r as RecepcionRow;
   const lineas = (lin ?? []) as unknown as Lin[];
   const etiquetas = (ets ?? []) as { codigo: string; linea_id: string; estado: keyof typeof ESTADO_ETIQUETA }[];
-  const imp = (q: string) => `/imprimir/etiquetas?${q}`;
+  const imp = (q: string) => `/imprimir/etiquetas?${q}&auto=1`;
   return (
     <div className="space-y-4">
       <Link href="/almacen/recepciones" className="text-sm text-slate-500 hover:text-slate-800">← Recepciones</Link>
@@ -35,12 +35,12 @@ export default async function Recepcion({ params, searchParams }: { params: Prom
         subtitle={TIPOS_RECEPCION[rec.tipo]}
         actions={
           <div className="flex flex-wrap gap-2">
-            <a href={imp(`recepcion=${id}&formato=carta`)} target="_blank" rel="noreferrer" className="rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">Imprimir etiquetas (hoja carta)</a>
-            <a href={imp(`recepcion=${id}&formato=50x25`)} target="_blank" rel="noreferrer" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">Etiquetadora</a>
+            <a href={imp(`recepcion=${id}&formato=carta`)} target="_blank" rel="noreferrer" className="rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">Reimprimir todas (hoja carta)</a>
+            <a href={imp(`recepcion=${id}&formato=50x25`)} target="_blank" rel="noreferrer" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">Reimprimir en etiquetadora</a>
           </div>
         }
       />
-      {sp.nueva && <Alert tone="success">Recepción guardada con {etiquetas.length} etiqueta(s). Imprímelas y pega una en cada caja.</Alert>}
+      {sp.nueva && <Alert tone="success">Recepción guardada con {etiquetas.length} etiqueta(s). Si alguna se perdió o salió mal, reimprímela aquí.</Alert>}
       <Card className="p-4">
         <Dl
           items={[
@@ -65,7 +65,7 @@ export default async function Recepcion({ params, searchParams }: { params: Prom
                   </div>
                   <div className="flex shrink-0 items-center gap-2 text-sm">
                     <span className="font-semibold">{l.cantidad} etiqueta(s)</span>
-                    <a href={imp(`linea=${l.id}&formato=carta`)} target="_blank" rel="noreferrer" className="text-xs text-brand-700 underline">Imprimir solo estas</a>
+                    <a href={imp(`linea=${l.id}&formato=carta`)} target="_blank" rel="noreferrer" className="text-xs text-brand-700 underline">Reimprimir solo este producto</a>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1">

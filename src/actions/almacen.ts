@@ -14,7 +14,6 @@ const esAlmacen = (rol: string) => (ALMACEN as readonly string[]).includes(rol);
 
 const recepcionSchema = z.object({
   tipo: z.enum(["compra", "inventario_inicial", "devolucion", "ajuste"]),
-  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
   orden_compra: z.string().trim().max(80).default(""),
   proveedor: z.string().trim().max(200).default(""),
   notas: z.string().trim().max(1000).default(""),
@@ -31,7 +30,7 @@ export async function crearRecepcionAction(input: RecepcionInput): Promise<Resul
   if (!p.success) return { ok: false, error: p.error.issues[0].message };
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("recepcion_crear", {
-    p_tipo: p.data.tipo, p_fecha: p.data.fecha, p_orden_compra: p.data.orden_compra, p_proveedor: p.data.proveedor,
+    p_tipo: p.data.tipo, p_fecha: null, p_orden_compra: p.data.orden_compra, p_proveedor: p.data.proveedor,
     p_notas: p.data.notas, p_lineas: p.data.lineas,
   });
   if (error) return { ok: false, error: friendlyError(error.message) };

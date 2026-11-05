@@ -46,6 +46,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 29 | `0034_folio_sac.sql` | Folio seriado de acciones correctivas: **SAC-01, SAC-02...** (renumera las existentes en orden). |
 | 30 | `0035_almacen_inventario.sql` | **Almacén con trazabilidad**: recepciones con etiquetas QR (1 etiqueta = 1 pieza en inventario), facturas que sube ventas para cargar, y escaneo al cargar el camión que rechaza lo que no viene en la factura. |
 | 31 | `0036_folio_factura_unico.sql` | Entregas: una factura (folio) **solo se puede subir una vez**, aunque se escriba con guion o espacios. El portal avisa en cuanto se lee el PDF. |
+| 32 | `0037_recepcion_fecha_hoy.sql` | Recepciones: la fecha queda **bloqueada al día en que se registra** (no se puede cambiar). |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

@@ -23,7 +23,9 @@ export function almacenSuite() {
       const S = await art("ESC-GLPFGG-S");
       const lineas = JSON.stringify([{ articulo_id: L, cantidad: 3 }, { articulo_id: M, cantidad: 2 }, { articulo_id: S, cantidad: 1 }]);
       expect(await failure(q(w.seller1, "select public.recepcion_crear('compra', current_date, 'OC-1', 'Prov', null, $1::jsonb)", [lineas]))).toMatch(/Solo almacen/);
-      const rec = (await q(alm.a, "select public.recepcion_crear('compra', current_date, 'OC-1', 'Prov', null, $1::jsonb) as id", [lineas])).rows[0].id;
+      const rec = (await q(alm.a, "select public.recepcion_crear('compra', date '2020-01-01', 'OC-1', 'Prov', null, $1::jsonb) as id", [lineas])).rows[0].id;
+      // La fecha no se puede cambiar: siempre es el dia en que se registra.
+      expect((await q("postgres", "select (fecha = public.local_today()) as hoy, (select bool_and(recibida = public.local_today()) from public.etiquetas where recepcion_id = $1) as ets from public.recepciones where id = $1", [rec])).rows[0]).toEqual({ hoy: true, ets: true });
       const et = (await q(w.seller1, "select codigo, articulo_id from public.etiquetas where recepcion_id=$1 order by codigo", [rec])).rows;
       expect(et).toHaveLength(6);
       expect(et[0].codigo).toMatch(/^E-\d{6}$/);
