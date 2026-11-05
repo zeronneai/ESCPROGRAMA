@@ -114,6 +114,14 @@ curl -X POST https://<portal>/api/leads/entrada \
 - Listas como tarjetas en celular y tablas en escritorio.
 - **Historial del comprador**: ahora muestra por defecto todas las partidas que ya respondió (antes salía vacío hasta buscar), con contadores de hoy, semana, mes y total, filtros por estado y paginación. La búsqueda por producto o proveedor sigue igual.
 
+## Almacén: recepciones, etiquetas QR, inventario y entregas (migración 0035)
+
+- **Recepciones** (almacén): se elige el producto del catálogo y cuántas piezas llegaron. Se crea una etiqueta por pieza (`E-000123`), con QR que lleva a `/e/E-000123`. El inventario es el número de etiquetas en almacén. Tipos: compra, inventario inicial, devolución, ajuste.
+- **Imprimir** (`/imprimir/etiquetas`): hoja carta para recortar (3 columnas de 64 x 35 mm) o etiquetadora de 50 x 25 y 100 x 50 mm.
+- **Entregas**: vendedor, jefa de ventas, marketplaces o almacén suben la factura (PDF y XML opcional). El PDF se lee en el navegador con pdf.js (`src/lib/factura-lector.ts`): folio, cliente y partidas con clave `ESC-` y cantidad. El XML del CFDI, si se sube, es más exacto. El usuario revisa antes de enviar.
+- **Carga**: almacén abre la factura y escanea cada etiqueta (lector USB o cámara del celular, que necesita HTTPS). `salida_escanear` rechaza lo que no viene en la factura, lo que ya salió o lo que sobra, y avisa si hay piezas más antiguas del mismo artículo (PEPS). Todo intento queda en `salida_escaneos`. Al terminar con faltantes pide nota y avisa a quien subió la factura.
+- Bajas de etiquetas (merma, dañado) con motivo; cancelar una entrega regresa sus piezas al almacén.
+
 ## Inicio (tablero por puesto) y CEO con lectura de todo (migración 0033)
 
 - Todos entran a **Inicio** (`/inicio`): arriba "Requiere tu atención" (rojo urgente, amarillo pendiente) y abajo tarjetas por sección según el puesto, con liga al detalle. Las reglas están en `src/lib/inicio.ts`.

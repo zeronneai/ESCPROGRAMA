@@ -6,7 +6,7 @@ import { Input, Spinner } from "@/components/ui";
 import { ESTATUS_ARTICULO, type Articulo, type BitacoraArticulo } from "@/lib/articulos";
 
 /** Buscar en el catalogo (solo vendibles) y agregar a la lista. */
-export function ArticuloSearch({ onPick, exclude = [] }: { onPick: (a: Articulo) => void; exclude?: string[] }) {
+export function ArticuloSearch({ onPick, exclude = [], soloVendibles = true, placeholder }: { onPick: (a: Articulo) => void; exclude?: string[]; soloVendibles?: boolean; placeholder?: string }) {
   const [q, setQ] = useState("");
   const [res, setRes] = useState<Articulo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -20,25 +20,25 @@ export function ArticuloSearch({ onPick, exclude = [] }: { onPick: (a: Articulo)
     setLoading(true);
     const n = ++seq.current;
     const t = setTimeout(async () => {
-      const r = await searchArticulosAction(q);
+      const r = await searchArticulosAction(q, soloVendibles);
       if (n === seq.current) {
         setRes(r);
         setLoading(false);
       }
     }, 250);
     return () => clearTimeout(t);
-  }, [q]);
+  }, [q, soloVendibles]);
   const shown = res.filter((a) => !exclude.includes(a.id));
   return (
     <div className="relative">
       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
         {loading ? <Spinner className="h-4 w-4" /> : <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>}
       </span>
-      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar artículo por nombre o clave (ej. guante nitrilo M)" className="pl-9" autoComplete="off" />
+      <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder={placeholder ?? "Buscar artículo por nombre o clave (ej. guante nitrilo M)"} className="pl-9" autoComplete="off" />
       {q.trim().length >= 2 && !loading && (
         <div className="absolute z-20 mt-1 max-h-80 w-full overflow-auto rounded-md border border-slate-200 bg-white shadow-lg">
           {shown.length === 0 ? (
-            <p className="px-3 py-2 text-sm text-slate-500">Sin artículos activos con ese texto.</p>
+            <p className="px-3 py-2 text-sm text-slate-500">{soloVendibles ? "Sin artículos activos con ese texto." : "Sin artículos con ese texto."}</p>
           ) : (
             shown.map((a) => (
               <button key={a.id} type="button" onClick={() => { onPick(a); setQ(""); }} className="block w-full px-3 py-2 text-left text-sm hover:bg-slate-50">

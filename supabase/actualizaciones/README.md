@@ -44,6 +44,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 27 | `0032_pagos_seguimiento.sql` | Pagos: el CEO paga en cuanto hay factura; "carga liberada" pasa a ser seguimiento de la importación; botón **Urgente** y **comentario para el CEO**. |
 | 28 | `0033_ceo_lectura.sql` | El **CEO** ve todo lo que ve la gerente (sin editar), además de Pagos. |
 | 29 | `0034_folio_sac.sql` | Folio seriado de acciones correctivas: **SAC-01, SAC-02...** (renumera las existentes en orden). |
+| 30 | `0035_almacen_inventario.sql` | **Almacén con trazabilidad**: recepciones con etiquetas QR (1 etiqueta = 1 pieza en inventario), facturas que sube ventas para cargar, y escaneo al cargar el camión que rechaza lo que no viene en la factura. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

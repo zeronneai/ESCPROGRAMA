@@ -331,6 +331,24 @@ export const FAQ: Faq[] = [
     links: [{ label: "Proveedores", href: "/comprador/proveedores" }],
   },
   {
+    id: "recepcion", q: "¿Cómo registro una recepción e imprimo etiquetas?", roles: ["almacen", "supervisor_almacen"], paths: ["/almacen/recepciones"],
+    keys: ["recepcion", "recibir", "llego", "material", "etiqueta", "etiquetas", "imprimir", "qr", "inventario"],
+    a: ["Entra a Recepciones > Nueva recepción, busca cada producto y pon cuántas piezas (cajas) llegaron.", "Al guardar se crea una etiqueta por pieza: 30 etiquetas = 30 en inventario.", "Toca Imprimir etiquetas: en hoja carta salen 3 columnas que puedes recortar; en etiquetadora usa 50x25 o 100x50 mm.", "Para lo que ya tienes en el almacén usa el tipo Inventario inicial."],
+    links: [{ label: "Recepciones", href: "/almacen/recepciones" }],
+  },
+  {
+    id: "cargar", q: "¿Cómo cargo una factura al camión?", roles: ["almacen", "supervisor_almacen"], paths: ["/entregas"],
+    keys: ["cargar", "carga", "camion", "escanear", "escaner", "factura", "entrega", "salida", "camara"],
+    a: ["Abre Entregas, toca la factura y presiona Usar cámara (o usa el escáner de pistola).", "Escanea cada etiqueta al subir la caja: el contador baja y suena un bip. Si la caja no es de esa factura sale en rojo y no se cuenta.", "Si te equivocas, toca Quitar en la última. Al terminar presiona Terminar carga; si faltó algo te pide una nota."],
+    links: [{ label: "Entregas", href: "/entregas" }],
+  },
+  {
+    id: "subir-factura", q: "¿Cómo subo una factura para que almacén la cargue?", roles: ["vendedor", "jefe_ventas", "marketplaces", "almacen", "supervisor_almacen"], paths: ["/entregas"],
+    keys: ["factura", "subir", "pdf", "xml", "entrega", "almacen", "cargar", "surtir"],
+    a: ["En Entregas > Subir factura elige el PDF (y el XML si lo tienes, es más exacto).", "El sistema lee el folio y los artículos ESC- con su cantidad. Revisa que estén bien antes de enviar.", "Almacén recibe aviso y tú ves el avance; te avisa si salió incompleta."],
+    links: [{ label: "Entregas", href: "/entregas" }],
+  },
+  {
     id: "indicadores", q: "¿Qué son los indicadores?",
     keys: ["indicadores", "kpi", "metas", "desempeño", "medicion", "resultados"],
     a: ["En Más > Indicadores ves los números de tu puesto que salen solos del portal (ventas, tiempos, satisfacción, evaluaciones).", "Verde va bien, ámbar a vigilar y rojo hay que atender. Cuando se definan las metas oficiales se ajustan."],

@@ -9,6 +9,7 @@ import { demoSuite, ventasSuite } from "./demo.suite";
 import { evaluacionesSuite } from "./evaluaciones.suite";
 import { minutasSuite } from "./minutas.suite";
 import { documentosSuite } from "./documentos.suite";
+import { almacenSuite } from "./almacen.suite";
 import { pagosSuite } from "./pagos.suite";
 import { calcTabulador } from "@/lib/pricing/tabulador";
 import { DATABASE_URL, as, failure, pool, type Actor } from "./helpers";
@@ -549,6 +550,7 @@ ventasSuite();
 evaluacionesSuite();
 minutasSuite();
 documentosSuite();
+almacenSuite();
 pagosSuite();
 
 afterAll(async () => {

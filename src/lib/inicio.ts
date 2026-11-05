@@ -295,6 +295,37 @@ async function pagos(c: Ctx): Promise<Bloque> {
   };
 }
 
+async function entregas(c: Ctx, modo: "almacen" | "propias"): Promise<Bloque> {
+  let q = c.sb.from("salidas").select("estado, incompleta, cargada_at, created_by, created_at").neq("estado", "cancelada").order("created_at", { ascending: false });
+  if (modo === "propias") q = q.eq("created_by", c.uid);
+  const { data } = await q.limit(3000);
+  const rows = (data ?? []) as { estado: string; incompleta: boolean; cargada_at: string | null; created_at: string }[];
+  if (modo === "propias" && !rows.length) return { alertas: [], seccion: null };
+  const pend = rows.filter((s) => s.estado === "por_cargar" || s.estado === "cargando");
+  const hoyIni = DateTime.fromISO(c.today, { zone: c.tz }).startOf("day").toUTC().toISO()!;
+  const hace24 = DateTime.fromISO(c.nowIso).minus({ hours: 24 }).toISO()!;
+  const viejas = pend.filter((s) => s.created_at < hace24).length;
+  const cargadasHoy = rows.filter((s) => s.estado === "cargada" && s.cargada_at && s.cargada_at >= hoyIni).length;
+  const incompletas = rows.filter((s) => s.incompleta && s.cargada_at && s.cargada_at >= DateTime.fromISO(c.nowIso).minus({ days: 7 }).toISO()!).length;
+  const alertas: Alerta[] = [];
+  if (modo === "almacen" && pend.length) alertas.push({ texto: `${pend.length} factura(s) por cargar${viejas ? ` (${viejas} con más de 24 h)` : ""}`, href: "/entregas", tono: viejas ? "red" : "amber" });
+  if (modo === "propias" && incompletas) alertas.push({ texto: `${incompletas} entrega(s) tuyas salieron incompletas`, href: "/entregas?ver=cargadas", tono: "red" });
+  const metricas: Metrica[] = [
+    { label: "Por cargar", valor: pend.length, tono: modo === "almacen" ? tonoSi(pend.length) : "default", href: "/entregas" },
+    { label: "Más de 24 h", valor: viejas, tono: tonoSi(viejas, "red") },
+    { label: "Cargadas hoy", valor: cargadasHoy, tono: cargadasHoy ? "green" : "default", href: "/entregas?ver=cargadas" },
+    { label: "Incompletas (7 días)", valor: incompletas, tono: tonoSi(incompletas, "red") },
+  ];
+  if (modo === "almacen") {
+    const [recHoy, enAlmacen] = await Promise.all([
+      contar(c.sb.from("recepciones").select("id", { count: "exact", head: true }).eq("fecha", c.today)),
+      contar(c.sb.from("etiquetas").select("id", { count: "exact", head: true }).eq("estado", "almacen")),
+    ]);
+    metricas.push({ label: "Recepciones hoy", valor: recHoy, href: "/almacen/recepciones" }, { label: "Piezas en almacén", valor: enAlmacen, href: "/almacen/inventario" });
+  }
+  return { alertas, seccion: { id: "entregas", titulo: modo === "almacen" ? "Entregas e inventario" : "Mis entregas", icon: "truck", href: "/entregas", metricas } };
+}
+
 async function evalProveedores(c: Ctx): Promise<Bloque> {
   const { data: per } = await c.sb.from("eval_periodos").select("id, nombre").eq("tipo", "proveedores").eq("estado", "activo").maybeSingle();
   if (!per) return { alertas: [], seccion: null };
@@ -387,7 +418,7 @@ export async function cargarTablero(sb: SupabaseClient, uid: string, rol: Rol, t
   const plan: Promise<Bloque>[] = (() => {
     switch (rol) {
       case "vendedor":
-        return [cotizacionesVendedor(c), ventas(c, true), prospeccion(c, true), guias(c, true, false), encuesta(c, true), calidad(c, true), consumo(c, "propio")];
+        return [cotizacionesVendedor(c), ventas(c, true), prospeccion(c, true), guias(c, true, false), entregas(c, "propias"), encuesta(c, true), calidad(c, true), consumo(c, "propio")];
       case "comprador":
         return [cotizacionesCompras(c, false), pagos(c), consumo(c, "atender"), evalProveedores(c), soloResumen(ventas(c, false)), soloResumen(calidad(c, false)), controlCambios(c)];
       case "jefe_ventas":
@@ -399,10 +430,10 @@ export async function cargarTablero(sb: SupabaseClient, uid: string, rol: Rol, t
       case "coordinador_iso":
         return [calidad(c, false), controlCambios(c), encuesta(c, false), evalProveedores(c), soloResumen(ventas(c, false)), soloResumen(guias(c, false, false))];
       case "marketplaces":
-        return [guias(c, false, true), consumo(c, "propio")];
+        return [guias(c, false, true), entregas(c, "propias"), consumo(c, "propio")];
       case "almacen":
       case "supervisor_almacen":
-        return [evalProveedores(c), consumo(c, "propio")];
+        return [entregas(c, "almacen"), evalProveedores(c), consumo(c, "propio")];
       case "supervisor_finanzas":
         return [consumo(c, "propio")];
       default:
