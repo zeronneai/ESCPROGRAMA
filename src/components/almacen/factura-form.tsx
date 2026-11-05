@@ -9,6 +9,14 @@ import { filasDeItems, leerFacturaTexto, leerFacturaXml, type FacturaLeida } fro
 type Linea = { clave: string; descripcion: string; unidad: string; cantidad: string };
 type Cliente = { nombre: string; razon: string; rfc: string; direccion: string; telefono: string };
 type Cobro = { total: string; moneda: "MXN" | "USD"; pago: "contado" | "credito"; dias: string };
+/** Lo que se leyo del archivo queda fijo; solo se escribe lo que no se pudo leer. */
+type Fijo = {
+  folio: boolean; fecha: boolean; nombre: boolean; razon: boolean; rfc: boolean; direccion: boolean; telefono: boolean;
+  total: boolean; moneda: boolean; pago: boolean; dias: boolean; lineas: boolean; clave: boolean[]; cant: boolean[];
+};
+const SIN_FIJO: Fijo = { folio: false, fecha: false, nombre: false, razon: false, rfc: false, direccion: false, telefono: false, total: false, moneda: false, pago: false, dias: false, lineas: false, clave: [], cant: [] };
+const FIJO_CLS = "cursor-not-allowed !bg-slate-100 !text-slate-700 focus:!ring-0";
+const FALTA_CLS = "!border-amber-400 !bg-amber-50";
 
 async function leerPdf(f: File): Promise<FacturaLeida> {
   const pdfjs = await import("pdfjs-dist");
@@ -61,6 +69,8 @@ export function FacturaForm({ modo = "entrega", today }: { modo?: "entrega" | "v
   const [elegido, setElegido] = useState<{ id: string; nombre: string } | null>(null);
   const [cambiar, setCambiar] = useState(false);
   const [cobro, setCobro] = useState<Cobro>({ total: "", moneda: "MXN", pago: "contado", dias: "" });
+  const [fijo, setFijo] = useState<Fijo>(SIN_FIJO);
+  const [confirmado, setConfirmado] = useState(false);
   const { run, busy, notice, setNotice, router } = useRun();
   const pdfRef = useRef<HTMLInputElement>(null);
   const xmlRef = useRef<HTMLInputElement>(null);
@@ -122,6 +132,14 @@ export function FacturaForm({ modo = "entrega", today }: { modo?: "entrega" | "v
       pago: f.pago ?? "contado",
       dias: f.diasCredito != null ? String(f.diasCredito) : f.pago === "credito" ? "30" : "",
     });
+    const leidoTexto = (x: string | null | undefined) => !!(x && x.trim());
+    setFijo({
+      folio: leidoTexto(f.folio), fecha: leidoTexto(f.fecha),
+      nombre: leidoTexto(c.nombre), razon: leidoTexto(c.razon), rfc: leidoTexto(c.rfc), direccion: leidoTexto(c.direccion), telefono: leidoTexto(c.telefono),
+      total: f.total != null, moneda: !!f.moneda, pago: !!f.pago, dias: f.diasCredito != null,
+      lineas: ls.length > 0, clave: ls.map((l) => !!l.clave || !!l.descripcion), cant: ls.map((l) => l.cantidad !== ""),
+    });
+    setConfirmado(false);
     setLeida(true);
     if (f.folio) void revisarFolio(f.folio);
     void buscarCliente(c);
@@ -140,12 +158,30 @@ export function FacturaForm({ modo = "entrega", today }: { modo?: "entrega" | "v
       const junto = combinar(nuevo.xml, nuevo.pdf);
       if (junto) await aplicar(junto, nuevo.xml ? "XML" : "PDF");
     } catch {
-      setNotice({ tone: "error", text: "No pude leer el archivo. Llena los datos a mano." });
-      setLeida(true);
-      if (!lineas.length) setLineas([{ clave: "", descripcion: "", unidad: "", cantidad: "" }]);
+      setNotice({ tone: "error", text: "No pude leer ese archivo. Revisa que sea el PDF de la factura y vuelve a subirlo." });
     } finally {
       setLeyendo(false);
     }
+  }
+
+  function reiniciar() {
+    leidos.current = { pdf: null, xml: null };
+    setPdf(null);
+    setXml(null);
+    if (pdfRef.current) pdfRef.current.value = "";
+    if (xmlRef.current) xmlRef.current.value = "";
+    setLeida(false);
+    setAvisos([]);
+    setV({ folio: "", fecha: "", cliente: "", vendedor: "", notas: "", uuid: "", comentarios: "", pedido: "" });
+    setLineas([]);
+    setDup(null);
+    setCli({ nombre: "", razon: "", rfc: "", direccion: "", telefono: "" });
+    setMatch(null);
+    setElegido(null);
+    setCobro({ total: "", moneda: "MXN", pago: "contado", dias: "" });
+    setFijo(SIN_FIJO);
+    setConfirmado(false);
+    setNotice(null);
   }
 
   const setL = (i: number, k: keyof Linea, val: string) => setLineas((x) => x.map((l, j) => (j === i ? { ...l, [k]: k === "clave" ? val.toUpperCase() : val } : l)));
@@ -203,10 +239,11 @@ export function FacturaForm({ modo = "entrega", today }: { modo?: "entrega" | "v
           </label>
         </div>
         {leyendo && <p className="flex items-center gap-2 text-sm text-slate-600"><Spinner className="h-4 w-4" /> Leyendo la factura...</p>}
-        {!leida && !leyendo && (
-          <button type="button" className="text-xs text-brand-700 underline" onClick={() => { setLeida(true); setLineas([{ clave: "", descripcion: "", unidad: "", cantidad: "" }]); }}>
-            No tengo el archivo, capturar a mano
-          </button>
+        {leida && (
+          <p className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+            Lo que viene en la factura no se puede cambiar.
+            <button type="button" className="font-medium text-red-700 underline" onClick={reiniciar}>¿Se leyó mal? Quitar y subir otra vez</button>
+          </p>
         )}
       </Card>
 
@@ -214,6 +251,7 @@ export function FacturaForm({ modo = "entrega", today }: { modo?: "entrega" | "v
         <>
           <Card className="space-y-3 p-4 sm:p-5">
             <p className="font-semibold text-slate-900">2. Revisa lo que se leyó</p>
+            <p className="text-xs text-slate-500">Lo gris viene de la factura y no se edita. Lo amarillo no se pudo leer: escríbelo.</p>
             {avisos.map((a) => <Alert key={a} tone="error">{a}</Alert>)}
             {dup && (
               <Alert tone="error">
@@ -223,9 +261,9 @@ export function FacturaForm({ modo = "entrega", today }: { modo?: "entrega" | "v
               </Alert>
             )}
             <div className={`grid gap-3 ${venta ? "sm:grid-cols-2" : "sm:grid-cols-[10rem_10rem_1fr]"}`}>
-              <Field label="Folio *"><Input value={v.folio} onChange={(e) => { setV((s) => ({ ...s, folio: e.target.value.toUpperCase() })); setDup(null); }} onBlur={(e) => revisarFolio(e.target.value)} className={`font-mono ${dup ? "border-red-400 bg-red-50" : ""}`} /></Field>
-              <Field label="Fecha de la factura"><Input type="date" value={v.fecha} max={today} onChange={(e) => setV((s) => ({ ...s, fecha: e.target.value }))} /></Field>
-              {!venta && <Field label="Cliente"><Input value={v.cliente} onChange={(e) => setV((s) => ({ ...s, cliente: e.target.value }))} /></Field>}
+              <Field label="Folio *"><Input value={v.folio} readOnly={fijo.folio} onChange={(e) => { setV((s) => ({ ...s, folio: e.target.value.toUpperCase() })); setDup(null); }} onBlur={(e) => !fijo.folio && revisarFolio(e.target.value)} className={`font-mono ${dup ? "border-red-400 bg-red-50" : fijo.folio ? FIJO_CLS : FALTA_CLS}`} /></Field>
+              <Field label="Fecha de la factura"><Input type="date" value={v.fecha} max={today} readOnly={fijo.fecha} onChange={(e) => setV((s) => ({ ...s, fecha: e.target.value }))} className={fijo.fecha ? FIJO_CLS : FALTA_CLS} /></Field>
+              {!venta && <Field label="Cliente"><Input value={v.cliente} readOnly={!!v.cliente && fijo.folio} onChange={(e) => setV((s) => ({ ...s, cliente: e.target.value }))} className={v.cliente && fijo.folio ? FIJO_CLS : ""} /></Field>}
             </div>
             <div className="space-y-2">
               <p className="text-sm font-medium text-slate-700">Artículos</p>
@@ -234,7 +272,7 @@ export function FacturaForm({ modo = "entrega", today }: { modo?: "entrega" | "v
                   const enCat = l.clave && catalogo[l.clave.toUpperCase()];
                   return (
                     <li key={i} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center">
-                      <input value={l.clave} onChange={(e) => setL(i, "clave", e.target.value)} onBlur={async () => setCatalogo({ ...catalogo, ...(await verificarClavesAction([l.clave])) })} placeholder="ESC-..." className="w-full rounded border border-slate-300 px-2 py-1.5 font-mono text-sm sm:w-44" />
+                      <input value={l.clave} readOnly={!!fijo.clave[i]} onChange={(e) => setL(i, "clave", e.target.value)} onBlur={async () => !fijo.clave[i] && setCatalogo({ ...catalogo, ...(await verificarClavesAction([l.clave])) })} placeholder={fijo.clave[i] ? "Sin clave" : "ESC-..."} className={`w-full rounded border border-slate-300 px-2 py-1.5 font-mono text-sm sm:w-44 ${fijo.clave[i] ? FIJO_CLS : FALTA_CLS}`} />
                       <div className="min-w-0 flex-1 text-sm">
                         {venta && !l.descripcion && !enCat ? (
                           <input value={l.descripcion} onChange={(e) => setL(i, "descripcion", e.target.value)} placeholder="Descripción" className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
@@ -243,14 +281,14 @@ export function FacturaForm({ modo = "entrega", today }: { modo?: "entrega" | "v
                         )}
                         <p className={`text-xs ${enCat ? "text-green-700" : "text-amber-700"}`}>{enCat ? "En el catálogo: se escanea al cargar" : l.clave ? "Esa clave no está en el catálogo: no se escanea" : "Sin clave ESC (servicio o flete): no se escanea"}</p>
                       </div>
-                      <input value={l.cantidad} onChange={(e) => setL(i, "cantidad", e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="Cant." className="w-20 rounded border border-slate-300 px-2 py-1.5 text-right text-sm" aria-label="Cantidad" />
+                      <input value={l.cantidad} readOnly={!!fijo.cant[i]} onChange={(e) => setL(i, "cantidad", e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="Cant." className={`w-20 rounded border border-slate-300 px-2 py-1.5 text-right text-sm ${fijo.cant[i] ? FIJO_CLS : FALTA_CLS}`} aria-label="Cantidad" />
                       <span className="w-24 truncate text-xs text-slate-500">{l.unidad}</span>
-                      <button type="button" onClick={() => setLineas((x) => x.filter((_, j) => j !== i))} className="text-xs text-red-700">Quitar</button>
+                      {!fijo.lineas && <button type="button" onClick={() => setLineas((x) => x.filter((_, j) => j !== i))} className="text-xs text-red-700">Quitar</button>}
                     </li>
                   );
                 })}
               </ul>
-              <button type="button" className="text-xs text-brand-700 underline" onClick={() => setLineas((x) => [...x, { clave: "", descripcion: "", unidad: "", cantidad: "" }])}>+ Agregar renglón</button>
+              {!fijo.lineas && <button type="button" className="text-xs text-brand-700 underline" onClick={() => setLineas((x) => [...x, { clave: "", descripcion: "", unidad: "", cantidad: "" }])}>+ Agregar renglón</button>}
             </div>
             {(!venta || escaneables.length > 0) && (
               <Field label="Notas para almacén (opcional)"><Input value={v.notas} onChange={(e) => setV((s) => ({ ...s, notas: e.target.value }))} placeholder="Ej. Sale hoy en la tarde por Estafeta" /></Field>
@@ -283,25 +321,25 @@ export function FacturaForm({ modo = "entrega", today }: { modo?: "entrega" | "v
                   </div>
                 )}
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Nombre comercial"><Input value={cli.nombre} onChange={setC("nombre")} onBlur={() => !elegido && buscarCliente(cli)} /></Field>
-                  <Field label="Razón social"><Input value={cli.razon} onChange={setC("razon")} onBlur={() => !elegido && buscarCliente(cli)} /></Field>
-                  <Field label="RFC"><Input value={cli.rfc} onChange={setC("rfc")} onBlur={() => !elegido && buscarCliente(cli)} className="font-mono" /></Field>
-                  <Field label="Teléfono"><Input value={cli.telefono} onChange={setC("telefono")} /></Field>
+                  <Field label="Nombre comercial"><Input value={cli.nombre} readOnly={fijo.nombre} onChange={setC("nombre")} onBlur={() => !elegido && buscarCliente(cli)} className={`${fijo.nombre ? FIJO_CLS : ""}`} /></Field>
+                  <Field label="Razón social"><Input value={cli.razon} readOnly={fijo.razon} onChange={setC("razon")} onBlur={() => !elegido && buscarCliente(cli)} className={`${fijo.razon ? FIJO_CLS : ""}`} /></Field>
+                  <Field label="RFC"><Input value={cli.rfc} readOnly={fijo.rfc} onChange={setC("rfc")} onBlur={() => !elegido && buscarCliente(cli)} className={`font-mono ${fijo.rfc ? FIJO_CLS : ""}`} /></Field>
+                  <Field label="Teléfono"><Input value={cli.telefono} readOnly={fijo.telefono} onChange={setC("telefono")} className={`${fijo.telefono ? FIJO_CLS : ""}`} /></Field>
                 </div>
-                <Field label="Dirección fiscal"><Input value={cli.direccion} onChange={setC("direccion")} /></Field>
+                <Field label="Dirección fiscal"><Input value={cli.direccion} readOnly={fijo.direccion} onChange={setC("direccion")} className={fijo.direccion ? FIJO_CLS : ""} /></Field>
               </Card>
 
               <Card className="space-y-3 p-4 sm:p-5">
                 <p className="font-semibold text-slate-900">4. Cobranza</p>
                 <div className="grid gap-3 sm:grid-cols-4">
-                  <Field label="Total de la factura *"><Input value={cobro.total} onChange={(e) => setCobro((s) => ({ ...s, total: e.target.value.replace(/[^\d.]/g, "") }))} inputMode="decimal" /></Field>
+                  <Field label="Total de la factura *"><Input value={cobro.total} readOnly={fijo.total} onChange={(e) => setCobro((s) => ({ ...s, total: e.target.value.replace(/[^\d.]/g, "") }))} inputMode="decimal" className={fijo.total ? FIJO_CLS : FALTA_CLS} /></Field>
                   <Field label="Moneda">
-                    <Select value={cobro.moneda} onChange={(e) => setCobro((s) => ({ ...s, moneda: e.target.value as Cobro["moneda"] }))}><option value="MXN">MXN</option><option value="USD">USD</option></Select>
+                    <Select value={cobro.moneda} disabled={fijo.moneda} className={fijo.moneda ? FIJO_CLS : ""} onChange={(e) => setCobro((s) => ({ ...s, moneda: e.target.value as Cobro["moneda"] }))}><option value="MXN">MXN</option><option value="USD">USD</option></Select>
                   </Field>
                   <Field label="Pago">
-                    <Select value={cobro.pago} onChange={(e) => setCobro((s) => ({ ...s, pago: e.target.value as Cobro["pago"], dias: e.target.value === "credito" ? s.dias || "30" : "" }))}><option value="contado">Contado</option><option value="credito">Crédito</option></Select>
+                    <Select value={cobro.pago} disabled={fijo.pago} className={fijo.pago ? FIJO_CLS : FALTA_CLS} onChange={(e) => setCobro((s) => ({ ...s, pago: e.target.value as Cobro["pago"], dias: e.target.value === "credito" ? s.dias || "30" : "" }))}><option value="contado">Contado</option><option value="credito">Crédito</option></Select>
                   </Field>
-                  {cobro.pago === "credito" && <Field label="Días de crédito"><Input value={cobro.dias} onChange={(e) => setCobro((s) => ({ ...s, dias: e.target.value.replace(/\D/g, "") }))} inputMode="numeric" /></Field>}
+                  {cobro.pago === "credito" && <Field label="Días de crédito"><Input value={cobro.dias} readOnly={fijo.dias} onChange={(e) => setCobro((s) => ({ ...s, dias: e.target.value.replace(/\D/g, "") }))} inputMode="numeric" className={fijo.dias ? FIJO_CLS : FALTA_CLS} /></Field>}
                 </div>
                 <p className="text-xs text-slate-500">
                   {cobro.pago === "credito" && v.fecha && Number(cobro.dias) > 0 ? `Vence el ${sumarDias(v.fecha, Number(cobro.dias))}. ` : ""}
@@ -315,11 +353,16 @@ export function FacturaForm({ modo = "entrega", today }: { modo?: "entrega" | "v
             </>
           )}
 
+          <label className="flex items-start gap-2 rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800">
+            <input type="checkbox" checked={confirmado} onChange={(e) => setConfirmado(e.target.checked)} className="mt-0.5 h-4 w-4" />
+            <span>Revisé que el folio, {venta ? "el cliente, el total, " : ""}los artículos y las cantidades coinciden con la factura.</span>
+          </label>
           <div className="flex flex-wrap items-center gap-3">
-            <Button loading={busy === "s"} disabled={!v.folio.trim() || !!dup || !lineasOk || !ventaOk} onClick={guardar}>
+            <Button loading={busy === "s"} disabled={!confirmado || !v.folio.trim() || !!dup || !lineasOk || !ventaOk} onClick={guardar}>
               {venta ? (escaneables.length ? "Registrar venta y mandar a almacén" : "Registrar venta") : "Mandar a almacén para cargar"}
             </Button>
             <span className="text-sm text-slate-500">{escaneables.length} de {lineas.length} partida(s) se escanean en almacén</span>
+            <Button variant="ghost" className="!text-red-700" onClick={reiniciar}>Cancelar y subir otra</Button>
           </div>
         </>
       )}

@@ -128,6 +128,7 @@ export async function crearSalidaAction(fd: FormData): Promise<Result<{ id: stri
   if (usado) return { ok: false, error: mensajeFolio(usado) };
   const sub = await subirArchivos(supabase, fd);
   if ("error" in sub) return { ok: false, error: sub.error };
+  if (!sub.pdf.path && !sub.xml.path) return { ok: false, error: "Sube el PDF (o el XML) de la factura." };
   const { pdf, xml } = sub;
   const { data, error } = await supabase.rpc("salida_crear", {
     p_folio: p.data.folio, p_fecha: p.data.fecha, p_cliente: p.data.cliente, p_vendedor: p.data.vendedor, p_notas: p.data.notas,
@@ -252,6 +253,7 @@ export async function ventaDesdeFacturaAction(fd: FormData): Promise<Result<{ id
   if (usado) return { ok: false, error: mensajeFolio(usado) };
   const sub = await subirArchivos(supabase, fd);
   if ("error" in sub) return { ok: false, error: sub.error };
+  if (!sub.pdf.path && !sub.xml.path) return { ok: false, error: "Sube el PDF (o el XML) de la factura." };
   const { data, error } = await supabase.rpc("venta_desde_factura", {
     p: {
       ...p.data,
