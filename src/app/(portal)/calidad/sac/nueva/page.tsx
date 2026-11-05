@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DateTime } from "luxon";
-import { emptySac, SacForm } from "@/components/calidad/sac-form";
+import { SacForm } from "@/components/calidad/sac-form";
+import { emptySac } from "@/lib/ops/sac-values";
 import { Card, PageHeader } from "@/components/ui";
 import { requireRoles } from "@/lib/auth/sales";
 import { getBusinessSettings } from "@/lib/quotes/server";
