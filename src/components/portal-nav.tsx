@@ -148,12 +148,13 @@ export function PortalNav({
                 </svg>
               </button>
               {menu && (
-                <div className="absolute right-0 mt-2 w-60 rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
-                  <div className="px-3 py-2">
+                <div className="absolute right-0 mt-2 flex max-h-[calc(100vh-5rem)] w-64 flex-col rounded-lg border border-slate-200 bg-white p-1.5 shadow-lg">
+                  <div className="shrink-0 px-3 py-2">
                     <p className="truncate text-sm font-medium text-slate-900">{user.nombre}</p>
                     <p className="text-xs text-slate-500">{rolLabel}</p>
                   </div>
-                  {secondary.length > 0 && <div className="my-1 border-t border-slate-100" />}
+                  {secondary.length > 0 && <div className="my-1 shrink-0 border-t border-slate-100" />}
+                  <div className="menu-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
                   {secondary.map((i) => (
                     <Link
                       key={i.href}
@@ -166,8 +167,9 @@ export function PortalNav({
                       {i.label}
                     </Link>
                   ))}
-                  <div className="my-1 border-t border-slate-100" />
-                  {logout}
+                  </div>
+                  <div className="my-1 shrink-0 border-t border-slate-100" />
+                  <div className="shrink-0">{logout}</div>
                 </div>
               )}
             </div>
