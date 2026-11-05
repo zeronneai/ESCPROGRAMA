@@ -28,7 +28,7 @@ export async function loginAction(_: FormState, formData: FormData): Promise<For
 
   const { error: touchError } = await supabase.rpc("touch_login");
   if (touchError) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     return { error: "Tu usuario esta desactivado. Contacta al administrador." };
   }
   redirect("/");

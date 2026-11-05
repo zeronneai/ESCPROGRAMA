@@ -43,6 +43,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 26 | `0031_pagos_extranjeros.sql` | **Pagos a proveedores extranjeros**: el comprador registra OC con sus facturas o anticipos y las libera; el CEO marca pagado y sube el comprobante; al descargarlo el comprador pasa al historial. |
 | 27 | `0032_pagos_seguimiento.sql` | Pagos: el CEO paga en cuanto hay factura; "carga liberada" pasa a ser seguimiento de la importación; botón **Urgente** y **comentario para el CEO**. |
 | 28 | `0033_ceo_lectura.sql` | El **CEO** ve todo lo que ve la gerente (sin editar), además de Pagos. |
+| 29 | `0034_folio_sac.sql` | Folio seriado de acciones correctivas: **SAC-01, SAC-02...** (renumera las existentes en orden). |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

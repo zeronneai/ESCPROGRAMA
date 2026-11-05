@@ -55,7 +55,7 @@ export function operacionesSuite() {
       const qid = (await q(w.seller1, "insert into public.quejas (via_recepcion, cliente_nombre, descripcion) values ('correo','Lear','Cantidad incompleta') returning id")).rows[0].id;
       expect(await failure(q(w.seller1, "insert into public.acciones_correctivas (solicitante, fuente, descripcion) values ('Vend','queja_cliente','Faltante')"))).toMatch(/row-level security/);
       const sac = (await q(A("iso"), "insert into public.acciones_correctivas (solicitante, fuente, queja_id, descripcion) values ('Coord ISO','queja_cliente',$1,'Faltante en embarque') returning id, numero", [qid])).rows[0];
-      expect(sac.numero).toMatch(/^SAC-\d{4}-\d{3}$/);
+      expect(sac.numero).toMatch(/^SAC-\d{2,}$/);
       expect((await q(w.seller1, "select estado from public.quejas where id=$1", [qid])).rows[0].estado).toBe("con_sac");
       expect(await notif(w.ids.s1, "sac_nueva", sac.id)).toBe(1);
       expect((await q(w.seller1, "select id from public.acciones_correctivas where id=$1", [sac.id])).rowCount).toBe(1);

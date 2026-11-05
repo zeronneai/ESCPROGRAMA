@@ -5,7 +5,7 @@ import { saveSacAction } from "@/actions/calidad";
 import { areaCls, useRun } from "@/components/ops-ui";
 import { Alert, Button, Input, Select } from "@/components/ui";
 import type { SacValues } from "@/lib/ops/sac-values";
-import { FUENTES, SAC_ESTADOS, SEIS_M, type SacActividad, type SacEstado, type SacInput, type SacPersona, type SacVerificacion } from "@/lib/ops/calidad";
+import { CLAUSULAS_ISO, FUENTES, SAC_ESTADOS, SEIS_M, type SacActividad, type SacEstado, type SacInput, type SacPersona, type SacVerificacion } from "@/lib/ops/calidad";
 
 export type { SacValues } from "@/lib/ops/sac-values";
 
@@ -35,8 +35,11 @@ function YesNo({ value, onChange, ro }: { value: boolean | null; onChange: (v: b
   );
 }
 
-export function SacForm({ id, initial, readOnly, quejas }: { id: string | null; initial: SacValues; readOnly: boolean; quejas: { id: string; numero: string; cliente_nombre: string }[] }) {
-  const [v, setV] = useState<SacValues>(initial);
+export function SacForm({ id, initial, readOnly, quejas, folio = null }: { id: string | null; initial: SacValues; readOnly: boolean; quejas: { id: string; numero: string; cliente_nombre: string }[]; folio?: string | null }) {
+  // Una clausula capturada solo con el numero (ej. "8.5.1") se muestra con su nombre de la lista.
+  const clausulaIni = CLAUSULAS_ISO.find((c) => c === initial.clausula.trim() || (!!initial.clausula.trim() && c.startsWith(`${initial.clausula.trim()} `))) ?? initial.clausula;
+  const [v, setV] = useState<SacValues>({ ...initial, clausula: clausulaIni });
+  const [otraClausula, setOtraClausula] = useState(!!clausulaIni && !(CLAUSULAS_ISO as readonly string[]).includes(clausulaIni));
   const { run, busy, notice, router } = useRun();
   const ro = readOnly;
   const t = (k: keyof SacValues) => ({
@@ -70,8 +73,32 @@ export function SacForm({ id, initial, readOnly, quejas }: { id: string | null; 
         <div className="grid gap-3 sm:grid-cols-4">
           <L label="Fecha"><Input type="date" {...t("fecha")} /></L>
           <L label="Solicitante" className="sm:col-span-1"><Input {...t("solicitante")} /></L>
-          <L label="Control de códigos"><Input {...t("codigo_control")} /></L>
-          <L label="Cláusula afectada"><Input {...t("clausula")} placeholder={ro ? "" : "Ej. 8.2.1"} /></L>
+          <L label="Folio">
+            <div className={`flex h-[38px] items-center rounded-md border border-slate-200 bg-slate-50 px-3 text-sm ${folio ? "font-mono font-semibold text-slate-900" : "text-slate-500"}`}>
+              {folio ?? "Se asigna al guardar"}
+            </div>
+          </L>
+          <L label="Cláusula afectada (ISO 9001)">
+            <Select
+              disabled={ro}
+              value={otraClausula ? "__otra" : v.clausula}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === "__otra") {
+                  setOtraClausula(true);
+                  setV((s) => ({ ...s, clausula: "" }));
+                } else {
+                  setOtraClausula(false);
+                  setV((s) => ({ ...s, clausula: val }));
+                }
+              }}
+            >
+              <option value="">Elige</option>
+              {CLAUSULAS_ISO.map((c) => <option key={c} value={c}>{c}</option>)}
+              <option value="__otra">Otra (escribirla)</option>
+            </Select>
+            {otraClausula && <Input {...t("clausula")} placeholder="Ej. 8.3 Diseño y desarrollo" className="mt-1.5" maxLength={80} />}
+          </L>
           <L label="Fuente de generación" className="sm:col-span-2">
             <Select {...t("fuente")}>
               <option value="">Elige</option>

@@ -55,7 +55,7 @@ const ACCESOS: Partial<Record<string, { href: string; label: string }[]>> = {
 
 function Dato({ m, href }: { m: Metrica; href: string }) {
   return (
-    <Link href={m.href ?? href} className={`block rounded-lg px-3 py-2.5 ring-1 transition hover:brightness-95 ${TONO[m.tono ?? "default"]}`}>
+    <Link prefetch={false} href={m.href ?? href} className={`block rounded-lg px-3 py-2.5 ring-1 transition hover:brightness-95 ${TONO[m.tono ?? "default"]}`}>
       <p className="text-xs opacity-80">{m.label}</p>
       <p className="text-xl font-semibold leading-tight">{m.valor}</p>
       {m.hint && <p className="truncate text-[11px] opacity-75">{m.hint}</p>}
@@ -103,7 +103,7 @@ export default async function Inicio() {
           <ul className="grid gap-2 md:grid-cols-2">
             {t.alertas.map((a) => (
               <li key={a.texto}>
-                <Link href={a.href} className={`flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2.5 text-sm shadow-sm ring-1 hover:bg-slate-50 ${a.tono === "red" ? "ring-red-200" : "ring-amber-200"}`}>
+                <Link prefetch={false} href={a.href} className={`flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2.5 text-sm shadow-sm ring-1 hover:bg-slate-50 ${a.tono === "red" ? "ring-red-200" : "ring-amber-200"}`}>
                   <span className="flex items-center gap-2">
                     <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${a.tono === "red" ? "bg-red-600" : "bg-amber-500"}`} />
                     <span className="text-slate-800">{a.texto}</span>
@@ -124,7 +124,7 @@ export default async function Inicio() {
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><Icon name={s.icon} className="h-4 w-4" /></span>
                 {s.titulo}
               </h2>
-              <Link href={s.href} className="shrink-0 text-xs font-medium text-brand-700 hover:underline">Ver detalle</Link>
+              <Link prefetch={false} href={s.href} className="shrink-0 text-xs font-medium text-brand-700 hover:underline">Ver detalle</Link>
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {s.metricas.map((m) => <Dato key={m.label} m={m} href={s.href} />)}

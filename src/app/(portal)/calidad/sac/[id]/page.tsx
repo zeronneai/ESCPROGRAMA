@@ -51,7 +51,7 @@ export default async function Sac({ params }: { params: Promise<{ id: string }> 
         </p>
       </div>
       <Card className="p-4 sm:p-6">
-        <SacForm key={s.updated_at} id={s.id} readOnly={!iso} quejas={quejas ?? (linked ? [linked] : [])} initial={values} />
+        <SacForm key={s.updated_at} id={s.id} folio={s.numero} readOnly={!iso} quejas={quejas ?? (linked ? [linked] : [])} initial={values} />
       </Card>
       <SacExtras
         id={s.id}

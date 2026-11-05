@@ -118,3 +118,26 @@ export const CALIDAD_FILE_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+/** Clausulas de ISO 9001:2015 que mas aplican a una accion correctiva (se guarda el texto completo). */
+export const CLAUSULAS_ISO = [
+  "4.4 Sistema de gestión de la calidad y sus procesos",
+  "5.1.2 Enfoque al cliente",
+  "6.1 Acciones para abordar riesgos y oportunidades",
+  "7.1.5 Recursos de seguimiento y medición",
+  "7.2 Competencia",
+  "7.5 Información documentada",
+  "8.2.1 Comunicación con el cliente",
+  "8.2.2 Requisitos de los productos y servicios",
+  "8.4 Control de los proveedores externos",
+  "8.5.1 Control de la provisión del servicio",
+  "8.5.2 Identificación y trazabilidad",
+  "8.5.4 Preservación",
+  "8.5.5 Actividades posteriores a la entrega",
+  "8.6 Liberación de los productos y servicios",
+  "8.7 Control de las salidas no conformes",
+  "9.1.2 Satisfacción del cliente",
+  "9.2 Auditoría interna",
+  "9.3 Revisión por la dirección",
+  "10.2 No conformidad y acción correctiva",
+] as const;

@@ -14,13 +14,19 @@ export interface SessionUser {
 /** Usuario activo con sesion valida; null si no. */
 export async function getSessionUser(): Promise<SessionUser | null> {
   const supabase = await createClient();
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) return null;
-  const { data: p } = await supabase
-    .from("profiles")
-    .select("id, nombre, correo, rol, activo, must_change_password")
-    .eq("id", data.user.id)
-    .maybeSingle();
+  let { data } = await supabase.auth.getUser();
+  if (!data.user) {
+    // Un tropiezo de red con Auth no debe mandar al usuario al login: se reintenta una vez.
+    await new Promise((r) => setTimeout(r, 300));
+    ({ data } = await supabase.auth.getUser());
+    if (!data.user) return null;
+  }
+  const leer = () => supabase.from("profiles").select("id, nombre, correo, rol, activo, must_change_password").eq("id", data.user!.id).maybeSingle();
+  let { data: p, error } = await leer();
+  if (error) {
+    await new Promise((r) => setTimeout(r, 300));
+    ({ data: p, error } = await leer());
+  }
   if (!p || !p.activo) return null;
   return {
     id: p.id,
