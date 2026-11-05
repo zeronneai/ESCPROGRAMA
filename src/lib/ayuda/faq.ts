@@ -162,7 +162,7 @@ export const FAQ: Faq[] = [
   {
     id: "recordar-guia", q: "Mi guía no sale: ¿cómo le recuerdo a Marketplaces?", roles: V, paths: ["/guias"],
     keys: ["recordar", "recordatorio", "tarda", "no sale", "urgente", "pendiente", "24", "horas"],
-    a: ["Después de 4 horas aparece el botón \"Recordar a Marketplaces\" dentro de la guía (uno por hora).", "También puedes escribirle en los mensajes de la guía.", "Si pasa de 24 horas la guía se marca en rojo para todos."],
+    a: ["Después de 1 hora aparece el botón \"Recordar a Marketplaces\" dentro de la guía (uno por hora).", "También puedes escribirle en los mensajes de la guía.", "A la hora la guía se marca en amarillo y a las 2 horas en rojo fuerte para todos."],
   },
   {
     id: "faltan-datos", q: "Mi guía dice \"Faltan datos\"", roles: V,

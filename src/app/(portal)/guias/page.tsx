@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AutoRefresh } from "@/components/auto-refresh";
 import { Icon } from "@/components/icons";
 import { Chip } from "@/components/ops-ui";
 import { Card, EmptyState, FilterChip, PageHeader, StatCard } from "@/components/ui";
@@ -41,6 +42,7 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
           a.solicitada_at.localeCompare(b.solicitada_at),
     );
   const vencidas = pendientes.filter((g) => guiaAlert(g, now) === "roja").length;
+  const conAlarma = pendientes.filter((g) => guiaAlert(g, now) === "ambar").length;
   const today = new Date().toLocaleDateString("en-CA", { timeZone: cfg.timezone });
   const listasHoy = all.filter((g) => g.lista_at && new Date(g.lista_at).toLocaleDateString("en-CA", { timeZone: cfg.timezone }) === today).length;
   const done = all.filter((g) => g.lista_at).slice(0, 50);
@@ -63,16 +65,23 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
         )}
       />
       {error && <Card className="border-red-200 bg-red-50 text-sm text-red-800">No se pudieron cargar las guías: {error.message}</Card>}
+      <AutoRefresh segundos={60} />
       {vencidas > 0 && (
-        <div className="flex items-center gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-900">
+        <div className="flex animate-pulse items-center gap-3 rounded-lg border-2 border-red-700 bg-red-600 px-4 py-3 text-sm text-white shadow-lg">
+          <Icon name="alert" className="h-6 w-6 shrink-0" />
+          <span className="text-base"><strong>{vencidas} guía(s) con más de 2 horas</strong> sin resolverse. Atiéndelas ya.</span>
+        </div>
+      )}
+      {vencidas === 0 && conAlarma > 0 && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <Icon name="alert" className="h-5 w-5 shrink-0" />
-          <span><strong>{vencidas}</strong> guía(s) llevan más de 24 horas sin resolverse.</span>
+          <span><strong>{conAlarma}</strong> guía(s) llevan más de 1 hora. A las 2 horas se ponen en rojo.</span>
         </div>
       )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label={isMkt ? "Por atender" : "Pendientes"} value={pendientes.filter((g) => g.estado !== "requiere_datos").length} tone={pendientes.length ? "amber" : "default"} />
         <StatCard label="Faltan datos" value={pendientes.filter((g) => g.estado === "requiere_datos").length} tone={pendientes.some((g) => g.estado === "requiere_datos") ? "red" : "default"} hint={isSeller ? "Corrígelas para que avancen" : undefined} />
-        <StatCard label="Más de 24 horas" value={vencidas} tone={vencidas ? "red" : "default"} />
+        <StatCard label="Más de 2 horas" value={vencidas} tone={vencidas ? "red" : "default"} />
         <StatCard label="Listas hoy" value={listasHoy} tone={listasHoy ? "green" : "default"} hint={avgH !== null ? `Promedio ${elapsedText(avgH)} por guía` : undefined} />
       </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -97,11 +106,13 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
               const h = hoursPending(g, now);
               return (
                 <li key={g.id}>
-                  <Link href={`/guias/${g.id}`} className={`flex flex-col gap-1.5 px-4 py-3 hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between ${alert === "roja" ? "border-l-4 border-red-500 bg-red-50/40" : ""}`}>
+                  <Link href={`/guias/${g.id}`} className={`flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${alert === "roja" ? "border-l-8 border-red-600 bg-red-100 hover:bg-red-200" : alert === "ambar" ? "border-l-4 border-amber-500 bg-amber-50 hover:bg-amber-100" : "hover:bg-slate-50"}`}>
                     <div className="min-w-0">
                       <p className="flex flex-wrap items-center gap-2 font-medium text-slate-900">
                         <span className="truncate">{guiaTitle(g)}</span>
                         {g.urgente && <Chip cls="bg-red-600 text-white">URGENTE</Chip>}
+                        {alert === "roja" && <Chip cls="animate-pulse bg-red-700 text-white">ATRASADA +2 h</Chip>}
+                        {alert === "ambar" && <Chip cls="bg-amber-500 text-white">+1 h</Chip>}
                       </p>
                       <p className="text-xs text-slate-500">
                         {g.numero}
@@ -112,7 +123,7 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2 text-xs">
-                      {h !== null && <span className={alert === "roja" ? "font-semibold text-red-700" : alert === "ambar" ? "font-medium text-amber-700" : "text-slate-500"}>Hace {elapsedText(h)}</span>}
+                      {h !== null && <span className={alert === "roja" ? "text-sm font-bold text-red-700" : alert === "ambar" ? "font-semibold text-amber-700" : "text-slate-500"}>Hace {elapsedText(h)}</span>}
                       <Chip cls={st.chip}>{st.label}</Chip>
                     </div>
                   </Link>

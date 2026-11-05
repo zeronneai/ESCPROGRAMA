@@ -61,8 +61,8 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
         </ol>
       )}
       {alert && h !== null && (
-        <div className={`rounded-lg border px-4 py-3 text-sm ${alert === "roja" ? "border-red-300 bg-red-50 text-red-900" : "border-amber-300 bg-amber-50 text-amber-900"}`}>
-          {alert === "roja" ? <strong>Lleva {elapsedText(h)} sin resolverse. </strong> : <>Lleva {elapsedText(h)} pendiente. </>}
+        <div className={`rounded-lg border px-4 py-3 text-sm ${alert === "roja" ? "animate-pulse border-2 border-red-700 bg-red-600 text-white shadow-lg" : "border-amber-300 bg-amber-50 text-amber-900"}`}>
+          {alert === "roja" ? <strong className="text-base">ATRASADA: lleva {elapsedText(h)} sin resolverse (límite 2 horas). </strong> : <>Lleva {elapsedText(h)} pendiente. A las 2 horas se pone en rojo. </>}
           {g.recordatorios > 0 && `Recordatorios enviados: ${g.recordatorios}.`}
         </div>
       )}

@@ -94,7 +94,7 @@ export function operacionesSuite() {
       expect(await failure(q(w.buyer1, "insert into public.consumo_solicitudes (tipo, categoria, descripcion, cantidad, motivo) values ('producto','limpieza','Cloro',3,'Limpieza')"))).toMatch(/row-level security/);
     });
 
-    it("guias: el vendedor pide, Marketplaces toma, pide datos y sube la guia; recordatorio a las 4 horas", async () => {
+    it("guias: el vendedor pide, Marketplaces toma, pide datos y sube la guia; recordatorio a partir de 1 hora", async () => {
       const g = (await q(w.seller1, GUIA, ["F-1234"])).rows[0];
       expect(g).toMatchObject({ vendedor_id: w.ids.s1, estado: "solicitada" });
       expect(await notif(people.mkt.id, "guia_nueva", g.id)).toBe(1);
@@ -102,7 +102,7 @@ export function operacionesSuite() {
       expect((await q(A("mkt"), "select id from public.guias where id=$1", [g.id])).rowCount).toBe(1);
       expect((await q(A("mkt"), "select id from public.quejas")).rowCount).toBe(0);
       expect(await failure(q(w.seller1, "select public.guia_mover($1,'en_proceso')", [g.id]))).toMatch(/Marketplaces/);
-      expect(await failure(q(w.seller1, "select public.guia_recordar($1)", [g.id]))).toMatch(/4 horas/);
+      expect(await failure(q(w.seller1, "select public.guia_recordar($1)", [g.id]))).toMatch(/1 hora/);
       await q(A("mkt"), "select public.guia_mover($1,'en_proceso')", [g.id]);
       await q(A("mkt"), "select public.guia_mover($1,'requiere_datos','Falta la colonia')", [g.id]);
       expect(await notif(w.ids.s1, "guia_requiere_datos", g.id)).toBe(1);

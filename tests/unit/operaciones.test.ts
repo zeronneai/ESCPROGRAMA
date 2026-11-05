@@ -11,15 +11,15 @@ describe("guias", () => {
     expect(guiaTitle({ factura: "A-123", destinatario: "Foxconn", paqueteria: "Paquete Express" })).toBe("A-123 · Foxconn · Paquete Express");
     expect(guiaTitle({ factura: "A-1", destinatario: "Juan", paqueteria: "Otra", paqueteria_otra: "Fletes Juárez" })).toBe("A-1 · Juan · Fletes Juárez");
   });
-  it("alerta ambar a las 4 horas y roja a las 24; nada si ya esta lista", () => {
-    expect(guiaAlert({ estado: "solicitada", solicitada_at: ago(1) }, now)).toBeNull();
-    expect(guiaAlert({ estado: "en_proceso", solicitada_at: ago(5) }, now)).toBe("ambar");
-    expect(guiaAlert({ estado: "solicitada", solicitada_at: ago(25) }, now)).toBe("roja");
+  it("alerta ambar a la hora y roja a las 2 horas; nada si ya esta lista", () => {
+    expect(guiaAlert({ estado: "solicitada", solicitada_at: ago(0.5) }, now)).toBeNull();
+    expect(guiaAlert({ estado: "en_proceso", solicitada_at: ago(1.2) }, now)).toBe("ambar");
+    expect(guiaAlert({ estado: "solicitada", solicitada_at: ago(2.1) }, now)).toBe("roja");
     expect(guiaAlert({ estado: "lista", solicitada_at: ago(30) }, now)).toBeNull();
   });
-  it("recordar: a partir de 4 horas y uno por hora", () => {
-    expect(canRemind({ estado: "solicitada", solicitada_at: ago(3), ultimo_recordatorio_at: null }, now)).toMatchObject({ ok: false, reason: "Podrás recordar en 1 h 0 min" });
-    expect(canRemind({ estado: "solicitada", solicitada_at: ago(4.5), ultimo_recordatorio_at: null }, now).ok).toBe(true);
+  it("recordar: a partir de 1 hora y uno por hora", () => {
+    expect(canRemind({ estado: "solicitada", solicitada_at: ago(0.5), ultimo_recordatorio_at: null }, now)).toMatchObject({ ok: false, reason: "Podrás recordar en 30 min" });
+    expect(canRemind({ estado: "solicitada", solicitada_at: ago(1.5), ultimo_recordatorio_at: null }, now).ok).toBe(true);
     expect(canRemind({ estado: "solicitada", solicitada_at: ago(6), ultimo_recordatorio_at: ago(0.5) }, now).ok).toBe(false);
     expect(canRemind({ estado: "lista", solicitada_at: ago(6), ultimo_recordatorio_at: null }, now).ok).toBe(false);
     expect(elapsedText(0.2)).toBe("12 min");

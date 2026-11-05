@@ -11,7 +11,7 @@ export const DEMO_SECCIONES = [
   { id: "bitacora", label: "Bitácora de ventas / prospección", hint: "Etapas, artículos, cartera, prospecto convertido y uno del sitio web", needs: ["vendedor"] },
   { id: "calidad", label: "Quejas y acción correctiva", hint: "3 quejas y una SAC con plan de acción", needs: ["vendedor", "coordinador_iso"] },
   { id: "consumo", label: "Consumo interno", hint: "Por aprobar, aprobada, agendada y recibida", needs: ["vendedor", "jefe_ventas"] },
-  { id: "guias", label: "Guías de paquetería", hint: "Una con más de 24 h, una con datos faltantes y por atender", needs: ["vendedor", "marketplaces"] },
+  { id: "guias", label: "Guías de paquetería", hint: "Una con más de 2 h, una con datos faltantes y por atender", needs: ["vendedor", "marketplaces"] },
 ] as const;
 
 const ROL: Record<string, string> = { vendedor: "Vendedor", comprador: "Comprador", coordinador_iso: "Coordinador ISO", jefe_ventas: "Jefa de ventas", marketplaces: "Marketplaces" };

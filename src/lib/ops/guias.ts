@@ -19,8 +19,10 @@ export function guiaTitle(g: { factura: string; destinatario: string; paqueteria
   return `${g.factura} · ${g.destinatario} · ${g.paqueteria === "Otra" ? g.paqueteria_otra || "Otra" : g.paqueteria}`;
 }
 
-export const REMIND_AFTER_HOURS = 4;
-export const ALERT_AFTER_HOURS = 24;
+/** Las guias se atienden rapido: alarma a la hora y alerta roja fuerte a las 2 horas. */
+export const AMBAR_AFTER_HOURS = 1;
+export const ALERT_AFTER_HOURS = 2;
+export const REMIND_AFTER_HOURS = 1;
 
 /** Horas que lleva pendiente (desde que se pidio o se corrigieron los datos). */
 export function hoursPending(g: { estado: GuiaEstado; solicitada_at: string }, now: Date): number | null {
@@ -28,16 +30,16 @@ export function hoursPending(g: { estado: GuiaEstado; solicitada_at: string }, n
   return (now.getTime() - new Date(g.solicitada_at).getTime()) / 3_600_000;
 }
 
-/** Alerta visual: roja a las 24 horas, ambar a las 4. */
+/** Alerta visual: ambar a la hora, roja (fuerte) a las 2 horas. */
 export function guiaAlert(g: { estado: GuiaEstado; solicitada_at: string }, now: Date): "roja" | "ambar" | null {
   const h = hoursPending(g, now);
   if (h === null) return null;
   if (h >= ALERT_AFTER_HOURS) return "roja";
-  if (h >= REMIND_AFTER_HOURS) return "ambar";
+  if (h >= AMBAR_AFTER_HOURS) return "ambar";
   return null;
 }
 
-/** El vendedor puede recordar a partir de 4 horas y maximo una vez por hora. */
+/** El vendedor puede recordar a partir de 1 hora y maximo una vez por hora. */
 export function canRemind(g: { estado: GuiaEstado; solicitada_at: string; ultimo_recordatorio_at: string | null }, now: Date): { ok: boolean; reason?: string } {
   const h = hoursPending(g, now);
   if (h === null) return { ok: false, reason: "La guía ya no está pendiente" };

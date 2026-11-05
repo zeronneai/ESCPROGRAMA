@@ -48,6 +48,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 31 | `0036_folio_factura_unico.sql` | Entregas: una factura (folio) **solo se puede subir una vez**, aunque se escriba con guion o espacios. El portal avisa en cuanto se lee el PDF. |
 | 32 | `0037_recepcion_fecha_hoy.sql` | Recepciones: la fecha queda **bloqueada al día en que se registra** (no se puede cambiar). |
 | 33 | `0038_venta_desde_factura.sql` | **Venta con factura**: el vendedor sube el PDF y se registra la venta, el cliente (alta o datos que falten) y la entrega a almacén. Almacén ya no cierra con faltantes: **En espera por falta de material**. |
+| 34 | `0039_guias_alarma_2h.sql` | Guías: el vendedor puede recordar a Marketplaces desde la **1 hora** (antes 4). Alarma a la hora y rojo fuerte a las 2 horas. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

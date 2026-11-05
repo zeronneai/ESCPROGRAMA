@@ -213,14 +213,14 @@ async function guias(c: Ctx, propias: boolean, mkt: boolean): Promise<Bloque> {
   const { data } = await q.limit(5000);
   const rows = (data ?? []) as { estado: string; solicitada_at: string; urgente: boolean; lista_at: string | null }[];
   const abiertas = rows.filter((g) => g.estado === "solicitada" || g.estado === "en_proceso");
-  const hace24 = DateTime.fromISO(c.nowIso).minus({ hours: 24 }).toISO()!;
-  const mas24 = abiertas.filter((g) => g.solicitada_at < hace24).length;
+  const hace2 = DateTime.fromISO(c.nowIso).minus({ hours: 2 }).toISO()!;
+  const mas24 = abiertas.filter((g) => g.solicitada_at < hace2).length;
   const urgentes = abiertas.filter((g) => g.urgente).length;
   const faltan = rows.filter((g) => g.estado === "requiere_datos").length;
   const hoyIni = DateTime.fromISO(c.today, { zone: c.tz }).startOf("day").toUTC().toISO()!;
   const listasHoy = rows.filter((g) => g.estado === "lista" && g.lista_at && g.lista_at >= hoyIni).length;
   const alertas: Alerta[] = [];
-  if (mas24) alertas.push({ texto: `${mas24} guía(s) con más de 24 h sin salir`, href: "/guias", tono: "red" });
+  if (mas24) alertas.push({ texto: `${mas24} guía(s) con más de 2 horas sin salir`, href: "/guias", tono: "red" });
   if (mkt && urgentes) alertas.push({ texto: `${urgentes} guía(s) urgentes por atender`, href: "/guias", tono: "red" });
   if (propias && faltan) alertas.push({ texto: `Marketplaces pide datos en ${faltan} guía(s)`, href: "/guias", tono: "red" });
   return {
@@ -229,7 +229,7 @@ async function guias(c: Ctx, propias: boolean, mkt: boolean): Promise<Bloque> {
       id: "guias", titulo: propias ? "Mis guías" : "Guías de paquetería", icon: "package", href: "/guias",
       metricas: [
         { label: mkt ? "Por atender" : "En proceso", valor: abiertas.length, tono: tonoSi(abiertas.length) },
-        { label: "Más de 24 h", valor: mas24, tono: tonoSi(mas24, "red") },
+        { label: "Más de 2 h", valor: mas24, tono: tonoSi(mas24, "red") },
         { label: "Urgentes", valor: urgentes, tono: tonoSi(urgentes, "red") },
         { label: "Faltan datos", valor: faltan, tono: tonoSi(faltan, propias ? "red" : "amber") },
         { label: "Listas hoy", valor: listasHoy, tono: listasHoy ? "green" : "default" },
