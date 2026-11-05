@@ -296,25 +296,26 @@ async function pagos(c: Ctx): Promise<Bloque> {
 }
 
 async function entregas(c: Ctx, modo: "almacen" | "propias"): Promise<Bloque> {
-  let q = c.sb.from("salidas").select("estado, incompleta, cargada_at, created_by, created_at").neq("estado", "cancelada").order("created_at", { ascending: false });
+  let q = c.sb.from("salidas").select("estado, incompleta, espera, cargada_at, created_by, created_at").neq("estado", "cancelada").order("created_at", { ascending: false });
   if (modo === "propias") q = q.eq("created_by", c.uid);
   const { data } = await q.limit(3000);
-  const rows = (data ?? []) as { estado: string; incompleta: boolean; cargada_at: string | null; created_at: string }[];
+  const rows = (data ?? []) as { estado: string; incompleta: boolean; espera: boolean; cargada_at: string | null; created_at: string }[];
   if (modo === "propias" && !rows.length) return { alertas: [], seccion: null };
   const pend = rows.filter((s) => s.estado === "por_cargar" || s.estado === "cargando");
   const hoyIni = DateTime.fromISO(c.today, { zone: c.tz }).startOf("day").toUTC().toISO()!;
   const hace24 = DateTime.fromISO(c.nowIso).minus({ hours: 24 }).toISO()!;
   const viejas = pend.filter((s) => s.created_at < hace24).length;
   const cargadasHoy = rows.filter((s) => s.estado === "cargada" && s.cargada_at && s.cargada_at >= hoyIni).length;
-  const incompletas = rows.filter((s) => s.incompleta && s.cargada_at && s.cargada_at >= DateTime.fromISO(c.nowIso).minus({ days: 7 }).toISO()!).length;
+  const espera = pend.filter((s) => s.espera).length;
   const alertas: Alerta[] = [];
-  if (modo === "almacen" && pend.length) alertas.push({ texto: `${pend.length} factura(s) por cargar${viejas ? ` (${viejas} con más de 24 h)` : ""}`, href: "/entregas", tono: viejas ? "red" : "amber" });
-  if (modo === "propias" && incompletas) alertas.push({ texto: `${incompletas} entrega(s) tuyas salieron incompletas`, href: "/entregas?ver=cargadas", tono: "red" });
+  const listas = pend.length - espera;
+  if (modo === "almacen" && listas) alertas.push({ texto: `${listas} factura(s) por cargar${viejas ? ` (${viejas} con más de 24 h)` : ""}`, href: "/entregas", tono: viejas ? "red" : "amber" });
+  if (espera) alertas.push({ texto: modo === "almacen" ? `${espera} factura(s) en espera por falta de material` : `Almacén no tiene material para ${espera} de tus entregas`, href: "/entregas", tono: modo === "almacen" ? "amber" : "red" });
   const metricas: Metrica[] = [
     { label: "Por cargar", valor: pend.length, tono: modo === "almacen" ? tonoSi(pend.length) : "default", href: "/entregas" },
     { label: "Más de 24 h", valor: viejas, tono: tonoSi(viejas, "red") },
     { label: "Cargadas hoy", valor: cargadasHoy, tono: cargadasHoy ? "green" : "default", href: "/entregas?ver=cargadas" },
-    { label: "Incompletas (7 días)", valor: incompletas, tono: tonoSi(incompletas, "red") },
+    { label: "En espera (sin material)", valor: espera, tono: tonoSi(espera, "red") },
   ];
   if (modo === "almacen") {
     const [recHoy, enAlmacen] = await Promise.all([

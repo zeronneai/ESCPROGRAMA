@@ -120,7 +120,10 @@ curl -X POST https://<portal>/api/leads/entrada \
 - **Imprimir** (`/imprimir/etiquetas`): hoja carta para recortar (3 columnas de 64 x 35 mm) o etiquetadora de 50 x 25 y 100 x 50 mm.
 - **Entregas**: vendedor, jefa de ventas, marketplaces o almacén suben la factura (PDF y XML opcional). El PDF se lee en el navegador con pdf.js (`src/lib/factura-lector.ts`): folio, cliente y partidas con clave `ESC-` y cantidad. El XML del CFDI, si se sube, es más exacto. El usuario revisa antes de enviar.
 - **Carga**: almacén abre la factura y escanea cada etiqueta (lector USB o cámara del celular, que necesita HTTPS). `salida_escanear` rechaza lo que no viene en la factura, lo que ya salió o lo que sobra, y avisa si hay piezas más antiguas del mismo artículo (PEPS). Todo intento queda en `salida_escaneos`. Al terminar con faltantes pide nota y avisa a quien subió la factura.
-- Bajas de etiquetas (merma, dañado) con motivo; cancelar una entrega regresa sus piezas al almacén.
+- Bajas de etiquetas (merma, dañado) con motivo; cancelar una entrega regresa sus piezas al almacén (la cancela quien subió la factura o la jefa de ventas, no almacén).
+- **Venta con factura** (migración 0038, `venta_desde_factura`): el vendedor arrastra el PDF en Bitácora > Registrar venta con factura. Se leen fecha, folio, folio fiscal, total, moneda, contado o crédito (método PUE/PPD, condiciones y "El día" del pagaré), cliente (RFC, razón social, nombre comercial, dirección fiscal por columna, teléfono) y partidas. El cliente se busca por RFC o nombre; si no existe se da de alta, si existe se completan sus datos vacíos. Si hay artículos del catálogo se crea también la entrega, y al terminar la carga la venta queda Entregada.
+- Almacén no cierra con faltantes: `salida_espera` deja la factura En espera por falta de material (avisa al vendedor y a compras) y se retoma al llegar el material.
+- La cámara solo lee el QR que está dentro del cuadro y exige dos lecturas iguales seguidas (evita leer etiquetas vecinas).
 
 ## Inicio (tablero por puesto) y CEO con lectura de todo (migración 0033)
 

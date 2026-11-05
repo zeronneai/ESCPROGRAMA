@@ -55,15 +55,21 @@ export function almacenSuite() {
       expect(await scan(cod(L)[0])).toMatchObject({ ok: false, mensaje: expect.stringMatching(/ya se escaneo/) });
       expect(await scan(`https://x.mx/e/${cod(L)[1].toLowerCase()}`)).toMatchObject({ ok: true, faltan: 1 });
       expect(await scan(cod(L)[2])).toMatchObject({ ok: false, mensaje: expect.stringMatching(/Ya se cargo todo/) });
-      expect(await failure(q(alm.a, "select public.salida_terminar($1)", [sal]))).toMatch(/Faltan 1/);
+      expect(await failure(q(alm.a, "select public.salida_terminar($1, 'cierro asi')", [sal]))).toMatch(/Faltan 1 pieza/);
+      // Sin material: queda en espera (no se cancela) y avisa al vendedor
+      expect(await failure(q(alm.a, "select public.salida_espera($1, true, '')", [sal]))).toMatch(/Escribe el mensaje/);
+      await q(alm.a, "select public.salida_espera($1, true, 'No hay talla M')", [sal]);
+      expect((await q(w.seller1, "select estado, espera, espera_nota from public.salidas where id=$1", [sal])).rows[0]).toEqual({ estado: "cargando", espera: true, espera_nota: "No hay talla M" });
+      expect(Number((await q("postgres", "select count(*) from public.notifications where tipo='salida_espera' and user_id=$1", [w.ids.s1])).rows[0].count)).toBe(1);
+      expect(await failure(q(w.seller1, "select public.salida_espera($1, false)", [sal]))).toMatch(/Solo almacen/);
       // Quitar por error y volver a escanear
       await q(alm.a, "select public.salida_quitar($1,$2)", [sal, cod(L)[1]]);
       expect((await q(alm.a, "select estado from public.etiquetas where codigo=$1", [cod(L)[1]])).rows[0].estado).toBe("almacen");
       await scan(cod(L)[2]);
       expect(await scan(cod(M)[0])).toMatchObject({ ok: true, faltan: 0 });
       await q(alm.a, "select public.salida_terminar($1)", [sal]);
-      const fin = (await q(w.seller1, "select estado, incompleta from public.salidas where id=$1", [sal])).rows[0];
-      expect(fin).toEqual({ estado: "cargada", incompleta: false });
+      const fin = (await q(w.seller1, "select estado, incompleta, espera from public.salidas where id=$1", [sal])).rows[0];
+      expect(fin).toEqual({ estado: "cargada", incompleta: false, espera: false });
       expect(Number((await q("postgres", "select count(*) from public.notifications where tipo='salida_cargada' and user_id=$1", [w.ids.s1])).rows[0].count)).toBe(1);
       // Otra factura no puede usar una etiqueta que ya salio
       const sal2 = (await q(w.seller1, "select public.salida_crear($1, null, null, null, null, null, null, null, $2::jsonb) as id", [folio + "B", JSON.stringify([{ clave: "ESC-GLPFGG-L", cantidad: 1 }])])).rows[0].id;
@@ -75,12 +81,50 @@ export function almacenSuite() {
       // Cancelar regresa las etiquetas
       await q(alm.a, "select public.salida_escanear($1,$2)", [sal2, cod(L)[1]]);
       expect(await failure(q(w.seller2, "select public.salida_cancelar($1,'x')", [sal2]))).toMatch(/No autorizado/);
-      await q(alm.a, "select public.salida_cancelar($1,'El cliente cancelo')", [sal2]);
+      // Almacen ya no cancela; el vendedor tampoco si ya se empezo a cargar; la jefa de ventas si.
+      expect(await failure(q(alm.a, "select public.salida_cancelar($1,'x')", [sal2]))).toMatch(/No autorizado/);
+      expect(await failure(q(w.seller1, "select public.salida_cancelar($1,'x')", [sal2]))).toMatch(/No autorizado/);
+      const jefa = await user("jefe_ventas");
+      await q(jefa.a, "select public.salida_cancelar($1,'El cliente cancelo')", [sal2]);
       expect((await q(alm.a, "select estado from public.etiquetas where codigo=$1", [cod(L)[1]])).rows[0].estado).toBe("almacen");
       // Baja
       await q(alm.a, "select public.etiqueta_baja($1,'Caja danada')", [cod(S)[0]]);
       expect(await failure(q(alm.a, "select public.etiqueta_baja($1,'otra')", [cod(S)[0]]))).toMatch(/ya no esta en almacen/);
       expect(await failure(q("postgres", "delete from public.etiquetas where codigo=$1", [cod(S)[0]]))).toMatch(/inmutable|no se puede/i);
+    });
+    it("venta desde factura: cliente por RFC o nuevo, venta, entrega y entregada al cargar", async () => {
+      const w = await createWorld();
+      const alm = await user("almacen");
+      const L = await art("ESC-GLPFGG-L");
+      const rec = (await q(alm.a, "select public.recepcion_crear('compra', null, null, null, null, $1::jsonb) as id", [JSON.stringify([{ articulo_id: L, cantidad: 1 }])])).rows[0].id;
+      const cod = (await q("postgres", "select codigo from public.etiquetas where recepcion_id=$1", [rec])).rows[0].codigo;
+      const folio = "V" + Math.floor(Math.random() * 1e8);
+      const rfc = "PEL" + String(Math.floor(Math.random() * 1e6)).padStart(6, "0") + "AB1";
+      const datos = (o: Record<string, unknown> = {}) => JSON.stringify({
+        folio, fecha: null, uuid: randomUUID(), rfc, razon_social: "JUAN PRUEBA " + folio, nombre: "TACOS " + folio,
+        direccion: "CALLE 1, CENTRO", telefono: "(614) 123-4567", pago: "credito", dias_credito: 7, total: 1160, moneda: "MXN",
+        lineas: [{ clave: "ESC-GLPFGG-L", descripcion: "Guante L", cantidad: 1 }, { clave: null, descripcion: "Flete", cantidad: 1 }], ...o,
+      });
+      // Solo vendedores
+      expect(await failure(q(alm.a, "select public.venta_desde_factura($1::jsonb)", [datos()]))).toMatch(/vendedores/);
+      const r = (await q(w.seller1, "select public.venta_desde_factura($1::jsonb) as r", [datos()])).rows[0].r;
+      expect(r.cliente_nuevo).toBe(true);
+      expect(r.salida_id).toBeTruthy();
+      const c = (await q(w.seller1, "select nombre, tipo, rfc, razon_social, direccion, contacto_telefono from public.customers where id=$1", [r.customer_id])).rows[0];
+      expect(c).toEqual({ nombre: "TACOS " + folio, tipo: "cliente", rfc, razon_social: "JUAN PRUEBA " + folio, direccion: "CALLE 1, CENTRO", contacto_telefono: "(614) 123-4567" });
+      const v = (await q(w.seller1, "select factura, monto::float, pago, dias_credito, origen, entregado, vence = fecha + 7 as vence_ok, (select count(*)::int from public.venta_lineas where venta_id = ventas.id) as n from public.ventas where id=$1", [r.venta_id])).rows[0];
+      expect(v).toEqual({ factura: folio, monto: 1160, pago: "credito", dias_credito: 7, origen: "factura", entregado: false, vence_ok: true, n: 2 });
+      expect((await q(w.seller1, "select venta_id from public.salidas where id=$1", [r.salida_id])).rows[0].venta_id).toBe(r.venta_id);
+      // Repetida (aunque cambie el formato del folio) no
+      expect(await failure(q(w.seller1, "select public.venta_desde_factura($1::jsonb)", [datos({ folio: folio.toLowerCase() })]))).toMatch(/No se puede subir dos veces/);
+      // Otra factura del mismo cliente: se encuentra por RFC (y desde Entregas tampoco se puede repetir)
+      const r2 = (await q(w.seller1, "select public.venta_desde_factura($1::jsonb) as r", [datos({ folio: folio + "X", nombre: "OTRO NOMBRE", lineas: [{ clave: null, descripcion: "Servicio", cantidad: 1 }] })])).rows[0].r;
+      expect(r2).toMatchObject({ customer_id: r.customer_id, cliente_nuevo: false, salida_id: null });
+      expect(await failure(q(w.seller2, "select public.salida_crear($1, null, null, null, null, null, null, null, $2::jsonb)", [folio + "X", JSON.stringify([{ clave: "ESC-GLPFGG-L", cantidad: 1 }])]))).toMatch(/registrada como venta/);
+      // Al terminar la carga, la venta queda entregada
+      await q(alm.a, "select public.salida_escanear($1,$2)", [r.salida_id, cod]);
+      await q(alm.a, "select public.salida_terminar($1)", [r.salida_id]);
+      expect((await q(w.seller1, "select entregado from public.ventas where id=$1", [r.venta_id])).rows[0].entregado).toBe(true);
     });
   });
 }

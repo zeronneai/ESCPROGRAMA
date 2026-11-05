@@ -37,7 +37,7 @@ export default async function Entrega({ params, searchParams }: { params: Promis
       <Link href="/entregas" className="text-sm text-slate-500 hover:text-slate-800">← Entregas</Link>
       <PageHeader
         title={`Factura ${sal.folio_factura}`}
-        subtitle={<span className="flex flex-wrap items-center gap-2"><Chip cls={ESTADO_SALIDA[sal.estado].cls}>{ESTADO_SALIDA[sal.estado].label}</Chip>{sal.incompleta && <Chip cls="bg-red-100 text-red-800">Incompleta</Chip>}{sal.cliente}</span>}
+        subtitle={<span className="flex flex-wrap items-center gap-2"><Chip cls={ESTADO_SALIDA[sal.estado].cls}>{ESTADO_SALIDA[sal.estado].label}</Chip>{sal.incompleta && <Chip cls="bg-red-100 text-red-800">Incompleta</Chip>}{sal.espera && abierta && <Chip cls="bg-orange-100 text-orange-800">En espera: sin material</Chip>}{sal.cliente}</span>}
         actions={
           <div className="flex flex-wrap gap-2 text-sm">
             {sal.factura_path && <a href={`/api/facturas/${id}`} target="_blank" rel="noreferrer" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-700 hover:bg-slate-50">Ver factura PDF</a>}
@@ -47,8 +47,10 @@ export default async function Entrega({ params, searchParams }: { params: Promis
       />
       {sp.nueva && <Alert tone="success">Factura enviada a almacén. Te avisamos cuando quede cargada.</Alert>}
       {sal.notas && <Alert tone="info">Nota para almacén: {sal.notas}</Alert>}
+      {!alm && sal.espera && abierta && <Alert tone="error"><span className="font-semibold">Almacén no puede surtir por falta de material:</span> {sal.espera_nota} <span className="text-xs">({[sal.espera_nombre, sal.espera_at ? fmtDate(sal.espera_at, cfg.timezone) : null].filter(Boolean).join(" · ")})</span></Alert>}
+      {sal.venta_id && !alm && <p className="text-sm"><Link href={u.rol === "vendedor" ? `/vendedor/bitacora/venta/${sal.venta_id}` : `/ventas/venta/${sal.venta_id}`} className="text-brand-700 underline">Ver la venta registrada con esta factura</Link></p>}
       {alm && abierta ? (
-        <CargaPanel salidaId={id} lineas={lineas} cargadas={cargadas} />
+        <CargaPanel salidaId={id} lineas={lineas} cargadas={cargadas} espera={sal.espera ? { nota: sal.espera_nota, nombre: sal.espera_nombre, fecha: sal.espera_at ? fmtDate(sal.espera_at, cfg.timezone) : null } : null} />
       ) : (
         <Card className="p-0">
           <ul className="divide-y divide-slate-100">
@@ -77,7 +79,7 @@ export default async function Entrega({ params, searchParams }: { params: Promis
           ]}
         />
       </Card>
-      {!alm && sal.estado === "por_cargar" && sal.created_by === u.id && <CancelarEntrega salidaId={id} />}
+      {!alm && ((sal.estado === "por_cargar" && sal.created_by === u.id) || (abierta && u.rol === "jefe_ventas")) && <CancelarEntrega salidaId={id} />}
       {logs.length > 0 && (
         <details className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm">
           <summary className="cursor-pointer font-medium text-slate-800">Registro de escaneos ({logs.length}){rechazos ? ` · ${rechazos} rechazado(s)` : ""}</summary>

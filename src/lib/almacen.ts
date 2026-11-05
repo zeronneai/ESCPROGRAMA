@@ -51,9 +51,14 @@ export interface SalidaRow {
   created_by: string;
   autor_nombre: string | null;
   created_at: string;
+  venta_id: string | null;
+  espera: boolean;
+  espera_nota: string | null;
+  espera_at: string | null;
+  espera_nombre: string | null;
 }
 export const SALIDA_COLS =
-  "id, folio_factura, fecha_factura, cliente, vendedor_factura, factura_path, factura_nombre, xml_path, estado, incompleta, notas, cierre_nota, cargada_at, cargada_nombre, created_by, autor_nombre, created_at";
+  "id, folio_factura, fecha_factura, cliente, vendedor_factura, factura_path, factura_nombre, xml_path, estado, incompleta, notas, cierre_nota, cargada_at, cargada_nombre, created_by, autor_nombre, created_at, venta_id, espera, espera_nota, espera_at, espera_nombre";
 
 export interface SalidaLinea {
   id: string;

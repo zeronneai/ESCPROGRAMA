@@ -64,6 +64,31 @@ const salidaSchema = z.object({
   lineas: z.array(lineaSalida).min(1, "La factura no tiene artículos"),
 });
 
+
+type Archivo = { path: string | null; nombre: string | null };
+/** Sube el PDF y el XML de la factura al bucket "facturas". */
+async function subirArchivos(supabase: Awaited<ReturnType<typeof createClient>>, fd: FormData): Promise<{ pdf: Archivo; xml: Archivo } | { error: string }> {
+  const carpeta = randomUUID();
+  const subir = async (campo: string, tipos: string[]) => {
+    const f = fd.get(campo);
+    if (!(f instanceof File) || f.size === 0) return { path: null as string | null, nombre: null as string | null };
+    if (f.size > 10 * 1024 * 1024) throw new Error("El archivo pesa más de 10 MB");
+    const ct = f.type || (f.name.toLowerCase().endsWith(".xml") ? "text/xml" : "application/pdf");
+    if (!tipos.includes(ct)) throw new Error(campo === "pdf" ? "La factura debe ser PDF" : "El XML no es válido");
+    const path = `${carpeta}/${f.name.replace(/[^\w.\-]+/g, "_").slice(-80)}`;
+    const { error } = await supabase.storage.from("facturas").upload(path, f, { contentType: ct });
+    if (error) throw new Error(friendlyError(error.message));
+    return { path, nombre: f.name.slice(0, 200) };
+  };
+  try {
+    const pdf = await subir("pdf", ["application/pdf"]);
+    const xml = await subir("xml", ["text/xml", "application/xml"]);
+    return { pdf, xml };
+  } catch (e) {
+    return { error: (e as Error).message };
+  }
+}
+
 /** Subir factura (PDF y/o XML) con lo que se leyo de ella, ya revisado por el usuario. */
 export type FolioUsado = { id: string; folio: string; subio: string | null; cliente: string | null; fecha: string; estado: string; estado_txt: string; puede_ver: boolean };
 
@@ -101,25 +126,9 @@ export async function crearSalidaAction(fd: FormData): Promise<Result<{ id: stri
   // Antes de subir archivos: el folio no se puede repetir.
   const usado = await buscarFolio(supabase, p.data.folio);
   if (usado) return { ok: false, error: mensajeFolio(usado) };
-  const carpeta = randomUUID();
-  const subir = async (campo: string, tipos: string[]) => {
-    const f = fd.get(campo);
-    if (!(f instanceof File) || f.size === 0) return { path: null as string | null, nombre: null as string | null };
-    if (f.size > 10 * 1024 * 1024) throw new Error("El archivo pesa más de 10 MB");
-    const ct = f.type || (f.name.toLowerCase().endsWith(".xml") ? "text/xml" : "application/pdf");
-    if (!tipos.includes(ct)) throw new Error(campo === "pdf" ? "La factura debe ser PDF" : "El XML no es válido");
-    const path = `${carpeta}/${f.name.replace(/[^\w.\-]+/g, "_").slice(-80)}`;
-    const { error } = await supabase.storage.from("facturas").upload(path, f, { contentType: ct });
-    if (error) throw new Error(friendlyError(error.message));
-    return { path, nombre: f.name.slice(0, 200) };
-  };
-  let pdf, xml;
-  try {
-    pdf = await subir("pdf", ["application/pdf"]);
-    xml = await subir("xml", ["text/xml", "application/xml"]);
-  } catch (e) {
-    return { ok: false, error: (e as Error).message };
-  }
+  const sub = await subirArchivos(supabase, fd);
+  if ("error" in sub) return { ok: false, error: sub.error };
+  const { pdf, xml } = sub;
   const { data, error } = await supabase.rpc("salida_crear", {
     p_folio: p.data.folio, p_fecha: p.data.fecha, p_cliente: p.data.cliente, p_vendedor: p.data.vendedor, p_notas: p.data.notas,
     p_factura_path: pdf.path, p_factura_nombre: pdf.nombre ?? xml.nombre, p_xml_path: xml.path,
@@ -161,6 +170,17 @@ export async function terminarSalidaAction(salidaId: string, nota: string): Prom
   return { ok: true };
 }
 
+/** Almacen: poner (o quitar) en espera por falta de material. No cancela la factura. */
+export async function esperaSalidaAction(salidaId: string, activa: boolean, nota: string): Promise<Result> {
+  await requireUser();
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("salida_espera", { p_salida: salidaId, p_activa: activa, p_nota: nota || null });
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/entregas");
+  revalidatePath(`/entregas/${salidaId}`);
+  return { ok: true };
+}
+
 export async function cancelarSalidaAction(salidaId: string, motivo: string): Promise<Result> {
   await requireUser();
   const supabase = await createClient();
@@ -179,4 +199,69 @@ export async function verificarClavesAction(claves: string[]): Promise<Record<st
   const supabase = await createClient();
   const { data } = await supabase.from("articulos").select("clave, nombre").in("clave", list);
   return Object.fromEntries((data ?? []).map((a) => [String(a.clave).toUpperCase(), a.nombre as string]));
+}
+
+export type ClienteFactura = { id: string; nombre: string; tipo: string; rfc: string | null; sucursal: string | null };
+
+/** A quien se le registraria la venta (por RFC o nombre de la factura). Null = cliente nuevo. */
+export async function clienteFacturaAction(rfc: string, nombre: string, razon: string): Promise<ClienteFactura | null> {
+  const u = await requireUser();
+  if (u.rol !== "vendedor") return null;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("cliente_factura_preview", { p_rfc: rfc.slice(0, 20), p_nombre: nombre.slice(0, 200), p_razon: razon.slice(0, 200) });
+  if (error) return null;
+  return (data as ClienteFactura | null) ?? null;
+}
+
+const ventaFacturaSchema = z.object({
+  folio: z.string().trim().min(1, "Escribe el folio de la factura").max(40),
+  fecha: z.union([z.literal(""), z.null(), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]).optional().transform((v) => v || null),
+  uuid: z.string().trim().max(40).nullable().optional(),
+  vendedor_factura: z.string().trim().max(150).nullable().optional(),
+  notas_almacen: z.string().trim().max(1000).nullable().optional(),
+  comentarios: z.string().trim().max(2000).nullable().optional(),
+  pedido: z.string().trim().max(80).nullable().optional(),
+  customer_id: z.string().uuid().nullable().optional(),
+  nombre: z.string().trim().max(200).default(""),
+  razon_social: z.string().trim().max(200).default(""),
+  rfc: z.string().trim().max(20).default(""),
+  direccion: z.string().trim().max(300).default(""),
+  telefono: z.string().trim().max(40).default(""),
+  total: z.coerce.number({ message: "Escribe el total de la factura" }).positive("Escribe el total de la factura").max(999_999_999),
+  moneda: z.enum(["MXN", "USD"]),
+  pago: z.enum(["contado", "credito"]),
+  dias_credito: z.coerce.number().int().min(1).max(365).nullable().optional(),
+  lineas: z.array(lineaSalida).min(1, "La factura no tiene artículos"),
+});
+
+/** Vendedor: registrar la venta con la factura (y mandarla a almacen si trae articulos del catalogo). */
+export async function ventaDesdeFacturaAction(fd: FormData): Promise<Result<{ id: string }>> {
+  const u = await requireUser();
+  if (u.rol !== "vendedor") return { ok: false, error: "Las ventas las registran los vendedores." };
+  let datos: unknown;
+  try {
+    datos = JSON.parse(String(fd.get("datos") ?? "{}"));
+  } catch {
+    return { ok: false, error: "Datos inválidos" };
+  }
+  const p = ventaFacturaSchema.safeParse(datos);
+  if (!p.success) return { ok: false, error: p.error.issues[0].message };
+  if (!p.data.customer_id && !p.data.nombre && !p.data.razon_social) return { ok: false, error: "Escribe el nombre del cliente" };
+  const supabase = await createClient();
+  const usado = await buscarFolio(supabase, p.data.folio);
+  if (usado) return { ok: false, error: mensajeFolio(usado) };
+  const sub = await subirArchivos(supabase, fd);
+  if ("error" in sub) return { ok: false, error: sub.error };
+  const { data, error } = await supabase.rpc("venta_desde_factura", {
+    p: {
+      ...p.data,
+      lineas: p.data.lineas.map((l) => ({ ...l, cantidad: Math.ceil(l.cantidad) })),
+      pdf_path: sub.pdf.path, pdf_nombre: sub.pdf.nombre ?? sub.xml.nombre, xml_path: sub.xml.path,
+    },
+  });
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  const r = data as { venta_id: string };
+  revalidatePath("/vendedor/bitacora");
+  revalidatePath("/entregas");
+  return { ok: true, id: r.venta_id };
 }

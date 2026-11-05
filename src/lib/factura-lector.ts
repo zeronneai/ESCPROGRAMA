@@ -17,6 +17,44 @@ export interface FacturaLeida {
   vendedor: string | null;
   lineas: LineaFactura[];
   avisos: string[];
+  /** Datos para registrar la venta y dar de alta al cliente (lo que se pudo leer). */
+  uuid?: string | null;
+  rfc?: string | null;
+  razonSocial?: string | null;
+  nombreComercial?: string | null;
+  direccion?: string | null;
+  telefono?: string | null;
+  moneda?: "MXN" | "USD" | null;
+  metodo?: "PUE" | "PPD" | null;
+  condiciones?: string | null;
+  pago?: "contado" | "credito" | null;
+  diasCredito?: number | null;
+  vence?: string | null;
+  subtotal?: number | null;
+  total?: number | null;
+}
+
+/** Celda de texto con su posicion horizontal (para separar columnas). */
+export type Celda = { x: number; s: string };
+
+const RFC_RE = /\b([A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3})\b/;
+const UUID_RE = /\b([0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12})\b/i;
+
+/** Contado o credito (y dias) a partir del metodo de pago, las condiciones y la fecha de vencimiento. */
+export function pagoDe(metodo: string | null | undefined, condiciones: string | null | undefined, fecha: string | null, vence: string | null): { pago: "contado" | "credito" | null; dias: number | null } {
+  const c = (condiciones ?? "").toUpperCase();
+  const dc = c.match(/(\d{1,3})\s*D[IÍ]AS/);
+  if (/CR[EÉ]DITO/.test(c) || (dc && !/CONTADO/.test(c))) return { pago: "credito", dias: dc ? Number(dc[1]) : diasEntre(fecha, vence) };
+  if (/CONTADO|INMEDIATO/.test(c)) return { pago: "contado", dias: null };
+  if (metodo === "PPD") return { pago: "credito", dias: diasEntre(fecha, vence) };
+  if (metodo === "PUE") return { pago: "contado", dias: null };
+  return { pago: null, dias: null };
+}
+
+function diasEntre(a: string | null, b: string | null): number | null {
+  if (!a || !b) return null;
+  const d = Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86_400_000);
+  return d >= 1 && d <= 365 ? d : null;
 }
 
 const ESC_RE = /\bESC-[A-Z0-9][A-Z0-9.\-/]*/i;
@@ -38,8 +76,10 @@ function cantidadDeNumeros(nums: number[]): number | null {
 }
 
 /** Texto del PDF ya separado en renglones; dentro del renglon, columnas separadas por 2+ espacios. */
-export function leerFacturaTexto(renglones: string[]): FacturaLeida {
-  const lines = renglones.map((l) => l.replace(/\s+$/, "")).filter((l) => l.trim());
+export function leerFacturaTexto(renglones: string[], filas?: Celda[][]): FacturaLeida {
+  const keep = renglones.map((l, i) => ({ l: l.replace(/\s+$/, ""), f: filas?.[i] })).filter((r) => r.l.trim());
+  const lines = keep.map((r) => r.l);
+  const celdas = keep.map((r) => r.f);
   const todo = lines.join("\n");
   const avisos: string[] = [];
 
@@ -97,7 +137,49 @@ export function leerFacturaTexto(renglones: string[]): FacturaLeida {
     avisos.push(claves.length ? "No reconocí la tabla de partidas: revisa las cantidades." : "No encontré artículos en la factura.");
   }
   if (!folio) avisos.push("No encontré el folio: escríbelo.");
-  return { folio: folio ? folio.toUpperCase() : null, fecha, cliente, vendedor, lineas, avisos };
+
+  // --- Datos del cliente y de cobranza
+  const partes = ci >= 0 && lines[ci + 1] ? lines[ci + 1].trim().split(/\s{2,}/) : [];
+  const razonSocial = partes[0] ? limpiar(partes[0]) : null;
+  const nombreComercial = partes[1] && partes[1] !== vendedor ? limpiar(partes[1]) : null;
+  const ri = ci >= 0 ? lines.findIndex((l, i) => i > ci && /\bRFC\s*:/i.test(l)) : -1;
+  const rfc = ri >= 0 ? (lines[ri].toUpperCase().replace(/[\s.-]/g, "").match(RFC_RE)?.[1] ?? null) : null;
+  const ETIQ = /^(Condiciones|Orden de compra|Vendedor|Cliente|CR[EÉ]DITO\b|CONTADO\b|R[ée]gimen)/i;
+  let direccion: string | null = null;
+  if (ci >= 0 && ri > ci) {
+    const x0 = celdas[ci + 1]?.[0]?.x;
+    const trozos: string[] = [];
+    for (let i = ci + 2; i < ri; i++) {
+      if (x0 !== undefined && celdas[i]) {
+        // Solo la columna del cliente (la de la izquierda); la otra es la direccion de entrega.
+        const c = celdas[i]!.find((k) => Math.abs(k.x - x0) < 25);
+        if (c && !ETIQ.test(c.s.trim())) trozos.push(c.s.trim());
+      } else {
+        const t = lines[i].trim().split(/\s{2,}/)[0];
+        if (t && t !== vendedor && !ETIQ.test(t)) trozos.push(t);
+      }
+    }
+    direccion = trozos.length ? limpiar(trozos.join(", ")) : null;
+  }
+  const telefono = (ci >= 0 ? lines.slice(ci).join("\n") : todo).match(/\bTEL\s*\.?\s*:[ \t]*([()\d][()\d \t-]{6,19})/i)?.[1]?.trim() ?? null;
+  const moneda = (todo.match(/Moneda:\s*(MXN|USD)\b/i)?.[1]?.toUpperCase() as "MXN" | "USD" | undefined) ?? null;
+  const metodo = (todo.match(/M[ée]todo de pago:\s*\(?(PUE|PPD)\)?/i)?.[1]?.toUpperCase() as "PUE" | "PPD" | undefined) ?? null;
+  const condiciones = lines.map((l) => l.trim()).find((l) => /^(CR[EÉ]DITO\b.*|CONTADO\b.*)$/i.test(l) && l.length <= 40) ?? null;
+  const dv = todo.match(/El d[ií]a\s+(\d{2})\/(\d{2})\/(\d{4})/i);
+  const vence = dv ? `${dv[3]}-${dv[2]}-${dv[1]}` : null;
+  const montoDe = (re: RegExp) => {
+    const m = lines.map((l) => l.trim().match(re)).find(Boolean);
+    return m ? num(m[1]) : null;
+  };
+  const total = montoDe(/^Total\s+\$?\s*([\d,]+\.\d{2})$/i);
+  const subtotal = montoDe(/^Subtotal\s+\$?\s*([\d,]+\.\d{2})$/i);
+  const uuid = todo.match(/Folio fiscal:\s*([0-9A-F-]{36})/i)?.[1]?.toUpperCase() ?? null;
+  const { pago, dias } = pagoDe(metodo, condiciones, fecha, vence);
+
+  return {
+    folio: folio ? folio.toUpperCase() : null, fecha, cliente, vendedor, lineas, avisos,
+    uuid, rfc, razonSocial, nombreComercial, direccion, telefono, moneda, metodo, condiciones, pago, diasCredito: dias, vence, subtotal, total,
+  };
 }
 
 /** XML del CFDI (3.3 o 4.0). Mas confiable que el PDF. */
@@ -124,24 +206,48 @@ export function leerFacturaXml(xml: string): FacturaLeida {
   const avisos: string[] = [];
   if (!comp) avisos.push("El archivo no parece un CFDI.");
   if (!lineas.length) avisos.push("El XML no tiene conceptos.");
+  const fecha = attr(comp, "Fecha")?.slice(0, 10) ?? null;
+  const metodo = (attr(comp, "MetodoPago")?.toUpperCase() as "PUE" | "PPD" | undefined) ?? null;
+  const condiciones = dec(attr(comp, "CondicionesDePago")) || null;
+  const { pago, dias } = pagoDe(metodo, condiciones, fecha, null);
+  const tfd = xml.match(/<(?:\w+:)?TimbreFiscalDigital\b[^>]*>/)?.[0] ?? "";
+  const n = (v: string | null) => (v != null && Number.isFinite(Number(v)) ? Number(v) : null);
+  const mon = attr(comp, "Moneda")?.toUpperCase();
   return {
     folio: folioN ? `${serie}${folioN}`.toUpperCase() : null,
-    fecha: attr(comp, "Fecha")?.slice(0, 10) ?? null,
+    fecha,
     cliente: dec(attr(receptor, "Nombre")) || null,
     vendedor: null,
     lineas,
     avisos,
+    uuid: attr(tfd, "UUID")?.toUpperCase() ?? null,
+    rfc: attr(receptor, "Rfc")?.toUpperCase() ?? null,
+    razonSocial: dec(attr(receptor, "Nombre")) || null,
+    nombreComercial: null,
+    direccion: attr(receptor, "DomicilioFiscalReceptor") ? `CP ${attr(receptor, "DomicilioFiscalReceptor")}` : null,
+    telefono: null,
+    moneda: mon === "MXN" || mon === "USD" ? mon : null,
+    metodo: metodo === "PUE" || metodo === "PPD" ? metodo : null,
+    condiciones,
+    pago,
+    diasCredito: dias,
+    vence: null,
+    subtotal: n(attr(comp, "SubTotal")),
+    total: n(attr(comp, "Total")),
   };
 }
 
 /** Renglones de un PDF a partir de los elementos de texto de pdf.js (agrupados por altura, ordenados por x). */
-export function renglonesDeItems(items: { str: string; transform: number[] }[]): string[] {
-  const rows = new Map<number, { x: number; s: string }[]>();
+export function filasDeItems(items: { str: string; transform: number[] }[]): Celda[][] {
+  const rows = new Map<number, Celda[]>();
   for (const it of items) {
     if (!it.str?.trim()) continue;
     const y = Math.round(it.transform[5] / 2) * 2;
     if (!rows.has(y)) rows.set(y, []);
     rows.get(y)!.push({ x: it.transform[4], s: it.str.trim() });
   }
-  return [...rows.keys()].sort((a, b) => b - a).map((y) => rows.get(y)!.sort((a, b) => a.x - b.x).map((r) => r.s).join("  "));
+  return [...rows.keys()].sort((a, b) => b - a).map((y) => rows.get(y)!.sort((a, b) => a.x - b.x));
+}
+export function renglonesDeItems(items: { str: string; transform: number[] }[]): string[] {
+  return filasDeItems(items).map((r) => r.map((c) => c.s).join("  "));
 }

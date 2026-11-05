@@ -90,8 +90,11 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
               <Link href="/vendedor/bitacora/venta/nueva?tipo=visita" className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
                 Visita sin venta
               </Link>
-              <Link href="/vendedor/bitacora/venta/nueva" className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
-                <Icon name="plus" className="h-4 w-4" /> Registrar venta
+              <Link href="/vendedor/bitacora/venta/nueva" className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                Venta sin factura
+              </Link>
+              <Link href="/vendedor/bitacora/venta/factura" className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
+                <Icon name="plus" className="h-4 w-4" /> Registrar venta con factura
               </Link>
             </div>
           ) : (

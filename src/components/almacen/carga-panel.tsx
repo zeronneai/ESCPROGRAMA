@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { cancelarSalidaAction, escanearAction, quitarEscaneoAction, terminarSalidaAction, type Escaneo } from "@/actions/almacen";
+import { cancelarSalidaAction, escanearAction, esperaSalidaAction, quitarEscaneoAction, terminarSalidaAction, type Escaneo } from "@/actions/almacen";
 import { Escaner, beep } from "@/components/almacen/escaner";
 import { useRun } from "@/components/ops-ui";
 import { Alert, Button, Card, Input } from "@/components/ui";
@@ -10,12 +10,12 @@ import type { SalidaLinea } from "@/lib/almacen";
 type Cargada = { codigo: string; clave: string };
 
 /** Carga del camion: escanear cada etiqueta contra la factura. */
-export function CargaPanel({ salidaId, lineas: ini, cargadas: iniCargadas }: { salidaId: string; lineas: SalidaLinea[]; cargadas: Cargada[] }) {
+export function CargaPanel({ salidaId, lineas: ini, cargadas: iniCargadas, espera }: { salidaId: string; lineas: SalidaLinea[]; cargadas: Cargada[]; espera: { nota: string | null; nombre: string | null; fecha: string | null } | null }) {
   const [lineas, setLineas] = useState(ini);
   const [cargadas, setCargadas] = useState<Cargada[]>(iniCargadas);
   const [ultimo, setUltimo] = useState<Escaneo | null>(null);
-  const [cerrar, setCerrar] = useState<"terminar" | "cancelar" | null>(null);
-  const [nota, setNota] = useState("");
+  const [enEspera, setEnEspera] = useState(false);
+  const [nota, setNota] = useState("No es posible surtir por falta de material: ");
   const { run, busy, notice, router } = useRun();
   const conClave = lineas.filter((l) => l.articulo_id);
   const faltan = conClave.reduce((a, l) => a + (l.cantidad - l.escaneadas), 0);
@@ -127,27 +127,39 @@ export function CargaPanel({ salidaId, lineas: ini, cargadas: iniCargadas }: { s
         </details>
       )}
 
-      {!cerrar ? (
+      {espera && (
+        <Alert tone="info">
+          <span className="font-semibold">En espera por falta de material.</span> {espera.nota}
+          <span className="block text-xs">{[espera.nombre, espera.fecha].filter(Boolean).join(" · ")}. Cuando llegue el material sigue escaneando; al completar se termina.</span>
+        </Alert>
+      )}
+      {!enEspera ? (
         <div className="flex flex-wrap gap-2">
-          <Button className={faltan ? "" : "bg-green-600 hover:bg-green-700"} onClick={() => (faltan ? setCerrar("terminar") : run("t", () => terminarSalidaAction(salidaId, ""), () => router.refresh()))} loading={busy === "t"}>
-            {faltan ? "Terminar con faltantes" : "Terminar carga"}
+          <Button
+            className={faltan ? "" : "bg-green-600 hover:bg-green-700"}
+            disabled={faltan > 0}
+            title={faltan ? "Solo se termina cuando están todas las piezas" : undefined}
+            onClick={() => run("t", () => terminarSalidaAction(salidaId, ""), () => router.refresh())}
+            loading={busy === "t"}
+          >
+            {faltan ? `Terminar carga (faltan ${faltan})` : "Terminar carga"}
           </Button>
-          <Button variant="ghost" className="text-red-700" onClick={() => setCerrar("cancelar")}>Cancelar entrega</Button>
+          {faltan > 0 && !espera && <Button variant="secondary" onClick={() => setEnEspera(true)}>No hay material: poner en espera</Button>}
+          {espera && <Button variant="ghost" loading={busy === "r"} onClick={() => run("r", () => esperaSalidaAction(salidaId, false, ""), () => router.refresh())}>Ya hay material: quitar espera</Button>}
         </div>
       ) : (
         <Card className="space-y-2 p-4">
-          <p className="text-sm font-medium text-slate-800">{cerrar === "terminar" ? `Faltan ${faltan} pieza(s). ¿Por qué se cierra incompleta?` : "¿Por qué se cancela? Las etiquetas escaneadas regresan al almacén."}</p>
-          <Input value={nota} onChange={(e) => setNota(e.target.value)} placeholder={cerrar === "terminar" ? "Ej. No hay existencia de talla M, se manda después" : "Ej. El cliente canceló el pedido"} />
+          <p className="text-sm font-medium text-slate-800">Mensaje para el vendedor y compras (la factura no se cancela, queda en espera):</p>
+          <Input value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Ej. No es posible surtir por falta de material: talla M" />
           <div className="flex gap-2">
             <Button
-              loading={busy === "c"}
-              disabled={nota.trim().length < 3}
-              className={cerrar === "cancelar" ? "bg-red-600 hover:bg-red-700" : ""}
-              onClick={() => run("c", () => (cerrar === "terminar" ? terminarSalidaAction(salidaId, nota) : cancelarSalidaAction(salidaId, nota)), () => router.refresh())}
+              loading={busy === "e"}
+              disabled={nota.trim().length < 5}
+              onClick={() => run("e", () => esperaSalidaAction(salidaId, true, nota), () => { setEnEspera(false); router.refresh(); })}
             >
-              {cerrar === "terminar" ? "Cerrar incompleta" : "Cancelar entrega"}
+              Poner en espera y avisar
             </Button>
-            <Button variant="ghost" onClick={() => setCerrar(null)}>Regresar</Button>
+            <Button variant="ghost" onClick={() => setEnEspera(false)}>Regresar</Button>
           </div>
         </Card>
       )}
@@ -155,7 +167,7 @@ export function CargaPanel({ salidaId, lineas: ini, cargadas: iniCargadas }: { s
   );
 }
 
-/** El vendedor puede cancelar mientras almacen no empieza a cargar. */
+/** Quien subio la factura la puede cancelar mientras almacen no empieza a cargar (la jefa de ventas, siempre que este abierta). */
 export function CancelarEntrega({ salidaId }: { salidaId: string }) {
   const [abierto, setAbierto] = useState(false);
   const [motivo, setMotivo] = useState("");

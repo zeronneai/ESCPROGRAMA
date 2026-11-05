@@ -48,7 +48,7 @@ export default async function Entregas({ searchParams }: { searchParams: Promise
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="Por cargar" value={pend.length} tone={pend.length ? "amber" : "default"} />
         <StatCard label="Cargadas hoy" value={all.filter((s) => s.estado === "cargada" && s.cargada_at && fmtDate(s.cargada_at, cfg.timezone, false) === fmtDate(new Date().toISOString(), cfg.timezone, false)).length} tone="green" />
-        <StatCard label="Incompletas" value={all.filter((s) => s.incompleta).length} tone={all.some((s) => s.incompleta) ? "red" : "default"} />
+        <StatCard label="En espera (sin material)" value={pend.filter((s) => s.espera).length} tone={pend.some((s) => s.espera) ? "red" : "default"} />
       </div>
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         {(Object.keys(VISTAS) as Vista[]).map((k) => (
@@ -75,6 +75,7 @@ export default async function Entregas({ searchParams }: { searchParams: Promise
                     <div className="flex shrink-0 items-center gap-2">
                       {p.total > 0 && <span className="text-sm font-semibold text-slate-700">{p.hechas}/{p.total}</span>}
                       {s.incompleta && <Chip cls="bg-red-100 text-red-800">Incompleta</Chip>}
+                      {s.espera && (s.estado === "por_cargar" || s.estado === "cargando") && <Chip cls="bg-orange-100 text-orange-800">Sin material</Chip>}
                       <Chip cls={ESTADO_SALIDA[s.estado].cls}>{ESTADO_SALIDA[s.estado].label}</Chip>
                     </div>
                   </Link>

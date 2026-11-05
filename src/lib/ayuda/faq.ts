@@ -339,11 +339,17 @@ export const FAQ: Faq[] = [
   {
     id: "cargar", q: "¿Cómo cargo una factura al camión?", roles: ["almacen", "supervisor_almacen"], paths: ["/entregas"],
     keys: ["cargar", "carga", "camion", "escanear", "escaner", "factura", "entrega", "salida", "camara"],
-    a: ["Abre Entregas, toca la factura y presiona Usar cámara (o usa el escáner de pistola).", "Escanea cada etiqueta al subir la caja: el contador baja y suena un bip. Si la caja no es de esa factura sale en rojo y no se cuenta.", "Si te equivocas, toca Quitar en la última. Al terminar presiona Terminar carga; si faltó algo te pide una nota."],
+    a: ["Abre Entregas, toca la factura y presiona Escanear con la cámara (o usa el escáner de pistola).", "Con la cámara acerca el celular hasta que UN solo QR llene el cuadro blanco. Cada caja suena un bip; si no es de esa factura sale en rojo y no se cuenta.", "Si te equivocas, toca Quitar en esa etiqueta. Terminar carga solo se puede cuando están todas.", "Si no hay material, toca No hay material: poner en espera y escribe el mensaje. No se cancela: se avisa al vendedor y a compras, y cuando llegue sigues escaneando."],
     links: [{ label: "Entregas", href: "/entregas" }],
   },
   {
-    id: "subir-factura", q: "¿Cómo subo una factura para que almacén la cargue?", roles: ["vendedor", "jefe_ventas", "marketplaces", "almacen", "supervisor_almacen"], paths: ["/entregas"],
+    id: "venta-factura", q: "¿Cómo registro una venta con la factura?", roles: ["vendedor"], paths: ["/vendedor/bitacora", "/entregas"],
+    keys: ["venta", "registrar", "factura", "pdf", "xml", "subir", "arrastrar", "cliente", "credito", "cobrar"],
+    a: ["En Bitácora toca Registrar venta con factura y arrastra el PDF de la factura al cuadro (o elígelo con el botón). El XML es opcional y más exacto.", "Se leen la fecha, el folio, el total, si es contado o crédito y los días, el cliente (RFC, razón social, dirección, teléfono) y los artículos. Revisa y guarda.", "Si el cliente no existe se da de alta solo; si ya existe se le completan los datos que falten.", "Si lleva artículos se manda a almacén para cargar. Cuando te paguen márcala como Cobrada. Para ventas sin factura usa Venta sin factura, y para cuando no se vendió, Visita sin venta."],
+    links: [{ label: "Registrar venta con factura", href: "/vendedor/bitacora/venta/factura" }],
+  },
+  {
+    id: "subir-factura", q: "¿Cómo subo una factura para que almacén la cargue?", roles: ["jefe_ventas", "marketplaces", "almacen", "supervisor_almacen"], paths: ["/entregas"],
     keys: ["factura", "subir", "pdf", "xml", "entrega", "almacen", "cargar", "surtir"],
     a: ["En Entregas > Subir factura elige el PDF (y el XML si lo tienes, es más exacto).", "El sistema lee el folio y los artículos ESC- con su cantidad. Revisa que estén bien antes de enviar.", "Almacén recibe aviso y tú ves el avance; te avisa si salió incompleta."],
     links: [{ label: "Entregas", href: "/entregas" }],

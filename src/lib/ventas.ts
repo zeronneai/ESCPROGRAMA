@@ -26,7 +26,7 @@ export interface VentaRow {
   porcentaje_cobrado: number | string;
   fecha_cobro: string | null;
   comentarios: string | null;
-  origen: "vendedor" | "portal";
+  origen: "vendedor" | "portal" | "factura";
   cancelada_at: string | null;
   created_at: string;
   tipo: "venta" | "visita";
