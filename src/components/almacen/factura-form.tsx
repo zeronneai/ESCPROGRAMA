@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { crearSalidaAction, verificarClavesAction } from "@/actions/almacen";
+import { crearSalidaAction, folioUsadoAction, verificarClavesAction, type FolioUsado } from "@/actions/almacen";
 import { useRun } from "@/components/ops-ui";
 import { Alert, Button, Card, Field, Input, Spinner } from "@/components/ui";
 import { leerFacturaTexto, leerFacturaXml, renglonesDeItems, type FacturaLeida } from "@/lib/factura-lector";
@@ -30,6 +30,14 @@ export function FacturaForm() {
   const [v, setV] = useState({ folio: "", fecha: "", cliente: "", vendedor: "", notas: "" });
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [catalogo, setCatalogo] = useState<Record<string, string>>({});
+  const [dup, setDup] = useState<{ folio: string; usado: FolioUsado; mensaje: string } | null>(null);
+
+  async function revisarFolio(folio: string) {
+    const f = folio.trim();
+    if (!f) return setDup(null);
+    const r = await folioUsadoAction(f);
+    setDup(r.usado && r.mensaje ? { folio: f, usado: r.usado, mensaje: r.mensaje } : null);
+  }
   const { run, busy, notice, setNotice, router } = useRun();
   const pdfRef = useRef<HTMLInputElement>(null);
   const xmlRef = useRef<HTMLInputElement>(null);
@@ -40,6 +48,7 @@ export function FacturaForm() {
     setLineas(ls);
     setAvisos(f.avisos.map((a) => `${fuente}: ${a}`));
     setLeida(true);
+    if (f.folio) void revisarFolio(f.folio);
     setCatalogo(await verificarClavesAction(ls.map((l) => l.clave)));
   }
 
@@ -95,8 +104,15 @@ export function FacturaForm() {
           <Card className="space-y-3 p-4 sm:p-5">
             <p className="font-semibold text-slate-900">2. Revisa lo que se leyó</p>
             {avisos.map((a) => <Alert key={a} tone="error">{a}</Alert>)}
+            {dup && (
+              <Alert tone="error">
+                <span className="font-semibold">Folio repetido.</span> {dup.mensaje}
+                {dup.usado.puede_ver && <> <a href={`/entregas/${dup.usado.id}`} className="underline">Ver la entrega</a>.</>}
+                {" "}Si fue un error y hay que volver a subirla, primero se cancela la anterior.
+              </Alert>
+            )}
             <div className="grid gap-3 sm:grid-cols-[10rem_10rem_1fr]">
-              <Field label="Folio *"><Input value={v.folio} onChange={(e) => setV((s) => ({ ...s, folio: e.target.value.toUpperCase() }))} className="font-mono" /></Field>
+              <Field label="Folio *"><Input value={v.folio} onChange={(e) => { setV((s) => ({ ...s, folio: e.target.value.toUpperCase() })); setDup(null); }} onBlur={(e) => revisarFolio(e.target.value)} className={`font-mono ${dup ? "border-red-400 bg-red-50" : ""}`} /></Field>
               <Field label="Fecha"><Input type="date" value={v.fecha} onChange={(e) => setV((s) => ({ ...s, fecha: e.target.value }))} /></Field>
               <Field label="Cliente"><Input value={v.cliente} onChange={(e) => setV((s) => ({ ...s, cliente: e.target.value }))} /></Field>
             </div>
@@ -126,7 +142,7 @@ export function FacturaForm() {
           <div className="flex flex-wrap items-center gap-3">
             <Button
               loading={busy === "s"}
-              disabled={!v.folio.trim() || !lineas.length || lineas.some((l) => !(Number(l.cantidad) > 0))}
+              disabled={!v.folio.trim() || !!dup || !lineas.length || lineas.some((l) => !(Number(l.cantidad) > 0))}
               onClick={() =>
                 run("s", () => {
                   const fd = new FormData();

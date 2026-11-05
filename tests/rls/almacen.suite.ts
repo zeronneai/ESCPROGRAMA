@@ -34,7 +34,13 @@ export function almacenSuite() {
       const fl = JSON.stringify([{ clave: "esc-glpfgg-l", cantidad: 2, descripcion: "Guante L" }, { clave: "ESC-GLPFGG-M", cantidad: 1 }, { clave: null, cantidad: 1, descripcion: "Flete" }]);
       const folio = "F" + Math.floor(Math.random() * 1e8);
       const sal = (await q(w.seller1, "select public.salida_crear($1, current_date, 'Cliente X', 'DIANA', null, null, null, null, $2::jsonb) as id", [folio, fl])).rows[0].id;
-      expect(await failure(q(w.seller1, "select public.salida_crear($1, current_date, 'X', null, null, null, null, null, $2::jsonb)", [folio.toLowerCase(), fl]))).toMatch(/ya esta registrada/);
+      expect(await failure(q(w.seller1, "select public.salida_crear($1, current_date, 'X', null, null, null, null, null, $2::jsonb)", [folio.toLowerCase(), fl]))).toMatch(/No se puede subir dos veces/);
+      // Otro vendedor tampoco puede, aunque lo escriba con guion o espacios, y se le avisa antes
+      const variante = folio.slice(0, 1) + "-" + folio.slice(1, 4) + " " + folio.slice(4).toLowerCase();
+      expect(await failure(q(w.seller2, "select public.salida_crear($1, current_date, 'X', null, null, null, null, null, $2::jsonb)", [variante, fl]))).toMatch(/ya se subio/);
+      const usado = (await q(w.seller2, "select public.salida_folio_usado($1) as u", [variante])).rows[0].u;
+      expect(usado).toMatchObject({ folio, estado: "por_cargar", puede_ver: false });
+      expect((await q(w.seller2, "select public.salida_folio_usado('ZZ-999') as u")).rows[0].u).toBeNull();
       expect(Number((await q("postgres", "select count(*) from public.notifications where tipo='salida_nueva' and ref_id=$1 and user_id=$2", [sal, alm.id])).rows[0].count)).toBe(1);
       expect((await q(w.seller2, "select id from public.salidas where id=$1", [sal])).rowCount).toBe(0);
       expect(await failure(q(w.seller1, "select public.salida_escanear($1,'E-000001')", [sal]))).toMatch(/Solo almacen/);

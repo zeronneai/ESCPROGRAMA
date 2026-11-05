@@ -66,6 +66,27 @@ const salidaSchema = z.object({
 });
 
 /** Subir factura (PDF y/o XML) con lo que se leyo de ella, ya revisado por el usuario. */
+export type FolioUsado = { id: string; folio: string; subio: string | null; cliente: string | null; fecha: string; estado: string; estado_txt: string; puede_ver: boolean };
+
+async function buscarFolio(supabase: Awaited<ReturnType<typeof createClient>>, folio: string): Promise<FolioUsado | null> {
+  if (!folio.trim()) return null;
+  const { data, error } = await supabase.rpc("salida_folio_usado", { p_folio: folio.slice(0, 40) });
+  if (error) return null;
+  return (data as FolioUsado | null) ?? null;
+}
+
+function mensajeFolio(f: FolioUsado) {
+  return `La factura ${f.folio} ya se subió el ${f.fecha} por ${f.subio ?? "otro usuario"} (${f.estado_txt}). No se puede subir dos veces.`;
+}
+
+/** Revisa si un folio ya se subio (para avisar en cuanto se lee la factura). */
+export async function folioUsadoAction(folio: string): Promise<{ usado: FolioUsado | null; mensaje: string | null }> {
+  await requireUser();
+  const supabase = await createClient();
+  const usado = await buscarFolio(supabase, folio);
+  return { usado, mensaje: usado ? mensajeFolio(usado) : null };
+}
+
 export async function crearSalidaAction(fd: FormData): Promise<Result<{ id: string }>> {
   const u = await requireUser();
   if (!(SUBEN_FACTURA as readonly string[]).includes(u.rol)) return { ok: false, error: "No puedes subir facturas." };
@@ -78,6 +99,9 @@ export async function crearSalidaAction(fd: FormData): Promise<Result<{ id: stri
   const p = salidaSchema.safeParse(datos);
   if (!p.success) return { ok: false, error: p.error.issues[0].message };
   const supabase = await createClient();
+  // Antes de subir archivos: el folio no se puede repetir.
+  const usado = await buscarFolio(supabase, p.data.folio);
+  if (usado) return { ok: false, error: mensajeFolio(usado) };
   const carpeta = randomUUID();
   const subir = async (campo: string, tipos: string[]) => {
     const f = fd.get(campo);
