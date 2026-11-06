@@ -1,5 +1,6 @@
 "use client";
 
+import { EVENTO_CAMBIO } from "@/components/realtime-sync";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -53,9 +54,13 @@ export function NotificationBell() {
     const t = setInterval(refreshCount, POLL_MS);
     const onFocus = () => void refreshCount();
     window.addEventListener("focus", onFocus);
+    // Tiempo real: en cuanto llega una notificacion nueva se actualiza el numero.
+    const onCambio = (e: Event) => (e as CustomEvent<string>).detail === "notifications" && void refreshCount();
+    window.addEventListener(EVENTO_CAMBIO, onCambio);
     return () => {
       clearInterval(t);
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener(EVENTO_CAMBIO, onCambio);
     };
   }, [refreshCount]);
 

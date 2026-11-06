@@ -4,6 +4,7 @@ import { NavigationProgress } from "@/components/navigation-progress";
 import { HelpChat } from "@/components/help-chat";
 import { PagosAviso } from "@/components/pagos/pagos-aviso";
 import { NotificationBell } from "@/components/notification-bell";
+import { RealtimeSync } from "@/components/realtime-sync";
 import { AddCustomerButton } from "@/components/customers";
 import { AddSupplierButton } from "@/components/eval/supplier-tools";
 import { PortalNav, type NavItem } from "@/components/portal-nav";
@@ -166,6 +167,7 @@ export default async function PortalLayout({ children }: { children: React.React
             <NotificationBell />
           </>
         } logo={<Logo className="h-7 sm:h-8" />} />
+      <RealtimeSync />
       <main className="pb-safe-nav mx-auto max-w-6xl px-4 pt-5 sm:pt-6">{children}</main>
       <HelpChat rol={user.rol} nombre={user.nombre} />
       <Suspense fallback={null}>
