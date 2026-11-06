@@ -2,6 +2,7 @@
 import { useState, useTransition } from "react";
 import {
   createUserAction,
+  resetAllPasswordsAction,
   resetPasswordAction,
   setUserActiveAction,
   updateUserNameAction,
@@ -35,6 +36,7 @@ export function UsersPanel({ users, meId }: { users: UserRow[]; meId: string }) 
   const [form, setForm] = useState({ nombre: "", correo: "", password: "", rol: "vendedor" as RolNuevo });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<{ id: string; nombre: string } | null>(null);
+  const [primera, setPrimera] = useState<{ id: string | null; nombre: string; password: string } | null>(null);
 
   function run(fn: () => Promise<UserActionResult>, para?: string, onOk?: () => void) {
     setNotice(null);
@@ -54,7 +56,39 @@ export function UsersPanel({ users, meId }: { users: UserRow[]; meId: string }) 
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold tracking-tight">Usuarios</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-semibold tracking-tight">Usuarios</h1>
+        <Button variant="secondary" disabled={pending} onClick={() => setPrimera({ id: null, nombre: "", password: generateTempPassword(10) })}>
+          Todos a primera vez
+        </Button>
+      </div>
+
+      {primera && (
+        <Card className="space-y-3 border-2 border-brand-200 p-4">
+          <p className="font-semibold text-slate-900">
+            {primera.id ? `Modo primera vez: ${primera.nombre}` : "Modo primera vez: TODOS los usuarios activos (menos tú)"}
+          </p>
+          <p className="text-sm text-slate-600">
+            Escribe la contraseña temporal (o deja la que se generó). Con ella entra{primera.id ? "" : "n"} y el sistema le{primera.id ? "" : "s"} pide cambiarla por una propia. Las contraseñas no se pueden ver: se guardan cifradas.
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <Field label="Contraseña temporal (mínimo 8, con letras y números)">
+              <Input value={primera.password} onChange={(e) => setPrimera({ ...primera, password: e.target.value })} className="font-mono" />
+            </Field>
+            <Button
+              disabled={pending || primera.password.length < 8}
+              onClick={() => {
+                const p = primera;
+                if (!p.id && !confirm("Se cambia la contraseña de TODOS los usuarios activos menos la tuya. ¿Seguro?")) return;
+                run(() => (p.id ? resetPasswordAction(p.id, p.password) : resetAllPasswordsAction(p.password)), p.id ? p.nombre : "todos los usuarios", () => setPrimera(null));
+              }}
+            >
+              Guardar y pedir cambio al entrar
+            </Button>
+            <Button variant="ghost" onClick={() => setPrimera(null)}>Cancelar</Button>
+          </div>
+        </Card>
+      )}
 
       {secret && (
         <Alert tone="info">
@@ -191,11 +225,11 @@ export function UsersPanel({ users, meId }: { users: UserRow[]; meId: string }) 
                     variant="ghost"
                     disabled={pending || !u.activo}
                     onClick={() => {
-                      if (confirm(`Restablecer la contraseña de ${u.nombre}?`))
-                        run(() => resetPasswordAction(u.id), u.nombre);
+                      setPrimera({ id: u.id, nombre: u.nombre, password: generateTempPassword(10) });
+                      window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                   >
-                    Restablecer contraseña
+                    Modo primera vez
                   </Button>
                   {u.id !== meId && (
                     <Button

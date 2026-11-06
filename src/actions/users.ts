@@ -74,20 +74,43 @@ export async function createUserAction(input: {
   return { ok: true, tempPassword: password };
 }
 
-export async function resetPasswordAction(userId: string): Promise<UserActionResult> {
+/** "Primera vez": pone una contraseña temporal (la que escribe el comprador o una al azar) y al entrar se la pide cambiar. */
+export async function resetPasswordAction(userId: string, password?: string): Promise<UserActionResult> {
   await requireBuyer();
   if (!z.string().uuid().safeParse(userId).success) return { ok: false, error: "Usuario invalido" };
+  if (password !== undefined) {
+    const p = passwordSchema.safeParse(password);
+    if (!p.success) return { ok: false, error: p.error.issues[0].message };
+  }
 
   const supabase = await createClient();
   // Primero se marca el cambio obligatorio (valida rol del llamador en la BD).
   const { error: rpcError } = await supabase.rpc("admin_flag_password_reset", { p_id: userId });
   if (rpcError) return { ok: false, error: "No se pudo restablecer la contraseña" };
 
-  const temp = generateTempPassword();
+  const temp = password ?? generateTempPassword();
   const { error } = await createAdminClient().auth.admin.updateUserById(userId, { password: temp });
   if (error) return { ok: false, error: "No se pudo restablecer la contraseña" };
   revalidatePath("/comprador/usuarios");
   return { ok: true, tempPassword: temp };
+}
+
+/** Pone en "primera vez" a todos los usuarios activos (menos a quien lo hace) con la misma contraseña temporal. */
+export async function resetAllPasswordsAction(password: string): Promise<UserActionResult> {
+  const me = await requireBuyer();
+  const p = passwordSchema.safeParse(password);
+  if (!p.success) return { ok: false, error: p.error.issues[0].message };
+  const supabase = await createClient();
+  const { data: users } = await supabase.from("profiles").select("id").eq("activo", true).neq("id", me.id);
+  let fallas = 0;
+  for (const u of users ?? []) {
+    const { error: e1 } = await supabase.rpc("admin_flag_password_reset", { p_id: u.id });
+    const { error: e2 } = e1 ? { error: e1 } : await createAdminClient().auth.admin.updateUserById(u.id, { password });
+    if (e2) fallas++;
+  }
+  revalidatePath("/comprador/usuarios");
+  if (fallas) return { ok: false, error: `No se pudo con ${fallas} usuario(s); intenta de nuevo` };
+  return { ok: true, tempPassword: password };
 }
 
 export async function setUserActiveAction(userId: string, active: boolean): Promise<UserActionResult> {
