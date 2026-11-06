@@ -117,7 +117,7 @@ export const FAQ: Faq[] = [
     id: "venta-diaria", q: "¿Cómo registro una venta del día?", roles: V, paths: ["/vendedor/bitacora"],
     keys: ["venta", "ventas", "diaria", "diarias", "registrar", "vendi", "bitacora", "hoy", "factura"],
     a: ["Ve a Bitácora > Ventas diarias y toca \"Registrar venta\".", "Busca al cliente y pon solo el artículo principal (el de mayor costo) con su cantidad.", "Llena pedido u OC, factura, monto sin IVA y si es contado o crédito (días).", "Marca si ya se entregó y cuánto se ha cobrado. Guarda."],
-    links: [{ label: "Registrar venta", href: "/vendedor/bitacora/venta/nueva" }],
+    links: [{ label: "Registrar venta con factura (PDF)", href: "/vendedor/bitacora/venta/factura" }, { label: "Venta sin factura", href: "/vendedor/bitacora/venta/nueva" }],
   },
   {
     id: "visita", q: "Fui con un cliente y no compró: ¿cómo lo registro?", roles: V, paths: ["/vendedor/bitacora"],

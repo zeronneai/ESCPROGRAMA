@@ -52,7 +52,7 @@ const sumarDias = (fecha: string, dias: number) => {
  * modo "entrega": solo se manda a almacen. modo "venta" (vendedor): se registra la venta, se da de alta o
  * completa el cliente y, si hay articulos del catalogo, tambien se manda a almacen.
  */
-export function FacturaForm({ modo = "entrega", today }: { modo?: "entrega" | "venta"; today?: string }) {
+export function FacturaForm({ modo = "entrega", today, cliente = null }: { modo?: "entrega" | "venta"; today?: string; cliente?: { id: string; nombre: string } | null }) {
   const venta = modo === "venta";
   const [pdf, setPdf] = useState<File | null>(null);
   const [xml, setXml] = useState<File | null>(null);
@@ -66,7 +66,7 @@ export function FacturaForm({ modo = "entrega", today }: { modo?: "entrega" | "v
   const [dup, setDup] = useState<{ folio: string; usado: FolioUsado; mensaje: string } | null>(null);
   const [cli, setCli] = useState<Cliente>({ nombre: "", razon: "", rfc: "", direccion: "", telefono: "" });
   const [match, setMatch] = useState<ClienteFactura | null>(null);
-  const [elegido, setElegido] = useState<{ id: string; nombre: string } | null>(null);
+  const [elegido, setElegido] = useState<{ id: string; nombre: string } | null>(cliente);
   const [cambiar, setCambiar] = useState(false);
   const [cobro, setCobro] = useState<Cobro>({ total: "", moneda: "MXN", pago: "contado", dias: "" });
   const [fijo, setFijo] = useState<Fijo>(SIN_FIJO);
@@ -177,7 +177,7 @@ export function FacturaForm({ modo = "entrega", today }: { modo?: "entrega" | "v
     setDup(null);
     setCli({ nombre: "", razon: "", rfc: "", direccion: "", telefono: "" });
     setMatch(null);
-    setElegido(null);
+    setElegido(cliente);
     setCobro({ total: "", moneda: "MXN", pago: "contado", dias: "" });
     setFijo(SIN_FIJO);
     setConfirmado(false);

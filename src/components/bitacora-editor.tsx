@@ -231,9 +231,14 @@ export function BitacoraEditor({
           <p className="text-xs text-slate-500">Cuando compre, registra la venta: pasa a cliente y este prospecto se cierra como ganado.</p>
         )}
         {!ro && mode !== "new" && customer && basePath.startsWith("/vendedor") && (
-          <Link href={`/vendedor/bitacora/venta/nueva?cliente=${customer.id}`} className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700">
-            {v.fecha_pedido ? "Registrar otra venta" : "Registrar su primera venta"}
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/vendedor/bitacora/venta/factura?cliente=${customer.id}`} className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700">
+              {v.fecha_pedido ? "Registrar otra venta con factura (PDF)" : "Registrar su primera venta con factura (PDF)"}
+            </Link>
+            <Link href={`/vendedor/bitacora/venta/nueva?cliente=${customer.id}`} className="inline-flex items-center rounded-md border border-green-600 bg-white px-3 py-2 text-xs font-medium text-green-700 hover:bg-green-50">
+              Venta sin factura
+            </Link>
+          </div>
         )}
       </div>
     ),

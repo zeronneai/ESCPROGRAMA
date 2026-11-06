@@ -20,7 +20,8 @@ const TONO: Record<Tono, string> = {
 const ACCESOS: Partial<Record<string, { href: string; label: string }[]>> = {
   vendedor: [
     { href: "/vendedor/solicitudes/nueva", label: "Nueva solicitud" },
-    { href: "/vendedor/bitacora/venta/nueva", label: "Registrar venta" },
+    { href: "/vendedor/bitacora/venta/factura", label: "Registrar venta con factura (PDF)" },
+    { href: "/vendedor/bitacora/venta/nueva", label: "Venta sin factura" },
     { href: "/vendedor/bitacora/venta/nueva?tipo=visita", label: "Visita sin venta" },
     { href: "/guias/nueva", label: "Pedir guía" },
   ],
