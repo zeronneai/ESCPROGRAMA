@@ -7,6 +7,16 @@ import { Icon, type IconName } from "@/components/icons";
 import type { Rol } from "@/lib/auth/route-guard";
 import { ROL_LABEL } from "@/lib/ops/roles";
 
+/** Igual que Link, pero los PDF (el catalogo) se abren en otra pestaña. */
+function NavLink(props: React.ComponentProps<typeof Link>) {
+  const href = String(props.href);
+  if (href.endsWith(".pdf")) {
+    const { prefetch: _p, replace: _r, scroll: _s, shallow: _sh, passHref: _ph, legacyBehavior: _l, locale: _lo, ...rest } = props as React.ComponentProps<typeof Link> & Record<string, unknown>;
+    return <a {...(rest as React.AnchorHTMLAttributes<HTMLAnchorElement>)} href={href} target="_blank" rel="noreferrer" />;
+  }
+  return <Link {...props} />;
+}
+
 export interface NavItem {
   href: string;
   label: string;
@@ -94,25 +104,25 @@ export function PortalNav({
     <>
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
-          <Link href={items[0]?.href ?? "/"} className="shrink-0" aria-label="Inicio">
+          <NavLink href={items[0]?.href ?? "/"} className="shrink-0" aria-label="Inicio">
             {logo}
-          </Link>
+          </NavLink>
 
           {/* Escritorio */}
           <nav className="hidden flex-1 items-center gap-1 overflow-x-auto md:flex" aria-label="Principal">
             {primary.map((i) => {
               const active = isActive(pathname, i, items);
               return i.cta ? (
-                <Link
+                <NavLink
                   key={i.href}
                   href={i.href}
                   className="ml-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
                 >
                   <Icon name={i.icon} className="h-4 w-4" />
                   {i.label}
-                </Link>
+                </NavLink>
               ) : (
-                <Link
+                <NavLink
                   key={i.href}
                   href={i.href}
                   aria-current={active ? "page" : undefined}
@@ -122,7 +132,7 @@ export function PortalNav({
                 >
                   <Icon name={i.icon} className="h-4 w-4" />
                   {i.label}
-                </Link>
+                </NavLink>
               );
             })}
           </nav>
@@ -156,7 +166,7 @@ export function PortalNav({
                   {secondary.length > 0 && <div className="my-1 shrink-0 border-t border-slate-100" />}
                   <div className="menu-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
                   {secondary.map((i) => (
-                    <Link
+                    <NavLink
                       key={i.href}
                       href={i.href}
                       className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
@@ -165,7 +175,7 @@ export function PortalNav({
                     >
                       <Icon name={i.icon} className="h-4 w-4" />
                       {i.label}
-                    </Link>
+                    </NavLink>
                   ))}
                   </div>
                   <div className="my-1 shrink-0 border-t border-slate-100" />
@@ -187,7 +197,7 @@ export function PortalNav({
             const active = isActive(pathname, i, items);
             return (
               <li key={i.href} className="flex-1">
-                <Link
+                <NavLink
                   href={i.href}
                   aria-current={active ? "page" : undefined}
                   className={`flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium ${active ? "text-brand-700" : "text-slate-500"}`}
@@ -202,7 +212,7 @@ export function PortalNav({
                     </span>
                   )}
                   {i.short ?? i.label}
-                </Link>
+                </NavLink>
               </li>
             );
           })}
@@ -242,7 +252,7 @@ export function PortalNav({
             {secondary.length > 0 && (
               <div className="mt-1 grid grid-cols-3 gap-2">
                 {secondary.map((i) => (
-                  <Link
+                  <NavLink
                     key={i.href}
                     href={i.href}
                     className={`flex flex-col items-center gap-1 rounded-xl border px-2 py-3 text-xs font-medium ${
@@ -251,7 +261,7 @@ export function PortalNav({
                   >
                     <Icon name={i.icon} className="h-5 w-5" />
                     {i.label}
-                  </Link>
+                  </NavLink>
                 ))}
               </div>
             )}

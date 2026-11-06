@@ -15,7 +15,7 @@ interface Notice {
   created_at: string;
 }
 
-const BASE_TITLE = "Portal de cotizaciones | ESC Representaciones";
+const BASE_TITLE = "ESC One | ESC Representaciones";
 const POLL_MS = 60_000;
 
 /** Campana con contador; tambien refleja el conteo en el titulo de la pestana. */

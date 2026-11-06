@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { Logo } from "@/components/logo";
+import { Wordmark } from "@/components/marca";
 import { NavigationProgress } from "@/components/navigation-progress";
 import { HelpChat } from "@/components/help-chat";
 import { PagosAviso } from "@/components/pagos/pagos-aviso";
@@ -160,13 +161,13 @@ export default async function PortalLayout({ children }: { children: React.React
       <Suspense fallback={null}>
         <NavigationProgress />
       </Suspense>
-      <PortalNav items={[{ href: "/inicio", label: "Inicio", icon: "home" }, ...NAV[user.rol]]} user={{ nombre: user.nombre, rol: user.rol }} bell={
+      <PortalNav items={[{ href: "/inicio", label: "Inicio", icon: "home" }, ...NAV[user.rol], { href: "/catalogo-esc-2026.pdf", label: "Catálogo 2026", icon: "download", secondary: true }]} user={{ nombre: user.nombre, rol: user.rol }} bell={
           <>
             {user.rol === "comprador" && <AddSupplierButton />}
             {(user.rol === "vendedor" || user.rol === "jefe_ventas" || user.rol === "comprador") && <AddCustomerButton />}
             <NotificationBell />
           </>
-        } logo={<Logo className="h-7 sm:h-8" />} />
+        } logo={<span className="flex items-center gap-2"><Logo className="h-7 sm:h-8" /><Wordmark className="hidden border-l border-slate-200 pl-2 text-base sm:inline" /></span>} />
       <RealtimeSync />
       <main className="pb-safe-nav mx-auto max-w-6xl px-4 pt-5 sm:pt-6">{children}</main>
       <HelpChat rol={user.rol} nombre={user.nombre} />

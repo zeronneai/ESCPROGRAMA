@@ -1,5 +1,6 @@
 "use client";
 
+import { EnviarCatalogo } from "@/components/catalogo";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -304,6 +305,12 @@ export function BitacoraEditor({
               <p className="text-slate-600">{[customer.contacto_nombre, customer.contacto_telefono, customer.contacto_correo].filter(Boolean).join(" · ") || "Sin contacto"}</p>
               {bitacoraMissing(customer).length > 0 && <p className="text-xs font-medium text-amber-800">Falta para el formato: {bitacoraMissing(customer).join(", ")}</p>}
               {isClient && customerMissing(customer).length > 0 && <p className="text-xs text-slate-500">Para cotizarle falta: {customerMissing(customer).join(", ")}</p>}
+              {!ro && (
+                <div className="pt-2">
+                  <p className="mb-1 text-xs font-medium text-slate-500">Mandarle el catálogo 2026</p>
+                  <EnviarCatalogo compacto telefono={customer.contacto_telefono} correo={customer.contacto_correo} contacto={customer.contacto_nombre} />
+                </div>
+              )}
             </div>
             {!ro && (
               <div className="flex shrink-0 flex-wrap gap-2">

@@ -1,0 +1,13 @@
+/** Nombre y textos de la plataforma interna de ESC Representaciones. */
+export const APP_NOMBRE = "ESC One";
+export const APP_LEMA = "Todo ESC Representaciones en un solo lugar";
+export const APP_TITULO = `${APP_NOMBRE} | ESC Representaciones`;
+
+/** Catalogo vigente: archivo publico (se puede mandar a clientes sin que inicien sesion). */
+export const CATALOGO = { nombre: "Catálogo ESC 2026", archivo: "/catalogo-esc-2026.pdf", ruta: "/catalogo" };
+
+/** Mensaje para mandar el catalogo a un cliente. */
+export function mensajeCatalogo(url: string, contacto?: string | null) {
+  const hola = contacto?.trim() ? `Hola ${contacto.trim().split(" ")[0]}` : "Hola";
+  return `${hola}, te comparto el catálogo 2026 de ESC Representaciones: guantes, desechables, ropa ESD, limpieza para cuarto limpio y materiales de refuerzo. ${url}\n\nCualquier duda o cotización, aquí estoy.`;
+}

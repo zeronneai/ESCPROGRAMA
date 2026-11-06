@@ -1,18 +1,16 @@
-import { Card } from "@/components/ui";
-import { Logo } from "@/components/logo";
+import { DateTime } from "luxon";
+import { AuthShell } from "@/components/auth-shell";
 import { LoginForm } from "./login-form";
+
+export const dynamic = "force-dynamic";
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
+  const h = DateTime.now().setZone("America/Chihuahua").hour;
+  const saludo = h < 12 ? "¡Buenos días!" : h < 19 ? "¡Buenas tardes!" : "¡Buenas noches!";
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 px-4">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <Logo className="h-12" />
-        <h1 className="text-lg font-semibold">Portal de cotizaciones</h1>
-      </div>
-      <Card>
-        <LoginForm inactive={error === "inactivo"} />
-      </Card>
-    </main>
+    <AuthShell titulo={`${saludo} Qué gusto verte`} subtitulo="Bienvenido de nuevo. Entra con tu correo de ESC para seguir donde te quedaste.">
+      <LoginForm inactive={error === "inactivo"} />
+    </AuthShell>
   );
 }

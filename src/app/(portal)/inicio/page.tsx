@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { FondoAzul, Wordmark } from "@/components/marca";
+import { CATALOGO } from "@/lib/marca";
+import { EnviarCatalogo } from "@/components/catalogo";
 import { DateTime } from "luxon";
 import { Icon } from "@/components/icons";
 import { requireUser } from "@/lib/auth/guards";
@@ -77,22 +80,41 @@ export default async function Inicio() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm text-slate-500">{now.toFormat("cccc d 'de' LLLL")} · {ROL_LABEL[u.rol]}</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{saludo}, {u.nombre.split(" ")[0]}</h1>
-        </div>
-        {accesos.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {accesos.map((a, i) => (
-              <Link key={a.href} href={a.href} className={`inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium ${i === 0 ? "bg-brand-600 text-white hover:bg-brand-700" : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}>
-                {i === 0 && <Icon name="plus" className="h-4 w-4" />}
-                {a.label}
-              </Link>
-            ))}
+      <section className="relative isolate overflow-hidden rounded-2xl px-5 pb-16 pt-6 text-white shadow-lg sm:px-8 sm:pb-20 sm:pt-8">
+        <FondoAzul />
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-sky-200">Bienvenido a <Wordmark claro className="normal-case tracking-normal" /></p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{saludo}, {u.nombre.split(" ")[0]}</h1>
+            <p className="mt-1 text-sm text-sky-100/90 first-letter:uppercase">{now.toFormat("cccc d 'de' LLLL")} · {ROL_LABEL[u.rol]}</p>
           </div>
-        )}
-      </div>
+          {accesos.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {accesos.map((a, i) => (
+                <Link key={a.href} href={a.href} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium backdrop-blur ${i === 0 ? "bg-white text-brand-900 shadow hover:bg-sky-50" : "bg-white/10 text-white ring-1 ring-white/30 hover:bg-white/20"}`}>
+                  {i === 0 && <Icon name="plus" className="h-4 w-4" />}
+                  {a.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <a href={CATALOGO.archivo} target="_blank" rel="noreferrer" className="-mt-12 relative mx-3 flex items-center gap-4 rounded-xl bg-white p-3 shadow-md ring-1 ring-slate-200 transition hover:shadow-lg sm:mx-6 sm:p-4">
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#0f2f7a] to-[#1d5fd6] text-xs font-bold text-white">PDF</span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold text-slate-900">{CATALOGO.nombre}</span>
+          <span className="block text-sm text-slate-600">Guantes, desechables, ropa ESD, limpieza y refuerzo. Ábrelo o compártelo con tus clientes.</span>
+        </span>
+        <span className="hidden shrink-0 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white sm:inline">Ver catálogo</span>
+      </a>
+      {["vendedor", "jefe_ventas", "marketplaces"].includes(u.rol) && (
+        <div className="mx-3 -mt-2 flex flex-wrap items-center gap-2 sm:mx-6">
+          <span className="text-sm text-slate-600">Mándalo a un cliente:</span>
+          <EnviarCatalogo compacto />
+        </div>
+      )}
 
       <section className={`rounded-xl border p-4 ${rojas ? "border-red-200 bg-red-50/60" : t.alertas.length ? "border-amber-200 bg-amber-50/50" : "border-green-200 bg-green-50/60"}`}>
         <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-600">

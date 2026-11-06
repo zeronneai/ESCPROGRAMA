@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Portal de cotizaciones | ESC Representaciones",
+  title: "ESC One | ESC Representaciones",
   robots: { index: false, follow: false },
 };
 
