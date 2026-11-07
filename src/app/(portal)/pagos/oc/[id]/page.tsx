@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { DateTime } from "luxon";
 import { OcAcciones } from "@/components/pagos/oc-header";
 import { OcPagos } from "@/components/pagos/oc-pagos";
+import { ProformaPanel } from "@/components/pagos/proforma-panel";
 import type { ProvOpcion } from "@/components/pagos/oc-form";
 import { Chip } from "@/components/ops-ui";
 import { Card, PageHeader, StatCard } from "@/components/ui";
@@ -28,9 +29,17 @@ export default async function OcDetalle({ params }: { params: Promise<{ id: stri
   const comprador = u.rol === "comprador";
   const provs = comprador ? (((await supabase.from("suppliers").select("id, nombre, pagos_moneda").eq("en_pagos", true).order("nombre")).data ?? []) as ProvOpcion[]) : [];
   const sum = (l: (number | string | null)[]) => l.reduce<number>((a, n) => a + Number(n ?? 0), 0);
-  const facturado = sum(pagos.map((p) => p.monto));
-  const pagado = sum(pagos.filter((p) => p.estado === "pagado" || p.estado === "cerrado").map((p) => p.pago_monto ?? p.monto));
-  const base = oc.monto != null ? Number(oc.monto) : facturado;
+  const hechos = pagos.filter((p) => p.estado === "pagado" || p.estado === "cerrado");
+  const facturas = pagos.filter((p) => p.tipo === "factura");
+  const facturado = sum(facturas.map((p) => p.monto));
+  const pagado = sum(hechos.map((p) => p.pago_monto ?? p.monto));
+  const anticipoPagado = sum(hechos.filter((p) => p.tipo === "anticipo").map((p) => p.pago_monto ?? p.monto));
+  const anticipoLibre = Math.max(0, Math.round((anticipoPagado - sum(facturas.map((p) => p.anticipo_aplicado ?? 0))) * 100) / 100);
+  const anticiposPend = sum(pagos.filter((p) => p.tipo === "anticipo" && p.estado === "pendiente").map((p) => p.monto));
+  const total = oc.monto != null ? Number(oc.monto) : oc.proforma_monto != null ? Number(oc.proforma_monto) : null;
+  // Lo que se debe: el total de la OC o lo facturado (lo que sea mayor), o lo registrado si aun no hay total.
+  const base = Math.max(total ?? 0, facturado, total == null ? facturado + anticipoPagado + anticiposPend : 0);
+  const porFacturar = total != null ? Math.max(0, total - facturado) : 0;
 
   return (
     <div className="space-y-4">
@@ -46,13 +55,14 @@ export default async function OcDetalle({ params }: { params: Promise<{ id: stri
       />
       {oc.descripcion && <p className="text-sm text-slate-700">{oc.descripcion}</p>}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Monto de la OC" value={oc.monto != null ? fmtMonto(oc.monto, oc.moneda) : "Sin monto"} />
-        <StatCard label="Facturas y anticipos" value={fmtMonto(facturado, oc.moneda)} hint={`${pagos.length} registro(s)`} />
-        <StatCard label="Pagado" value={fmtMonto(pagado, oc.moneda)} tone={pagado > 0 ? "green" : "default"} />
+        <StatCard label="Total de la OC" value={total != null ? fmtMonto(total, oc.moneda) : "Sin monto"} hint={oc.monto == null && oc.proforma_monto != null ? "Según la proforma" : undefined} />
+        <StatCard label="Facturado" value={fmtMonto(facturado, oc.moneda)} hint={porFacturar > 0.004 ? `Falta por facturar ${fmtMonto(porFacturar, oc.moneda)}` : `${facturas.length} factura(s)`} />
+        <StatCard label="Pagado" value={fmtMonto(pagado, oc.moneda)} tone={pagado > 0 ? "green" : "default"} hint={anticipoLibre > 0.004 ? `Anticipo por descontar ${fmtMonto(anticipoLibre, oc.moneda)}` : undefined} />
         <StatCard label="Falta por pagar" value={fmtMonto(Math.max(0, base - pagado), oc.moneda)} tone={base - pagado > 0 ? "amber" : "green"} />
       </div>
       {comprador && <Card className="p-3"><OcAcciones oc={oc} proveedores={provs} today={today} sinPagos={pagos.length === 0} /></Card>}
-      <OcPagos ocId={oc.id} moneda={oc.moneda} pagos={pagos} rol={comprador ? "comprador" : "ceo"} today={today} cerrada={!!oc.cerrada_at} />
+      <ProformaPanel oc={oc} comprador={comprador} />
+      <OcPagos ocId={oc.id} moneda={oc.moneda} pagos={pagos} anticipoLibre={anticipoLibre} rol={comprador ? "comprador" : "ceo"} today={today} cerrada={!!oc.cerrada_at} />
     </div>
   );
 }

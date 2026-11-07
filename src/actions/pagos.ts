@@ -63,6 +63,8 @@ export async function saveOcAction(id: string | null, input: OcInput, lineas: Pa
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const ls = z.array(pagoSchema).max(50).safeParse(lineas);
   if (!ls.success) return { ok: false, error: ls.error.issues[0].message };
+  // Los datos de la proforma solo se tocan si vienen (editar la OC no los borra).
+  for (const k of ["proforma_numero", "proforma_fecha", "proforma_monto"] as const) if (!(k in input)) delete (parsed.data as Record<string, unknown>)[k];
   const supabase = await createClient();
   if (id) {
     if (!uuid.safeParse(id).success) return { ok: false, error: "OC inválida" };
@@ -108,6 +110,51 @@ export async function deleteOcAction(id: string): Promise<Result> {
   return { ok: true };
 }
 
+/** Comprador: subir (o reemplazar) el documento de la proforma de la OC, con sus datos. */
+export async function proformaArchivoAction(fd: FormData): Promise<Result> {
+  if (!(await rol("comprador"))) return { ok: false, error: "No autorizado" };
+  const ocId = String(fd.get("oc") ?? "");
+  if (!uuid.safeParse(ocId).success) return { ok: false, error: "OC inválida" };
+  const f = archivo(fd);
+  if (typeof f === "string") return { ok: false, error: f };
+  const datos = ocSchema.pick({ proforma_numero: true, proforma_fecha: true, proforma_monto: true }).safeParse({
+    proforma_numero: fd.get("numero") ?? undefined,
+    proforma_fecha: fd.get("fecha") ?? undefined,
+    proforma_monto: fd.get("monto") ?? undefined,
+  });
+  if (!datos.success) return { ok: false, error: datos.error.issues[0].message };
+  const patch: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(datos.data)) if (fd.has(k.replace("proforma_", ""))) patch[k] = v;
+  if (f) {
+    const up = await subir(ocId, f, "proforma");
+    if ("error" in up) return { ok: false, error: up.error };
+    patch.proforma_path = up.path;
+    patch.proforma_nombre = f.name.slice(0, 200);
+  }
+  // Si cambio el total de la proforma, tambien se puede actualizar el total de la OC.
+  if (fd.get("actualizar_oc") === "1" && typeof patch.proforma_monto === "number") patch.monto = patch.proforma_monto;
+  if (!Object.keys(patch).length) return { ok: false, error: "Nada que guardar" };
+  const supabase = await createClient();
+  const { error } = await supabase.from("ordenes_compra").update(patch).eq("id", ocId);
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  refresh(ocId);
+  return { ok: true };
+}
+
+/** Comprador: quitar la proforma de la OC (documento y datos). */
+export async function quitarProformaAction(ocId: string): Promise<Result> {
+  if (!(await rol("comprador"))) return { ok: false, error: "No autorizado" };
+  if (!uuid.safeParse(ocId).success) return { ok: false, error: "OC inválida" };
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("ordenes_compra")
+    .update({ proforma_numero: null, proforma_fecha: null, proforma_monto: null, proforma_path: null, proforma_nombre: null })
+    .eq("id", ocId);
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  refresh(ocId);
+  return { ok: true };
+}
+
 /** Comprador: alta o edicion de una factura o anticipo de la OC (numero y monto se pueden completar despues). */
 export async function savePagoAction(id: string | null, ocId: string, input: PagoInput): Promise<Result<{ id: string }>> {
   if (!(await rol("comprador"))) return { ok: false, error: "Solo el comprador captura facturas." };
@@ -119,7 +166,11 @@ export async function savePagoAction(id: string | null, ocId: string, input: Pag
     if (!uuid.safeParse(id).success) return { ok: false, error: "Pago inválido" };
     const { data: cur } = await supabase.from("pagos").select("estado, monto").eq("id", id).maybeSingle();
     const patch: Record<string, unknown> = { ...parsed.data };
-    if (cur && (cur.estado === "pagado" || cur.estado === "cerrado")) delete patch.monto;
+    if (cur && (cur.estado === "pagado" || cur.estado === "cerrado")) {
+      delete patch.monto;
+      delete patch.anticipo_aplicado;
+    }
+    if (patch.tipo === "anticipo") patch.anticipo_aplicado = 0;
     const { data, error } = await supabase.from("pagos").update(patch).eq("id", id).select("id");
     if (error) return { ok: false, error: friendlyError(error.message) };
     if (!data?.length) return { ok: false, error: "No se pudo guardar." };

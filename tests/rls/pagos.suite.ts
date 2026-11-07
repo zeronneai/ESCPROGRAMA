@@ -76,6 +76,20 @@ export function pagosSuite() {
       const filas = (await q(w.buyer1, "select estado, monto::float as monto, pago_monto::float as pagado from public.pagos where oc_id=$1 and numero_factura='PI-9' order by estado", [oc])).rows;
       expect(filas).toEqual([{ estado: "pagado", monto: 300, pagado: 300 }, { estado: "pendiente", monto: 700, pagado: null }]);
       expect(Number((await q("postgres", "select count(*) from public.notifications where user_id=$1", [ceo.id])).rows[0].count)).toBe(avisosCeo);
+      // Proforma como referencia de la OC
+      await q(w.buyer1, "update public.ordenes_compra set proforma_numero='PI-1', proforma_monto=10000, proforma_path=$2 where id=$1", [oc, `${oc}/proforma-x.pdf`]);
+      await q(w.buyer1, "insert into storage.objects (bucket_id, name) values ('pagos', $1)", [`${oc}/proforma-x.pdf`]);
+      expect(await failure(q(w.seller1, "insert into storage.objects (bucket_id, name) values ('pagos', $1)", [`${oc}/proforma-y.pdf`]))).toBeTruthy();
+      // Anticipo de 3000 pagado; la factura de 6000 le descuenta 3000 y el CEO paga solo 3000
+      const oc2 = (await q(w.buyer1, "insert into public.ordenes_compra (supplier_id, numero, fecha, moneda) values ($1, 'OC-AP-' || floor(random()*1e6), current_date, 'USD') returning id", [sid])).rows[0].id;
+      const ant = (await q(w.buyer1, "insert into public.pagos (oc_id, tipo, monto) values ($1, 'anticipo', 3000) returning id", [oc2])).rows[0].id;
+      expect(await failure(q(w.buyer1, "insert into public.pagos (oc_id, tipo, monto, anticipo_aplicado) values ($1, 'factura', 6000, 3000)", [oc2]))).toMatch(/anticipo pagado sin aplicar/);
+      await q(ceo.a, "select public.pago_marcar_pagado($1, current_date, null)", [ant]);
+      const fac = (await q(w.buyer1, "insert into public.pagos (oc_id, tipo, monto, anticipo_aplicado) values ($1, 'factura', 6000, 3000) returning id", [oc2])).rows[0].id;
+      expect(await failure(q(w.buyer1, "insert into public.pagos (oc_id, tipo, monto, anticipo_aplicado) values ($1, 'factura', 500, 100)", [oc2]))).toMatch(/anticipo pagado sin aplicar/);
+      expect(await failure(q(ceo.a, "select public.pago_marcar_pagado($1, current_date, 4000)", [fac]))).toMatch(/mas que el monto/);
+      await q(ceo.a, "select public.pago_marcar_pagado($1, current_date, null)", [fac]);
+      expect((await q(w.buyer1, "select pago_monto::float as p from public.pagos where id=$1", [fac])).rows[0].p).toBe(3000);
     });
   });
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { facturaArchivoAction, saveOcAction } from "@/actions/pagos";
+import { facturaArchivoAction, proformaArchivoAction, saveOcAction } from "@/actions/pagos";
 import { DocProveedorDrop } from "@/components/pagos/doc-proveedor-drop";
 import { areaCls, useRun } from "@/components/ops-ui";
 import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
@@ -24,6 +24,8 @@ export function OcForm({ oc, proveedores, today, proveedorInicial, onDone }: { o
   });
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [archivo, setArchivo] = useState<File | null>(null);
+  const [esProforma, setEsProforma] = useState(false);
+  const [proforma, setProforma] = useState<{ proforma_numero: string | null; proforma_fecha: string | null; proforma_monto: string | null } | null>(null);
   const [leido, setLeido] = useState<{ texto: string; avisos: string[]; error?: string } | null>(null);
 
   function aplicarDoc(d: DocProveedor | null, f: File, error?: string) {
@@ -42,7 +44,16 @@ export function OcForm({ oc, proveedores, today, proveedorInicial, onDone }: { o
       moneda: d.moneda ?? (prov?.pagos_moneda as Moneda) ?? s.moneda,
       monto: d.total ? String(d.total) : s.monto,
     }));
-    setLineas([pagoDesdeDoc(d)]);
+    if (d.tipo === "proforma") {
+      // La proforma queda como referencia de la OC; solo se registra el anticipo si lo piden.
+      setEsProforma(true);
+      setProforma({ proforma_numero: d.numero, proforma_fecha: d.fecha, proforma_monto: d.total ? String(d.total) : null });
+      setLineas(d.depositoPct || d.deposito ? [pagoDesdeDoc(d)] : []);
+    } else {
+      setEsProforma(false);
+      setProforma(null);
+      setLineas([pagoDesdeDoc(d)]);
+    }
     const avisos = [...d.avisos];
     if (!prov && !v.supplier_id) avisos.push("No reconocí al proveedor: elígelo.");
     if (!d.oc && !v.numero) avisos.push("El documento no trae número de OC: escríbelo.");
@@ -61,7 +72,7 @@ export function OcForm({ oc, proveedores, today, proveedorInicial, onDone }: { o
           {leido?.error && <Alert tone="error">{leido.error}</Alert>}
           {leido?.texto && (
             <Alert tone="success">
-              <span className="font-semibold">Leí:</span> {leido.texto}. Revisa los datos antes de registrar.
+              <span className="font-semibold">Leí:</span> {leido.texto}. {esProforma ? "Queda como la proforma de la OC (de referencia, no se suma a lo facturado). Las facturas reales las agregas cuando lleguen." : "Revisa los datos antes de registrar."}
               {leido.avisos.length > 0 && <span className="mt-1 block text-amber-800">{leido.avisos.join(" ")}</span>}
             </Alert>
           )}
@@ -112,9 +123,15 @@ export function OcForm({ oc, proveedores, today, proveedorInicial, onDone }: { o
           disabled={!v.supplier_id || !v.numero.trim()}
           onClick={() =>
             run("s", async () => {
-              const r = await saveOcAction(oc?.id ?? null, v, lineas as unknown as PagoInput[]);
-              // El documento del proveedor queda adjunto al primer anticipo o factura.
-              if (r.ok && archivo && r.pagos?.[0]) {
+              const r = await saveOcAction(oc?.id ?? null, proforma ? { ...v, ...proforma } : v, lineas as unknown as PagoInput[]);
+              // La proforma queda como documento de la OC; una factura queda adjunta a su renglon.
+              if (r.ok && archivo && esProforma) {
+                const fd = new FormData();
+                fd.set("oc", r.id);
+                fd.set("file", archivo);
+                const a = await proformaArchivoAction(fd);
+                if (!a.ok) return { ...r, ok: true as const, message: `OC registrada, pero no se pudo adjuntar la proforma: ${a.error}` };
+              } else if (r.ok && archivo && r.pagos?.[0]) {
                 const fd = new FormData();
                 fd.set("id", r.pagos[0]);
                 fd.set("oc", r.id);

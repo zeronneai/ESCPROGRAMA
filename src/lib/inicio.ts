@@ -266,14 +266,14 @@ async function consumo(c: Ctx, modo: "propio" | "aprobar" | "atender" | "lectura
 }
 
 async function pagos(c: Ctx): Promise<Bloque> {
-  const { data } = await c.sb.from("pagos").select("estado, monto, fecha_limite, urgente, carga, pago_fecha, pago_monto, ordenes_compra(moneda)").in("estado", ["pendiente", "pagado"]).limit(10000);
-  const rows = (data ?? []) as unknown as { estado: string; monto: number | null; fecha_limite: string | null; urgente: boolean; carga: string; ordenes_compra: { moneda: string } | null }[];
+  const { data } = await c.sb.from("pagos").select("estado, monto, anticipo_aplicado, fecha_limite, urgente, carga, pago_fecha, pago_monto, ordenes_compra(moneda)").in("estado", ["pendiente", "pagado"]).limit(10000);
+  const rows = (data ?? []) as unknown as { estado: string; monto: number | null; anticipo_aplicado: number | null; fecha_limite: string | null; urgente: boolean; carga: string; ordenes_compra: { moneda: string } | null }[];
   const pend = rows.filter((p) => p.estado === "pendiente");
   const urg = pend.filter((p) => p.urgente).length;
   const venc = pend.filter((p) => p.fecha_limite && p.fecha_limite < c.today).length;
   const sinLib = pend.filter((p) => p.carga === "sin_liberar").length;
   const pagados = rows.filter((p) => p.estado === "pagado").length;
-  const total = fmtTotales(totalesPorMoneda(pend.map((p) => ({ monto: p.monto, moneda: p.ordenes_compra?.moneda ?? "USD" }))));
+  const total = fmtTotales(totalesPorMoneda(pend.map((p) => ({ monto: Number(p.monto ?? 0) - Number(p.anticipo_aplicado ?? 0), moneda: p.ordenes_compra?.moneda ?? "USD" }))));
   const ceo = c.rol === "ceo";
   const alertas: Alerta[] = [];
   if (urg) alertas.push({ texto: `${urg} pago(s) a proveedor marcados URGENTE`, href: "/pagos?ver=por_pagar", tono: "red" });

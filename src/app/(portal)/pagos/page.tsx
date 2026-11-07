@@ -5,7 +5,7 @@ import { Chip } from "@/components/ops-ui";
 import { ProveedoresPagos, type ProvPagos } from "@/components/pagos/proveedores-pagos";
 import { Card, EmptyState, FilterChip, PageHeader, StatCard } from "@/components/ui";
 import { requireRoles } from "@/lib/auth/sales";
-import { CARGA, ESTADO_PAGO, fmtMonto, fmtTotales, OC_COLS, ordenPagos, PAGO_COLS, prioridadPago, pagoVencido, TIPO_PAGO, totalesPorMoneda, type OcRow, type PagoRow } from "@/lib/pagos";
+import { CARGA, ESTADO_PAGO, fmtMonto, fmtTotales, OC_COLS, ordenPagos, PAGO_COLS, prioridadPago, pagoVencido, TIPO_PAGO, totalesPorMoneda, type OcRow, type PagoRow, netoPago } from "@/lib/pagos";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -28,7 +28,7 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
   const ordenes = (ocs ?? []) as unknown as OcRow[];
   const pagos = (ps ?? []) as PagoRow[];
   const ocMap = new Map(ordenes.map((o) => [o.id, o]));
-  const conMoneda = (l: PagoRow[]) => l.map((p) => ({ monto: p.monto, moneda: ocMap.get(p.oc_id)?.moneda ?? "USD" }));
+  const conMoneda = (l: PagoRow[]) => l.map((p) => ({ monto: netoPago(p), moneda: ocMap.get(p.oc_id)?.moneda ?? "USD" }));
   const enPagos = (sups ?? []).filter((s) => s.en_pagos);
 
   const porPagar = pagos.filter((p) => p.estado === "pendiente");
@@ -127,7 +127,7 @@ export default async function Pagos({ searchParams }: { searchParams: Promise<{ 
                           <p className="flex flex-wrap items-center gap-2">
                             <span className="font-mono text-xs text-slate-500">OC {oc.numero}</span>
                             <span className="font-medium text-slate-900">{TIPO_PAGO[p.tipo]} {p.numero_factura ?? <span className="font-normal text-amber-700">sin número</span>}</span>
-                            <span className="font-semibold">{fmtMonto(ver === "historial" ? p.pago_monto ?? p.monto : p.monto, oc.moneda)}</span>
+                            <span className="font-semibold">{fmtMonto(ver === "historial" ? p.pago_monto ?? p.monto : netoPago(p), oc.moneda)}</span>
                           </p>
                           <p className="text-xs text-slate-500">
                             {p.estado === "pagado" || p.estado === "cerrado"

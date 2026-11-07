@@ -27,6 +27,11 @@ export interface OcRow {
   descripcion: string | null;
   cerrada_at: string | null;
   created_at: string;
+  proforma_numero?: string | null;
+  proforma_fecha?: string | null;
+  proforma_monto?: number | string | null;
+  proforma_path?: string | null;
+  proforma_nombre?: string | null;
   suppliers?: { nombre: string; pais: string | null } | null;
 }
 export interface PagoRow {
@@ -36,6 +41,7 @@ export interface PagoRow {
   numero_factura: string | null;
   fecha_factura: string | null;
   monto: number | string | null;
+  anticipo_aplicado?: number | string | null;
   fecha_limite: string | null;
   notas: string | null;
   estado: EstadoPago;
@@ -57,9 +63,10 @@ export interface PagoRow {
   cerrado_at: string | null;
   created_at: string;
 }
-export const OC_COLS = "id, supplier_id, numero, fecha, moneda, monto, descripcion, cerrada_at, created_at, suppliers(nombre, pais)";
+export const OC_COLS =
+  "id, supplier_id, numero, fecha, moneda, monto, descripcion, cerrada_at, created_at, proforma_numero, proforma_fecha, proforma_monto, proforma_path, proforma_nombre, suppliers(nombre, pais)";
 export const PAGO_COLS =
-  "id, oc_id, tipo, numero_factura, fecha_factura, monto, fecha_limite, notas, estado, estado_nota, carga, carga_at, urgente, factura_path, factura_nombre, liberado_at, pago_fecha, pago_monto, pago_referencia, pago_notas, comprobante_path, comprobante_nombre, pagado_at, pagado_nombre, cerrado_at, created_at";
+  "id, oc_id, tipo, numero_factura, fecha_factura, monto, anticipo_aplicado, fecha_limite, notas, estado, estado_nota, carga, carga_at, urgente, factura_path, factura_nombre, liberado_at, pago_fecha, pago_monto, pago_referencia, pago_notas, comprobante_path, comprobante_nombre, pagado_at, pagado_nombre, cerrado_at, created_at";
 
 const txt = (max: number) => z.string().trim().max(max, `Máximo ${max} caracteres`).optional().nullable().transform((v) => v || null);
 const fecha = z.union([z.literal(""), z.null(), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida")]).optional().transform((v) => v || null);
@@ -75,6 +82,9 @@ export const ocSchema = z.object({
   moneda: z.enum(MONEDAS),
   monto,
   descripcion: txt(1000),
+  proforma_numero: txt(60).optional(),
+  proforma_fecha: fecha.optional(),
+  proforma_monto: monto.optional(),
 });
 export type OcInput = z.input<typeof ocSchema>;
 
@@ -85,8 +95,14 @@ export const pagoSchema = z.object({
   monto,
   fecha_limite: fecha,
   notas: txt(1000),
+  /** Factura: cuanto del anticipo ya pagado se descuenta de esta factura. */
+  anticipo_aplicado: z.union([z.literal(""), z.null(), z.coerce.number().min(0, "Anticipo inválido").max(999_999_999)]).optional().transform((v) => (v === "" || v == null ? 0 : v)),
 });
 export type PagoInput = z.input<typeof pagoSchema>;
+
+/** Lo que falta pagar de una factura o anticipo: su monto menos el anticipo que se le descuenta. */
+export const netoPago = (p: { monto: number | string | null; anticipo_aplicado?: number | string | null }) =>
+  p.monto == null || p.monto === "" ? null : Math.round((Number(p.monto) - Number(p.anticipo_aplicado ?? 0)) * 100) / 100;
 
 export const fmtMonto = (n: number | string | null | undefined, moneda: string) =>
   n === null || n === undefined || n === "" ? "Sin monto" : `${Number(n).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${moneda}`;

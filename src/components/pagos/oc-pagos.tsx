@@ -9,24 +9,24 @@ import { DocProveedorDrop } from "@/components/pagos/doc-proveedor-drop";
 import { pagoDesdeDoc, resumenDoc, type DocProveedor } from "@/lib/proforma-lector";
 import { Chip, useRun } from "@/components/ops-ui";
 import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
-import { CARGA, ESTADO_PAGO, fmtMonto, ordenPagos, pagoVencido, TIPO_PAGO, type PagoInput, type PagoRow } from "@/lib/pagos";
+import { CARGA, ESTADO_PAGO, fmtMonto, netoPago, ordenPagos, pagoVencido, TIPO_PAGO, type PagoInput, type PagoRow } from "@/lib/pagos";
 
 const fecha = (d: string | null) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }) : "");
 type Rol = "comprador" | "ceo";
 
 /** Facturas y anticipos de una OC con las acciones del comprador y del CEO. */
-export function OcPagos({ ocId, moneda, pagos, rol, today, cerrada }: { ocId: string; moneda: string; pagos: PagoRow[]; rol: Rol; today: string; cerrada: boolean }) {
+export function OcPagos({ ocId, moneda, pagos, rol, today, cerrada, anticipoLibre = 0 }: { ocId: string; moneda: string; pagos: PagoRow[]; rol: Rol; today: string; cerrada: boolean; anticipoLibre?: number }) {
   const [nuevo, setNuevo] = useState(false);
   return (
     <div className="space-y-3">
       {pagos.length === 0 && !nuevo && (
         <Card className="p-4 text-sm text-slate-600">Esta OC aún no tiene facturas ni anticipos.{rol === "comprador" && " Agrégalos cuando el proveedor los mande."}</Card>
       )}
-      {ordenPagos(pagos, today).map((p) => <PagoCard key={p.id} p={p} ocId={ocId} moneda={moneda} rol={rol} today={today} />)}
+      {ordenPagos(pagos, today).map((p) => <PagoCard key={p.id} p={p} ocId={ocId} moneda={moneda} rol={rol} today={today} anticipoLibre={anticipoLibre} />)}
       {rol === "comprador" && !cerrada && (nuevo ? (
         <Card className="space-y-3 border-brand-100 p-4">
           <p className="text-sm font-semibold text-slate-800">Agregar factura o anticipo</p>
-          <PagoForm ocId={ocId} moneda={moneda} p={null} onDone={() => setNuevo(false)} />
+          <PagoForm ocId={ocId} moneda={moneda} p={null} anticipoLibre={anticipoLibre} onDone={() => setNuevo(false)} />
         </Card>
       ) : (
         <Button variant="secondary" onClick={() => setNuevo(true)}><Icon name="plus" className="h-4 w-4" /> Agregar factura o anticipo</Button>
@@ -35,7 +35,7 @@ export function OcPagos({ ocId, moneda, pagos, rol, today, cerrada }: { ocId: st
   );
 }
 
-function PagoForm({ ocId, moneda, p, onDone }: { ocId: string; moneda: string; p: PagoRow | null; onDone: () => void }) {
+function PagoForm({ ocId, moneda, p, onDone, anticipoLibre = 0 }: { ocId: string; moneda: string; p: PagoRow | null; onDone: () => void; anticipoLibre?: number }) {
   const hecho = p?.estado === "pagado" || p?.estado === "cerrado";
   const [v, setV] = useState({
     tipo: p?.tipo ?? "factura",
@@ -44,7 +44,10 @@ function PagoForm({ ocId, moneda, p, onDone }: { ocId: string; moneda: string; p
     monto: p?.monto != null ? String(Number(p.monto)) : "",
     fecha_limite: p?.fecha_limite ?? "",
     notas: p?.notas ?? "",
+    anticipo_aplicado: p?.anticipo_aplicado != null && Number(p.anticipo_aplicado) > 0 ? String(Number(p.anticipo_aplicado)) : "",
   });
+  // Anticipo que se puede descontar: el libre de la OC mas lo que esta factura ya tenia aplicado.
+  const disponible = Math.round((anticipoLibre + Number(p?.anticipo_aplicado ?? 0)) * 100) / 100;
   const { run, busy, notice, router } = useRun();
   const [archivo, setArchivo] = useState<File | null>(null);
   const [leido, setLeido] = useState<{ texto: string; avisos: string[]; error?: string } | null>(null);
@@ -53,7 +56,13 @@ function PagoForm({ ocId, moneda, p, onDone }: { ocId: string; moneda: string; p
     setArchivo(f);
     if (!d) return setLeido({ texto: "", avisos: [], error });
     const l = pagoDesdeDoc(d);
-    setV((s) => ({ ...s, ...l, fecha_limite: s.fecha_limite, monto: hecho ? s.monto : l.monto || s.monto }));
+    // Factura que descuenta el anticipo: se registra por su total y se aplica el anticipo pagado.
+    const conAnticipo = l.tipo === "factura" && d.total && d.deposito && disponible > 0;
+    setV((s) => ({
+      ...s, ...l, fecha_limite: s.fecha_limite,
+      monto: hecho ? s.monto : conAnticipo ? String(d.total) : l.monto || s.monto,
+      anticipo_aplicado: conAnticipo ? String(Math.min(d.deposito!, disponible, d.total!)) : s.anticipo_aplicado,
+    }));
     const avisos = [...d.avisos];
     if (d.moneda && d.moneda !== moneda) avisos.push(`Ojo: el documento está en ${d.moneda} y la OC en ${moneda}.`);
     setLeido({ texto: resumenDoc(d), avisos });
@@ -77,6 +86,21 @@ function PagoForm({ ocId, moneda, p, onDone }: { ocId: string; moneda: string; p
         <Field label="Fecha límite de pago"><Input type="date" value={v.fecha_limite} onChange={set("fecha_limite")} /></Field>
         <Field label="Notas"><Input value={v.notas} onChange={set("notas")} placeholder="Ej. 30% anticipo, saldo contra BL" /></Field>
       </div>
+      {v.tipo === "factura" && (disponible > 0 || Number(v.anticipo_aplicado) > 0) && (
+        <div className="flex flex-wrap items-end gap-3 rounded-md border border-indigo-200 bg-indigo-50/50 p-3">
+          <Field label={`Descontar anticipo ya pagado (${moneda})`}>
+            <Input value={v.anticipo_aplicado} onChange={set("anticipo_aplicado")} inputMode="decimal" disabled={hecho} placeholder="0" />
+          </Field>
+          {!hecho && disponible > 0 && (
+            <Button variant="ghost" className="text-xs" onClick={() => setV((s) => ({ ...s, anticipo_aplicado: String(Math.min(disponible, Number(s.monto) || disponible)) }))}>
+              Usar anticipo disponible ({fmtMonto(disponible, moneda)})
+            </Button>
+          )}
+          {Number(v.monto) > 0 && Number(v.anticipo_aplicado) > 0 && (
+            <p className="text-sm font-medium text-slate-800">Por pagar de esta factura: {fmtMonto(Number(v.monto) - Number(v.anticipo_aplicado), moneda)}</p>
+          )}
+        </div>
+      )}
       {hecho && <p className="text-xs text-slate-500">Ya se pagó: el monto no se puede cambiar.</p>}
       <div className="flex gap-2">
         <Button
@@ -114,11 +138,13 @@ function FileBtn({ label, accept = "application/pdf,image/png,image/jpeg,image/w
   );
 }
 
-function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; moneda: string; rol: Rol; today: string }) {
+function PagoCard({ p, ocId, moneda, rol, today, anticipoLibre = 0 }: { p: PagoRow; ocId: string; moneda: string; rol: Rol; today: string; anticipoLibre?: number }) {
+  const neto = netoPago(p);
+  const aplicado = Number(p.anticipo_aplicado ?? 0);
   const [edit, setEdit] = useState(false);
   const [nota, setNota] = useState(p.estado_nota ?? "");
   const [pagar, setPagar] = useState(false);
-  const [pv, setPv] = useState({ fecha: today, monto: p.monto != null ? String(Number(p.monto)) : "", referencia: "", notas: "" });
+  const [pv, setPv] = useState({ fecha: today, monto: neto != null ? String(neto) : "", referencia: "", notas: "" });
   const comp = useRef<HTMLInputElement>(null);
   const [compName, setCompName] = useState("");
   const { run, busy, notice, router } = useRun();
@@ -139,7 +165,7 @@ function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; m
     <Card className={`space-y-3 p-4 ${abierto && p.urgente ? "border-red-400 ring-2 ring-red-200" : abierto && rol === "ceo" ? "border-amber-200" : ""}`}>
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
       {edit ? (
-        <PagoForm ocId={ocId} moneda={moneda} p={p} onDone={() => setEdit(false)} />
+        <PagoForm ocId={ocId} moneda={moneda} p={p} anticipoLibre={anticipoLibre} onDone={() => setEdit(false)} />
       ) : (
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-0.5 text-sm">
@@ -147,6 +173,11 @@ function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; m
               {TIPO_PAGO[p.tipo]} {p.numero_factura ?? <span className="font-normal text-amber-700">(sin número todavía)</span>}
               <span className="text-base font-semibold">{fmtMonto(p.monto, moneda)}</span>
             </p>
+            {aplicado > 0 && (
+              <p className="text-xs font-medium text-indigo-800">
+                Menos anticipo ya pagado {fmtMonto(aplicado, moneda)} = {abierto ? "por pagar" : "pagado"} {fmtMonto(neto, moneda)}
+              </p>
+            )}
             <p className="text-xs text-slate-500">
               {[p.fecha_factura && `Factura del ${fecha(p.fecha_factura)}`, p.fecha_limite && `Pagar antes del ${fecha(p.fecha_limite)}`, p.notas].filter(Boolean).join(" · ") || "Sin fechas"}
             </p>
@@ -244,21 +275,21 @@ function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; m
                 <Field label="Referencia"><Input value={pv.referencia} onChange={(e) => setPv((s) => ({ ...s, referencia: e.target.value }))} placeholder="SWIFT, folio" /></Field>
                 <Field label="Notas"><Input value={pv.notas} onChange={(e) => setPv((s) => ({ ...s, notas: e.target.value }))} /></Field>
               </div>
-              {p.monto != null && (
+              {neto != null && (
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span className="text-slate-600">Pagar:</span>
                   {[100, 50, 30].map((pc) => (
                     <button key={pc} type="button" className="rounded-full border border-green-300 bg-white px-2.5 py-1 font-medium text-green-800 hover:bg-green-100"
-                      onClick={() => setPv((s) => ({ ...s, monto: String(Math.round(Number(p.monto) * pc) / 100) }))}>
+                      onClick={() => setPv((s) => ({ ...s, monto: String(Math.round(neto * pc) / 100) }))}>
                       {pc === 100 ? "Todo" : `Anticipo ${pc}%`}
                     </button>
                   ))}
                   {(() => {
                     const pagando = Number(String(pv.monto).replace(/,/g, ""));
-                    const resto = Math.round((Number(p.monto) - pagando) * 100) / 100;
+                    const resto = Math.round((neto - pagando) * 100) / 100;
                     return pagando > 0 && resto > 0.004 ? (
                       <span className="font-medium text-amber-800">Quedará un saldo de {fmtMonto(resto, moneda)} por pagar.</span>
-                    ) : pagando > Number(p.monto) + 0.004 ? (
+                    ) : pagando > neto + 0.004 ? (
                       <span className="font-medium text-red-700">Es más que el monto pendiente.</span>
                     ) : null;
                   })()}
