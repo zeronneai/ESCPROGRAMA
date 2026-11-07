@@ -23,6 +23,7 @@
     "@zxing/library": "0.21.3",
     "decimal.js": "^10.6.0",
     "exceljs": "^4.4.0",
+    "jszip": "3.10.1",
     "luxon": "^3.7.2",
     "next": "^15.5.27",
     "qrcode": "^1.5.4",

@@ -10,7 +10,9 @@ import { createClient } from "@/lib/supabase/server";
 import type { Result } from "./requests";
 
 const uuid = z.string().uuid();
-const FILE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
+const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const FILE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp", XLSX, "application/vnd.ms-excel", DOCX, "application/msword"];
 const MAX = 10 * 1024 * 1024;
 const refresh = (ocId?: string | null) => {
   revalidatePath("/pagos");
@@ -20,10 +22,16 @@ async function rol(r: "comprador" | "ceo") {
   const u = await requireUser();
   return u.rol === r ? u : null;
 }
+const POR_EXT: Record<string, string> = { pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", xlsx: XLSX, xls: "application/vnd.ms-excel", docx: DOCX, doc: "application/msword" };
 function archivo(fd: FormData): File | string | null {
-  const file = fd.get("file");
+  let file = fd.get("file");
   if (!(file instanceof File) || file.size === 0) return null;
-  if (!FILE_TYPES.includes(file.type)) return "Solo PDF o imagen (PNG, JPG)";
+  // Algunos equipos mandan el archivo sin tipo: se toma de la extension.
+  if (!FILE_TYPES.includes(file.type)) {
+    const t = POR_EXT[file.name.split(".").pop()?.toLowerCase() ?? ""];
+    if (t) file = new File([file], file.name, { type: t });
+  }
+  if (!FILE_TYPES.includes(file.type)) return "Solo PDF, Excel, Word o imagen (PNG, JPG)";
   if (file.size > MAX) return "El archivo pesa más de 10 MB";
   return file;
 }
@@ -49,7 +57,7 @@ export async function proveedorPagosAction(id: string, en_pagos: boolean, moneda
 }
 
 /** Comprador: alta o edicion de la OC; en el alta puede traer sus facturas o anticipos. */
-export async function saveOcAction(id: string | null, input: OcInput, lineas: PagoInput[] = []): Promise<Result<{ id: string }>> {
+export async function saveOcAction(id: string | null, input: OcInput, lineas: PagoInput[] = []): Promise<Result<{ id: string; pagos?: string[] }>> {
   if (!(await rol("comprador"))) return { ok: false, error: "Solo el comprador registra órdenes de compra." };
   const parsed = ocSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
@@ -69,12 +77,14 @@ export async function saveOcAction(id: string | null, input: OcInput, lineas: Pa
   const { data, error } = await supabase.from("ordenes_compra").insert(parsed.data).select("id").single();
   if (error) return { ok: false, error: /duplicate/i.test(error.message) ? "Ese proveedor ya tiene una OC con ese número." : friendlyError(error.message) };
   const rows = ls.data.filter((l) => l.numero_factura || l.monto).map((l) => ({ ...l, oc_id: data.id }));
+  let pagos: string[] = [];
   if (rows.length) {
-    const { error: e2 } = await supabase.from("pagos").insert(rows);
+    const { data: ins, error: e2 } = await supabase.from("pagos").insert(rows).select("id");
     if (e2) return { ok: false, error: friendlyError(e2.message) };
+    pagos = (ins ?? []).map((r) => r.id as string);
   }
   refresh(data.id);
-  return { ok: true, id: data.id };
+  return { ok: true, id: data.id, pagos };
 }
 
 export async function ocCerrarAction(id: string, cerrar: boolean): Promise<Result> {
@@ -237,4 +247,22 @@ export async function archivarPagoAction(id: string, ocId: string): Promise<Resu
   if (error) return { ok: false, error: friendlyError(error.message) };
   refresh(ocId);
   return { ok: true };
+}
+
+/** Comprador: renglones de texto de una proforma o factura en Excel (.xlsx) o Word (.docx), para leerla. */
+export async function textoDocumentoAction(fd: FormData): Promise<Result<{ renglones: string[] }>> {
+  if (!(await rol("comprador"))) return { ok: false, error: "No autorizado" };
+  const f = fd.get("file");
+  if (!(f instanceof File) || f.size === 0) return { ok: false, error: "Elige el archivo" };
+  if (f.size > MAX) return { ok: false, error: "El archivo pesa más de 10 MB" };
+  const n = f.name.toLowerCase();
+  try {
+    const { renglonesDocx, renglonesXlsx } = await import("@/lib/documento-texto");
+    if (n.endsWith(".xlsx")) return { ok: true, renglones: await renglonesXlsx(await f.arrayBuffer()) };
+    if (n.endsWith(".docx")) return { ok: true, renglones: await renglonesDocx(await f.arrayBuffer()) };
+  } catch {
+    return { ok: false, error: "No pude abrir el archivo. Revisa que no esté dañado o con contraseña." };
+  }
+  if (n.endsWith(".xls") || n.endsWith(".doc")) return { ok: false, error: "Es un formato viejo (.xls o .doc): ábrelo y guárdalo como .xlsx o .docx, o súbelo en PDF." };
+  return { ok: false, error: "Sube el documento en PDF, Excel (.xlsx) o Word (.docx)." };
 }

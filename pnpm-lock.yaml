@@ -32,6 +32,9 @@ importers:
       exceljs:
         specifier: ^4.4.0
         version: 4.4.0
+      jszip:
+        specifier: 3.10.1
+        version: 3.10.1
       luxon:
         specifier: ^3.7.2
         version: 3.7.2
@@ -1460,8 +1463,8 @@ packages:
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
-  jszip@3.10.2:
-    resolution: {integrity: sha512-3l+rb15IOWtUhU0H5MFqES/T6Kh7abYwjosBey/vD6hDt8zoEffkSC5Ws5SGtgVw3gBx2NEbhTeSW1+kWkpyTQ==}
+  jszip@3.10.1:
+    resolution: {integrity: sha512-xXDvecyTpGLrqFrvkrUSoxxfJI5AH7U8zxxtVclpsUtMCq4JQ290LY8AW5c7Ggnr/Y/oK+bQMbqK2qmtk3pN4g==}
 
   lazystream@1.0.1:
     resolution: {integrity: sha512-b94GiNHQNy6JNTrt5w6zNyffMrNkXZb3KTkCZJb2V1xaEGCk093vkZ2jk3tpaeP33/OiXC+WvK9AxUebnf5nbw==}
@@ -3365,7 +3368,7 @@ snapshots:
       archiver: 5.3.2
       dayjs: 1.11.23
       fast-csv: 4.3.6
-      jszip: 3.10.2
+      jszip: 3.10.1
       readable-stream: 3.6.2
       saxes: 5.0.1
       tmp: 0.2.7
@@ -3651,7 +3654,7 @@ snapshots:
 
   js-tokens@4.0.0: {}
 
-  jszip@3.10.2:
+  jszip@3.10.1:
     dependencies:
       lie: 3.3.0
       pako: 1.0.11

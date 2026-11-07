@@ -50,6 +50,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 33 | `0038_venta_desde_factura.sql` | **Venta con factura**: el vendedor sube el PDF y se registra la venta, el cliente (alta o datos que falten) y la entrega a almacén. Almacén ya no cierra con faltantes: **En espera por falta de material**. |
 | 34 | `0039_guias_alarma_2h.sql` | Guías: el vendedor puede recordar a Marketplaces desde la **1 hora** (antes 4). Alarma a la hora y rojo fuerte a las 2 horas. |
 | 35 | `0040_tiempo_real.sql` | **Tiempo real**: las pantallas se actualizan solas cuando alguien sube una factura, pide una guía, cotiza, paga, etc. (sin recargar). |
+| 36 | `0041_pagos_documentos_office.sql` | Pagos: se pueden adjuntar proformas y facturas del proveedor en **Excel y Word** (además de PDF e imagen). |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

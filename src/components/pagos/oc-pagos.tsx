@@ -5,6 +5,8 @@ import {
   archivarPagoAction, comprobanteAction, deletePagoAction, deshacerPagoAction, facturaArchivoAction, marcarPagadoAction, savePagoAction, seguimientoPagoAction,
 } from "@/actions/pagos";
 import { Icon } from "@/components/icons";
+import { DocProveedorDrop } from "@/components/pagos/doc-proveedor-drop";
+import { pagoDesdeDoc, resumenDoc, type DocProveedor } from "@/lib/proforma-lector";
 import { Chip, useRun } from "@/components/ops-ui";
 import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
 import { CARGA, ESTADO_PAGO, fmtMonto, ordenPagos, pagoVencido, TIPO_PAGO, type PagoInput, type PagoRow } from "@/lib/pagos";
@@ -44,10 +46,29 @@ function PagoForm({ ocId, moneda, p, onDone }: { ocId: string; moneda: string; p
     notas: p?.notas ?? "",
   });
   const { run, busy, notice, router } = useRun();
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [leido, setLeido] = useState<{ texto: string; avisos: string[]; error?: string } | null>(null);
   const set = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((s) => ({ ...s, [k]: e.target.value }));
+  const aplicarDoc = (d: DocProveedor | null, f: File, error?: string) => {
+    setArchivo(f);
+    if (!d) return setLeido({ texto: "", avisos: [], error });
+    const l = pagoDesdeDoc(d);
+    setV((s) => ({ ...s, ...l, fecha_limite: s.fecha_limite, monto: hecho ? s.monto : l.monto || s.monto }));
+    const avisos = [...d.avisos];
+    if (d.moneda && d.moneda !== moneda) avisos.push(`Ojo: el documento está en ${d.moneda} y la OC en ${moneda}.`);
+    setLeido({ texto: resumenDoc(d), avisos });
+  };
   return (
     <div className="space-y-3">
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
+      {!p && <DocProveedorDrop proveedores={[]} onLeido={aplicarDoc} archivo={archivo} />}
+      {leido?.error && <Alert tone="error">{leido.error}</Alert>}
+      {leido?.texto && (
+        <Alert tone="success">
+          <span className="font-semibold">Leí:</span> {leido.texto}. Revisa antes de guardar.
+          {leido.avisos.length > 0 && <span className="mt-1 block text-amber-800">{leido.avisos.join(" ")}</span>}
+        </Alert>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Field label="Tipo"><Select value={v.tipo} onChange={set("tipo")}><option value="factura">Factura</option><option value="anticipo">Anticipo</option></Select></Field>
         <Field label={v.tipo === "anticipo" ? "Proforma o referencia" : "Número de factura"}><Input value={v.numero_factura} onChange={set("numero_factura")} placeholder="Si aún no llega, déjalo vacío" /></Field>
@@ -58,7 +79,25 @@ function PagoForm({ ocId, moneda, p, onDone }: { ocId: string; moneda: string; p
       </div>
       {hecho && <p className="text-xs text-slate-500">Ya se pagó: el monto no se puede cambiar.</p>}
       <div className="flex gap-2">
-        <Button loading={busy === "s"} onClick={() => run("s", () => savePagoAction(p?.id ?? null, ocId, v as PagoInput), (r) => { if (r.ok) { onDone(); router.refresh(); } })}>Guardar</Button>
+        <Button
+          loading={busy === "s"}
+          onClick={() =>
+            run("s", async () => {
+              const r = await savePagoAction(p?.id ?? null, ocId, v as PagoInput);
+              if (r.ok && archivo) {
+                const fd = new FormData();
+                fd.set("id", r.id);
+                fd.set("oc", ocId);
+                fd.set("file", archivo);
+                const a = await facturaArchivoAction(fd);
+                if (!a.ok) return { ok: false as const, error: `Se guardó, pero no se pudo adjuntar el documento: ${a.error}` };
+              }
+              return r;
+            }, (r) => { if (r.ok) { onDone(); router.refresh(); } })
+          }
+        >
+          Guardar
+        </Button>
         <Button variant="ghost" onClick={onDone}>Cancelar</Button>
       </div>
     </div>
@@ -184,7 +223,7 @@ function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; m
           </div>
           <div className="flex flex-wrap gap-1.5">
             <Button variant="ghost" className="text-xs" onClick={() => setEdit(true)}>{p.numero_factura && p.monto ? "Editar" : "Completar factura y monto"}</Button>
-            <FileBtn label={p.factura_path ? "Cambiar PDF de factura" : "Adjuntar factura"} loading={busy === "fac"} onFile={(f) => go("fac", () => facturaArchivoAction(fd({}, f)), "Factura adjunta.")} />
+            <FileBtn label={p.factura_path ? "Cambiar documento" : "Adjuntar factura o proforma"} accept=".pdf,.xlsx,.xls,.docx,.doc,.png,.jpg,.jpeg,.webp" loading={busy === "fac"} onFile={(f) => go("fac", () => facturaArchivoAction(fd({}, f)), "Factura adjunta.")} />
             {abierto && (
               <Button variant="ghost" className="text-xs text-red-700" disabled={!!busy} onClick={() => { if (window.confirm("¿Borrar esta factura o anticipo?")) go("del", () => deletePagoAction(p.id, ocId), "Borrado."); }}>Borrar</Button>
             )}

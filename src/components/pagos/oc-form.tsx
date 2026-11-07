@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { saveOcAction } from "@/actions/pagos";
+import { facturaArchivoAction, saveOcAction } from "@/actions/pagos";
+import { DocProveedorDrop } from "@/components/pagos/doc-proveedor-drop";
 import { areaCls, useRun } from "@/components/ops-ui";
 import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
 import { MONEDAS, type Moneda, type OcRow, type PagoInput } from "@/lib/pagos";
+import { pagoDesdeDoc, resumenDoc, type DocProveedor } from "@/lib/proforma-lector";
 
 export type ProvOpcion = { id: string; nombre: string; pagos_moneda: string };
 type Linea = { tipo: "anticipo" | "factura"; numero_factura: string; fecha_factura: string; monto: string; fecha_limite: string; notas: string };
@@ -21,6 +23,31 @@ export function OcForm({ oc, proveedores, today, proveedorInicial, onDone }: { o
     descripcion: oc?.descripcion ?? "",
   });
   const [lineas, setLineas] = useState<Linea[]>([]);
+  const [archivo, setArchivo] = useState<File | null>(null);
+  const [leido, setLeido] = useState<{ texto: string; avisos: string[]; error?: string } | null>(null);
+
+  function aplicarDoc(d: DocProveedor | null, f: File, error?: string) {
+    setArchivo(f);
+    if (!d) {
+      setLeido({ texto: "", avisos: [], error });
+      if (!lineas.length) setLineas([{ ...LV, tipo: "anticipo" }]);
+      return;
+    }
+    const prov = proveedores.find((p) => p.id === d.proveedorId);
+    setV((s) => ({
+      ...s,
+      supplier_id: s.supplier_id || prov?.id || "",
+      numero: s.numero || d.oc || "",
+      fecha: d.fecha ?? s.fecha,
+      moneda: d.moneda ?? (prov?.pagos_moneda as Moneda) ?? s.moneda,
+      monto: d.total ? String(d.total) : s.monto,
+    }));
+    setLineas([pagoDesdeDoc(d)]);
+    const avisos = [...d.avisos];
+    if (!prov && !v.supplier_id) avisos.push("No reconocí al proveedor: elígelo.");
+    if (!d.oc && !v.numero) avisos.push("El documento no trae número de OC: escríbelo.");
+    setLeido({ texto: resumenDoc(d, prov?.nombre), avisos });
+  }
   const { run, busy, notice, router } = useRun();
   const set = (k: keyof typeof v) => (e: { target: { value: string } }) => setV((s) => ({ ...s, [k]: e.target.value }));
   const setL = (i: number, k: keyof Linea, val: string) => setLineas((l) => l.map((x, j) => (j === i ? { ...x, [k]: val } : x)));
@@ -28,6 +55,18 @@ export function OcForm({ oc, proveedores, today, proveedorInicial, onDone }: { o
   return (
     <Card className="space-y-4 p-4 sm:p-5">
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
+      {!oc && (
+        <div className="space-y-2">
+          <DocProveedorDrop proveedores={proveedores} onLeido={aplicarDoc} archivo={archivo} />
+          {leido?.error && <Alert tone="error">{leido.error}</Alert>}
+          {leido?.texto && (
+            <Alert tone="success">
+              <span className="font-semibold">Leí:</span> {leido.texto}. Revisa los datos antes de registrar.
+              {leido.avisos.length > 0 && <span className="mt-1 block text-amber-800">{leido.avisos.join(" ")}</span>}
+            </Alert>
+          )}
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Proveedor *">
           <Select value={v.supplier_id} disabled={!!oc} onChange={(e) => { const p = proveedores.find((x) => x.id === e.target.value); setV((s) => ({ ...s, supplier_id: e.target.value, moneda: (p?.pagos_moneda as Moneda) ?? s.moneda })); }}>
@@ -72,7 +111,19 @@ export function OcForm({ oc, proveedores, today, proveedorInicial, onDone }: { o
           loading={busy === "s"}
           disabled={!v.supplier_id || !v.numero.trim()}
           onClick={() =>
-            run("s", () => saveOcAction(oc?.id ?? null, v, lineas as unknown as PagoInput[]), (r) => {
+            run("s", async () => {
+              const r = await saveOcAction(oc?.id ?? null, v, lineas as unknown as PagoInput[]);
+              // El documento del proveedor queda adjunto al primer anticipo o factura.
+              if (r.ok && archivo && r.pagos?.[0]) {
+                const fd = new FormData();
+                fd.set("id", r.pagos[0]);
+                fd.set("oc", r.id);
+                fd.set("file", archivo);
+                const a = await facturaArchivoAction(fd);
+                if (!a.ok) return { ...r, ok: true as const, message: `OC registrada, pero no se pudo adjuntar el documento: ${a.error}` };
+              }
+              return r;
+            }, (r) => {
               if (!r.ok) return;
               if (onDone) onDone();
               else router.push(`/pagos/oc/${r.id}`);
