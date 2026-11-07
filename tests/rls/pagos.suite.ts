@@ -68,6 +68,14 @@ export function pagosSuite() {
       await q(ceo.a, "select public.pago_marcar_pagado($1, current_date, null)", [p3]);
       await q(ceo.a, "select public.pago_deshacer($1)", [p3]);
       expect((await q(w.buyer1, "select estado, pago_monto from public.pagos where id=$1", [p3])).rows[0]).toEqual({ estado: "pendiente", pago_monto: null });
+      // Pago parcial (anticipo): el resto queda como saldo por pagar; no se puede pagar de mas
+      const p4 = (await q(w.buyer1, "insert into public.pagos (oc_id, monto, numero_factura) values ($1, 1000, 'PI-9') returning id", [oc])).rows[0].id;
+      const avisosCeo = Number((await q("postgres", "select count(*) from public.notifications where user_id=$1", [ceo.id])).rows[0].count);
+      expect(await failure(q(ceo.a, "select public.pago_marcar_pagado($1, current_date, 1500)", [p4]))).toMatch(/mas que el monto/);
+      await q(ceo.a, "select public.pago_marcar_pagado($1, current_date, 300)", [p4]);
+      const filas = (await q(w.buyer1, "select estado, monto::float as monto, pago_monto::float as pagado from public.pagos where oc_id=$1 and numero_factura='PI-9' order by estado", [oc])).rows;
+      expect(filas).toEqual([{ estado: "pagado", monto: 300, pagado: 300 }, { estado: "pendiente", monto: 700, pagado: null }]);
+      expect(Number((await q("postgres", "select count(*) from public.notifications where user_id=$1", [ceo.id])).rows[0].count)).toBe(avisosCeo);
     });
   });
 }

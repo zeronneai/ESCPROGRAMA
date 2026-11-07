@@ -234,16 +234,36 @@ function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; m
       {rol === "ceo" && (
         <div className="space-y-2 border-t border-slate-100 pt-3">
           {abierto && !pagar && (
-            <Button className="bg-green-600 hover:bg-green-700" onClick={() => setPagar(true)}>Marcar como pagado</Button>
+            <Button className="bg-green-600 hover:bg-green-700" onClick={() => setPagar(true)}>Pagar (todo o anticipo)</Button>
           )}
           {abierto && pagar && (
             <div className="space-y-3 rounded-md border border-green-200 bg-green-50/50 p-3">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Field label="Fecha del pago *"><Input type="date" value={pv.fecha} onChange={(e) => setPv((s) => ({ ...s, fecha: e.target.value }))} /></Field>
-                <Field label={`Monto pagado (${moneda})`}><Input value={pv.monto} onChange={(e) => setPv((s) => ({ ...s, monto: e.target.value }))} inputMode="decimal" /></Field>
+                <Field label={`Monto que pagas (${moneda})`}><Input value={pv.monto} onChange={(e) => setPv((s) => ({ ...s, monto: e.target.value }))} inputMode="decimal" /></Field>
                 <Field label="Referencia"><Input value={pv.referencia} onChange={(e) => setPv((s) => ({ ...s, referencia: e.target.value }))} placeholder="SWIFT, folio" /></Field>
                 <Field label="Notas"><Input value={pv.notas} onChange={(e) => setPv((s) => ({ ...s, notas: e.target.value }))} /></Field>
               </div>
+              {p.monto != null && (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-slate-600">Pagar:</span>
+                  {[100, 50, 30].map((pc) => (
+                    <button key={pc} type="button" className="rounded-full border border-green-300 bg-white px-2.5 py-1 font-medium text-green-800 hover:bg-green-100"
+                      onClick={() => setPv((s) => ({ ...s, monto: String(Math.round(Number(p.monto) * pc) / 100) }))}>
+                      {pc === 100 ? "Todo" : `Anticipo ${pc}%`}
+                    </button>
+                  ))}
+                  {(() => {
+                    const pagando = Number(String(pv.monto).replace(/,/g, ""));
+                    const resto = Math.round((Number(p.monto) - pagando) * 100) / 100;
+                    return pagando > 0 && resto > 0.004 ? (
+                      <span className="font-medium text-amber-800">Quedará un saldo de {fmtMonto(resto, moneda)} por pagar.</span>
+                    ) : pagando > Number(p.monto) + 0.004 ? (
+                      <span className="font-medium text-red-700">Es más que el monto pendiente.</span>
+                    ) : null;
+                  })()}
+                </div>
+              )}
               <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-slate-400 bg-white px-3 py-2 text-sm text-slate-700">
                 <Icon name="download" className="h-4 w-4 rotate-180" />
                 <span className="truncate">{compName || "Comprobante (PDF o imagen)"}</span>
@@ -254,7 +274,7 @@ function PagoCard({ p, ocId, moneda, rol, today }: { p: PagoRow; ocId: string; m
                   const r = await marcarPagadoAction(fd(pv, comp.current?.files?.[0]));
                   if (r.ok) setPagar(false);
                   return r;
-                }, "Marcado como pagado. Se avisó a compras.")}>Guardar pago</Button>
+                }, "Pago registrado. Se avisó a compras.")}>Guardar pago</Button>
                 <Button variant="ghost" onClick={() => setPagar(false)}>Cancelar</Button>
               </div>
             </div>

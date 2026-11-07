@@ -51,6 +51,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 34 | `0039_guias_alarma_2h.sql` | Guías: el vendedor puede recordar a Marketplaces desde la **1 hora** (antes 4). Alarma a la hora y rojo fuerte a las 2 horas. |
 | 35 | `0040_tiempo_real.sql` | **Tiempo real**: las pantallas se actualizan solas cuando alguien sube una factura, pide una guía, cotiza, paga, etc. (sin recargar). |
 | 36 | `0041_pagos_documentos_office.sql` | Pagos: se pueden adjuntar proformas y facturas del proveedor en **Excel y Word** (además de PDF e imagen). |
+| 37 | `0042_pagos_parciales.sql` | Pagos: el CEO puede **pagar en partes** (anticipo). Lo que no paga queda como saldo Por pagar en un renglón nuevo. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 
