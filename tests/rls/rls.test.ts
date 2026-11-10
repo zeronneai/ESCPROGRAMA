@@ -10,6 +10,7 @@ import { evaluacionesSuite } from "./evaluaciones.suite";
 import { minutasSuite } from "./minutas.suite";
 import { documentosSuite } from "./documentos.suite";
 import { almacenSuite } from "./almacen.suite";
+import { riesgosSuite } from "./riesgos.suite";
 import { pagosSuite } from "./pagos.suite";
 import { calcTabulador } from "@/lib/pricing/tabulador";
 import { DATABASE_URL, as, failure, pool, type Actor } from "./helpers";
@@ -551,6 +552,7 @@ evaluacionesSuite();
 minutasSuite();
 documentosSuite();
 almacenSuite();
+  riesgosSuite();
 pagosSuite();
 
 afterAll(async () => {

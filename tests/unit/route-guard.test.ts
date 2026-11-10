@@ -99,6 +99,9 @@ describe("decideRoute", () => {
     expect(d("/", alm)).toEqual({ type: "redirect", to: "/inicio" });
     expect(d("/ventas", alm)).toEqual({ type: "redirect", to: "/inicio" });
     expect(d("/calidad", alm)).toEqual({ type: "redirect", to: "/inicio" });
+    expect(d("/calidad/riesgos", alm)).toEqual({ type: "next" });
+    expect(d("/calidad/riesgos/nuevo", { ...alm, rol: "supervisor_finanzas" })).toEqual({ type: "next" });
+    expect(d("/calidad/riesgos", { ...alm, rol: "marketplaces" })).toEqual({ type: "redirect", to: "/inicio" });
     expect(d("/encuesta/abc", null, false)).toEqual({ type: "next" });
   });
 });

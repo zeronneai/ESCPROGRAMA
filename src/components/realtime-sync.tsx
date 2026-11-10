@@ -17,7 +17,7 @@ const TABLAS = [
   "ventas", "customers", "bitacora", "leads",
   "salidas", "salida_lineas", "recepciones", "etiquetas",
   "pagos", "ordenes_compra",
-  "consumo_solicitudes", "quejas", "acciones_correctivas", "calidad_eventos", "control_cambios", "documentos", "minutas", "encuestas_cliente",
+  "consumo_solicitudes", "quejas", "acciones_correctivas", "calidad_eventos", "control_cambios", "documentos", "minutas", "encuestas_cliente", "riesgo_analisis",
 ];
 
 /** Evento que avisan otros componentes (ej. la campana de notificaciones). */

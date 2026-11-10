@@ -355,6 +355,12 @@ export const FAQ: Faq[] = [
     links: [{ label: "Entregas", href: "/entregas" }],
   },
   {
+    id: "riesgos", q: "¿Cómo hago el análisis de riesgo de mi proceso?", roles: ["jefe_ventas", "supervisor_finanzas", "gerente", "ceo", "comprador", "almacen", "supervisor_almacen", "coordinador_iso"], paths: ["/calidad/riesgos"],
+    keys: ["riesgo", "riesgos", "amef", "severidad", "ocurrencia", "deteccion", "roe", "modo de falla", "analisis"],
+    a: ["En Análisis de riesgo toca Nuevo análisis y escribe el nombre de tu proceso.", "Agrega tus actividades. En cada una puedes poner varios modos de falla con el botón + Otro modo de falla.", "Cada modo se llena por etapas: Identificación, Análisis, Tratamiento y Seguimiento. En Severidad, Ocurrencia y Detección toca el recuadro y elige la opción que describe tu caso; el número se pone solo.", "El nivel de riesgo (ROE) = S x O x D: menos de 25 verde, de 25 a 74 amarillo, 75 o más rojo. El botón Instrucciones de llenado explica cada campo. Al final puedes descargarlo en Excel."],
+    links: [{ label: "Análisis de riesgo", href: "/calidad/riesgos" }],
+  },
+  {
     id: "indicadores", q: "¿Qué son los indicadores?",
     keys: ["indicadores", "kpi", "metas", "desempeño", "medicion", "resultados"],
     a: ["En Más > Indicadores ves los números de tu puesto que salen solos del portal (ventas, tiempos, satisfacción, evaluaciones).", "Verde va bien, ámbar a vigilar y rojo hay que atender. Cuando se definan las metas oficiales se ajustan."],

@@ -79,7 +79,9 @@ export function decideRoute(input: {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   // Quejas y acciones correctivas: todos menos Marketplaces.
-  if (under("/calidad") && ["marketplaces", "almacen", "supervisor_almacen", "supervisor_finanzas"].includes(profile.rol)) {
+  // (El analisis de riesgo si lo hacen almacen y finanzas: cada jefe de area el de su proceso.)
+  const riesgo = under("/calidad/riesgos") && profile.rol !== "marketplaces";
+  if (!riesgo && under("/calidad") && ["marketplaces", "almacen", "supervisor_almacen", "supervisor_finanzas"].includes(profile.rol)) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   // Pagos a proveedores extranjeros: comprador y CEO.

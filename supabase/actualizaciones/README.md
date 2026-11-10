@@ -53,6 +53,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 36 | `0041_pagos_documentos_office.sql` | Pagos: se pueden adjuntar proformas y facturas del proveedor en **Excel y Word** (además de PDF e imagen). |
 | 37 | `0042_pagos_parciales.sql` | Pagos: el CEO puede **pagar en partes** (anticipo). Lo que no paga queda como saldo Por pagar en un renglón nuevo. |
 | 38 | `0043_proforma_oc_anticipos.sql` | Pagos: la **proforma** queda como documento de referencia de la OC (se reemplaza o quita; no se paga ni se suma). Las facturas reales **descuentan el anticipo** ya pagado y el CEO paga solo lo neto. |
+| 39 | `0044_analisis_riesgo.sql` | **Análisis y evaluación de riesgo** (formato de calidad) para los jefes de área: varios modos de falla por actividad, S/O/D con criterios, ROE automático, tratamiento y riesgo residual. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 
