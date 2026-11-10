@@ -54,14 +54,20 @@ export function ProformaPanel({ oc, comprador }: { oc: OcRow; comprador: boolean
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div className="text-sm">
           <p className="font-semibold text-slate-900">
-            Proforma {oc.proforma_numero ?? ""} {oc.proforma_monto != null && <span className="ml-1">{fmtMonto(oc.proforma_monto, oc.moneda)}</span>}
+            {oc.proforma_path ? (
+              <a href={`/api/pagos/oc/${oc.id}/proforma`} target="_blank" rel="noreferrer" title="Abrir la proforma" className="inline-flex items-center gap-1 hover:text-brand-700 hover:underline">
+                Proforma {oc.proforma_numero ?? ""} <span aria-hidden className="text-xs text-brand-600">↗</span>
+              </a>
+            ) : (
+              <>Proforma {oc.proforma_numero ?? ""}</>
+            )}
+            {oc.proforma_monto != null && <span className="ml-2">{fmtMonto(oc.proforma_monto, oc.moneda)}</span>}
           </p>
           <p className="text-xs text-slate-600">
             {tiene
               ? [oc.proforma_fecha && `Del ${fecha(oc.proforma_fecha)}`, "Es de referencia: no se paga ni se suma a lo facturado."].filter(Boolean).join(" · ")
               : "Si el proveedor mandó proforma con el total, agrégala aquí. Las facturas reales se agregan abajo."}
           </p>
-          {oc.proforma_path && <a href={`/api/pagos/oc/${oc.id}/proforma`} target="_blank" rel="noreferrer" className="text-xs text-brand-700 underline">Ver proforma</a>}
         </div>
         {comprador && !modo && (
           <div className="flex shrink-0 flex-wrap gap-2">

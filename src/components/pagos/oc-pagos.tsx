@@ -170,7 +170,13 @@ function PagoCard({ p, ocId, moneda, rol, today, anticipoLibre = 0 }: { p: PagoR
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-0.5 text-sm">
             <p className="flex flex-wrap items-center gap-2 font-medium text-slate-900">
-              {TIPO_PAGO[p.tipo]} {p.numero_factura ?? <span className="font-normal text-amber-700">(sin número todavía)</span>}
+              {p.factura_path ? (
+                <a href={`/api/pagos/${p.id}/archivo?tipo=factura`} target="_blank" rel="noreferrer" title="Abrir el documento" className="inline-flex items-center gap-1 hover:text-brand-700 hover:underline">
+                  {TIPO_PAGO[p.tipo]} {p.numero_factura ?? "(sin número todavía)"} <span aria-hidden className="text-xs text-brand-600">↗</span>
+                </a>
+              ) : (
+                <>{TIPO_PAGO[p.tipo]} {p.numero_factura ?? <span className="font-normal text-amber-700">(sin número todavía)</span>}</>
+              )}
               <span className="text-base font-semibold">{fmtMonto(p.monto, moneda)}</span>
             </p>
             {aplicado > 0 && (
@@ -190,7 +196,6 @@ function PagoCard({ p, ocId, moneda, rol, today, anticipoLibre = 0 }: { p: PagoR
               </p>
             )}
             <div className="flex flex-wrap gap-2 pt-1 text-xs">
-              {p.factura_path && <a href={`/api/pagos/${p.id}/archivo?tipo=factura`} target="_blank" rel="noreferrer" className="text-brand-700 underline">Ver factura</a>}
               {p.comprobante_path && rol === "ceo" && <a href={`/api/pagos/${p.id}/archivo`} target="_blank" rel="noreferrer" className="text-brand-700 underline">Ver comprobante</a>}
               {p.comprobante_path && rol === "comprador" && p.estado === "cerrado" && <a href={`/api/pagos/${p.id}/archivo?descargar=1`} className="text-brand-700 underline">Descargar comprobante otra vez</a>}
             </div>
