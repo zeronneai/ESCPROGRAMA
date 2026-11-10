@@ -51,8 +51,8 @@ export function aFecha(s: string): string | null {
   if (m) return iso(+m[1], +m[2], +m[3]);
   m = s.match(/\b([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(20\d{2})/);
   if (m && MESES[m[1].toLowerCase().slice(0, 3)]) return iso(+m[3], MESES[m[1].toLowerCase().slice(0, 3)], +m[2]);
-  m = s.match(/\b(\d{1,2})(?:st|nd|rd|th)?[\s-]+([A-Za-z]{3,9})\.?[\s,-]+(20\d{2})/);
-  if (m && MESES[m[2].toLowerCase().slice(0, 3)]) return iso(+m[3], MESES[m[2].toLowerCase().slice(0, 3)], +m[1]);
+  m = s.match(/\b(\d{1,2})(?:st|nd|rd|th)?[\s/.-]+([A-Za-z]{3,9})\.?[\s/,.-]+(20\d{2}|\d{2})\b/);
+  if (m && MESES[m[2].toLowerCase().slice(0, 3)]) return iso(m[3].length === 2 ? 2000 + +m[3] : +m[3], MESES[m[2].toLowerCase().slice(0, 3)], +m[1]);
   m = s.match(/\b(\d{1,2})[/.-](\d{1,2})[/.-](20\d{2})\b/);
   if (m) {
     const a = +m[1];
@@ -110,7 +110,8 @@ export function leerDocProveedor(renglones: string[], proveedores: { id: string;
 
   const cuenta = (re: RegExp) => (T.match(re) ?? []).length;
   const votos: [Moneda, number][] = [
-    ["USD", cuenta(/USD|US\$|U\.S\. DOLLARS?/g)],
+    // "$" solo, sin otra moneda, en proformas de China casi siempre es dolar.
+    ["USD", cuenta(/USD|US\$|U\.?S\.? DOLLARS?|(?<![A-Z])\$/g)],
     ["CNY", cuenta(/RMB|CNY|¥|人民币/g)],
     ["EUR", cuenta(/EUR|€/g)],
     ["MXN", cuenta(/MXN|PESOS/g)],
@@ -120,11 +121,15 @@ export function leerDocProveedor(renglones: string[], proveedores: { id: string;
 
   // Total: el monto mas grande en renglones que dicen TOTAL (sin contar cantidades, pesos o volumen).
   let total: number | null = null;
-  for (const l of lineas) {
-    if (!/TOTAL|AMOUNT\s+DUE|SUMA|合计|总计/i.test(l) || /SUB\s*-?\s*TOTAL/i.test(l)) continue;
-    if (NO_DINERO.test(l) && !tieneMoneda(l)) continue;
-    for (const n of montos(l)) if (n > 0 && (total === null || n > total)) total = n;
-  }
+  const conSigno = (l: string) => (l.match(/(?:US\$|\$|USD|RMB|CNY|¥|EUR|€)\s*\d[\d,.]*\d/gi) ?? []).map(aNumero).filter((n): n is number => n !== null);
+  lineas.forEach((l, i) => {
+    if (!/TOTAL|AMOUNT\s+DUE|SUMA|合计|总计/i.test(l) || /SUB\s*-?\s*TOTAL|IN\s+WORDS|IN\s+WRITING|\bSAY\b/i.test(l)) return;
+    let ns = conSigno(l);
+    if (!ns.length && !(NO_DINERO.test(l) && !tieneMoneda(l))) ns = montos(l).filter((n) => !Number.isInteger(n) || n >= 100);
+    // La etiqueta "Total Amount :" a veces queda en su propio renglon y la cantidad en el de junto.
+    if (!ns.length) ns = [...conSigno(lineas[i - 1] ?? ""), ...conSigno(lineas[i + 1] ?? "")];
+    for (const n of ns) if (n > 0 && (total === null || n > total)) total = n;
+  });
 
   // Condiciones de pago: deposito / anticipo y saldo.
   const pct = (re: RegExp) => {
@@ -135,12 +140,14 @@ export function leerDocProveedor(renglones: string[], proveedores: { id: string;
   const depositoPct =
     pct(/(\d{1,2})\s*%\s*(?:T\s*\/\s*T\s*)?(?:IN\s+)?(?:DEPOSIT|ADVANCE|PREPAYMENT|DOWN\s*PAYMENT|ANTICIPO)/) ??
     pct(/(?:DEPOSIT|ADVANCE|PREPAYMENT|DOWN\s*PAYMENT|ANTICIPO)[^%\n]{0,40}?(\d{1,2})\s*%/);
+  const todoAdelantado = /100\s*%[^\n]{0,40}(?:IN\s+ADVANCE|ADVANCE|PREPAY|BEFORE\s+(?:PRODUCTION|SHIPMENT))/.test(T);
   const saldoPct =
     pct(/(\d{1,2})\s*%\s*(?:T\s*\/\s*T\s*)?(?:THE\s+)?(?:BALANCE|SALDO|REST)/) ?? pct(/(?:BALANCE|SALDO)[^%\n]{0,40}?(\d{1,2})\s*%/);
   const montoDe = (re: RegExp) => {
     for (const l of lineas) {
       if (!re.test(l) || /%\s*$/.test(l)) continue;
-      const ns = montos(l.replace(/\d{1,3}\s*%/g, "")).filter((n) => n >= 1);
+      const sin = l.replace(/\d{1,3}\s*%/g, "");
+      const ns = tieneMoneda(sin) ? conSigno(sin).concat(montos(sin).filter((n) => !Number.isInteger(n))) : montos(sin).filter((n) => !Number.isInteger(n) && n >= 1);
       if (ns.length) return Math.max(...ns);
     }
     return null;
@@ -150,6 +157,8 @@ export function leerDocProveedor(renglones: string[], proveedores: { id: string;
   if (total && deposito && deposito >= total) deposito = null;
   if (total && saldo && saldo >= total) saldo = null;
   if (!deposito && depositoPct && total) deposito = Math.round(total * depositoPct) / 100;
+  const pctFinal = depositoPct ?? (todoAdelantado ? 100 : null);
+  if (todoAdelantado && !depositoPct && total) deposito = total;
   if (!saldo && saldoPct && total) saldo = Math.round(total * saldoPct) / 100;
   const condiciones = lineas.find((l) => /PAYMENT\s*(TERMS?|:)|TERMS\s+OF\s+PAYMENT|T\s*\/\s*T|CONDICIONES/i.test(l) && l.length < 200) ?? null;
 
@@ -170,7 +179,7 @@ export function leerDocProveedor(renglones: string[], proveedores: { id: string;
   if (!numero) avisos.push(`No encontré el número de ${tipo === "proforma" ? "proforma" : "factura"}.`);
   if (!total) avisos.push("No encontré el total.");
   if (!fecha) avisos.push("No encontré la fecha.");
-  return { tipo, numero, oc, fecha, moneda, total, depositoPct, deposito, saldoPct, saldo, condiciones, proveedorId, avisos };
+  return { tipo, numero, oc, fecha, moneda, total, depositoPct: pctFinal, deposito, saldoPct, saldo, condiciones, proveedorId, avisos };
 }
 
 const dinero = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -180,7 +189,7 @@ export function pagoDesdeDoc(d: DocProveedor): { tipo: "anticipo" | "factura"; n
   if (d.tipo === "proforma") {
     const monto = d.deposito ?? d.total;
     const notas = [
-      d.depositoPct ? `Anticipo ${d.depositoPct}% de la proforma` : "Pago de la proforma",
+      d.depositoPct === 100 ? "Pago 100% por adelantado" : d.depositoPct ? `Anticipo ${d.depositoPct}% de la proforma` : "Pago de la proforma",
       d.total ? `total ${dinero(d.total)}` : null,
       d.saldo ? `saldo ${d.saldoPct ? `${d.saldoPct}% ` : ""}${dinero(d.saldo)} pendiente` : null,
     ].filter(Boolean).join(", ");

@@ -14,6 +14,7 @@ describe("lector de proformas y facturas de proveedor", () => {
     expect(aFecha("2026年11月6日")).toBe("2026-11-06");
     expect(aFecha("06/11/2026")).toBe("2026-11-06");
     expect(aFecha("11/26/2026")).toBe("2026-11-26");
+    expect(aFecha("10/Nov/26")).toBe("2026-11-10");
   });
 
   it("proforma china: PI, PO, fecha, total, 30% de anticipo y 70% de saldo", () => {
@@ -50,6 +51,24 @@ describe("lector de proformas y facturas de proveedor", () => {
       "Balance due: USD 30,266.19",
     ], PROVS);
     expect(d).toMatchObject({ tipo: "factura", numero: "HG2026-0457", oc: "26JGH1104", fecha: "2026-12-02", total: 43237.42, deposito: 12971.23, saldo: 30266.19, proveedorId: "p2" });
+  });
+
+  it("proforma con el total en el renglon de arriba, fecha 10/Nov/26 y 100% por adelantado", () => {
+    const d = leerDocProveedor([
+      "Hubei Mingerkang Health & Safety Appliances Co., Ltd",
+      "PROFORMA INVOICE",
+      "Purchaser:  ESC Representaciones  Invoice No:  MEK260657/W0033",
+      "Address: Chihuahua Mexico  CP 31105  PO No.  26HMG1109",
+      "10/Nov/26",
+      "Tel: (614) 424-6200  Date:",
+      "Unit Price  Amount",
+      "Microporous  173*67  White  $35.00  80  4,000  50*28*41  4.59  $2,800.00",
+      "17.22  $10,500.00",
+      "Total Amount :",
+      "Total Amount In Writing: SAY US DOLLARS TEN THOUSAND AND FIVE HUNDRED ONLY.",
+      "2. Payment : 100% by T/T in advance for less amount .",
+    ], [{ id: "h", nombre: "HUBEI MINGERKANG" }]);
+    expect(d).toMatchObject({ tipo: "proforma", numero: "MEK260657/W0033", oc: "26HMG1109", fecha: "2026-11-10", moneda: "USD", total: 10500, depositoPct: 100, deposito: 10500, proveedorId: "h", avisos: [] });
   });
 
   it("si no encuentra datos, avisa", () => {
