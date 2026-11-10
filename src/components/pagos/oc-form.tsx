@@ -8,7 +8,7 @@ import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
 import { MONEDAS, type Moneda, type OcRow, type PagoInput } from "@/lib/pagos";
 import { pagoDesdeDoc, resumenDoc, type DocProveedor } from "@/lib/proforma-lector";
 
-export type ProvOpcion = { id: string; nombre: string; pagos_moneda: string };
+export type ProvOpcion = { id: string; nombre: string; pagos_moneda: string; en_pagos?: boolean; tipo?: string };
 type Linea = { tipo: "anticipo" | "factura"; numero_factura: string; fecha_factura: string; monto: string; fecha_limite: string; notas: string };
 const LV: Linea = { tipo: "factura", numero_factura: "", fecha_factura: "", monto: "", fecha_limite: "", notas: "" };
 

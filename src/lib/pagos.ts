@@ -131,3 +131,7 @@ export function prioridadPago(p: Pick<PagoRow, "estado" | "fecha_limite" | "urge
 }
 export const ordenPagos = <T extends Pick<PagoRow, "estado" | "fecha_limite" | "urgente" | "carga" | "created_at">>(l: T[], today: string) =>
   [...l].sort((a, b) => prioridadPago(a, today) - prioridadPago(b, today) || (a.fecha_limite ?? "9999").localeCompare(b.fecha_limite ?? "9999") || a.created_at.localeCompare(b.created_at));
+
+/** Proveedores para elegir en la OC: primero los que ya estan en pagos, luego extranjeros y el resto. */
+export const ordenarProvs = <T extends { nombre: string; en_pagos?: boolean; tipo?: string }>(l: T[]) =>
+  [...l].sort((a, b) => Number(!!b.en_pagos) - Number(!!a.en_pagos) || Number(b.tipo === "extranjero") - Number(a.tipo === "extranjero") || a.nombre.localeCompare(b.nombre));

@@ -78,6 +78,8 @@ export async function saveOcAction(id: string | null, input: OcInput, lineas: Pa
   }
   const { data, error } = await supabase.from("ordenes_compra").insert(parsed.data).select("id").single();
   if (error) return { ok: false, error: /duplicate/i.test(error.message) ? "Ese proveedor ya tiene una OC con ese número." : friendlyError(error.message) };
+  // Si el proveedor no estaba en la seccion de pagos, se agrega solo.
+  await supabase.from("suppliers").update({ en_pagos: true }).eq("id", parsed.data.supplier_id).eq("en_pagos", false);
   const rows = ls.data.filter((l) => l.numero_factura || l.monto).map((l) => ({ ...l, oc_id: data.id }));
   let pagos: string[] = [];
   if (rows.length) {

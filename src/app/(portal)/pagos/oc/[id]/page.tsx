@@ -8,7 +8,7 @@ import type { ProvOpcion } from "@/components/pagos/oc-form";
 import { Chip } from "@/components/ops-ui";
 import { Card, PageHeader, StatCard } from "@/components/ui";
 import { requireRoles } from "@/lib/auth/sales";
-import { fmtMonto, OC_COLS, PAGO_COLS, type OcRow, type PagoRow } from "@/lib/pagos";
+import { fmtMonto, OC_COLS, ordenarProvs, PAGO_COLS, type OcRow, type PagoRow } from "@/lib/pagos";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -27,7 +27,7 @@ export default async function OcDetalle({ params }: { params: Promise<{ id: stri
   const oc = o as unknown as OcRow;
   const pagos = (ps ?? []) as PagoRow[];
   const comprador = u.rol === "comprador";
-  const provs = comprador ? (((await supabase.from("suppliers").select("id, nombre, pagos_moneda").eq("en_pagos", true).order("nombre")).data ?? []) as ProvOpcion[]) : [];
+  const provs = comprador ? ordenarProvs(((await supabase.from("suppliers").select("id, nombre, pagos_moneda, en_pagos, tipo").eq("activo", true).order("nombre")).data ?? []) as ProvOpcion[]) : [];
   const sum = (l: (number | string | null)[]) => l.reduce<number>((a, n) => a + Number(n ?? 0), 0);
   const hechos = pagos.filter((p) => p.estado === "pagado" || p.estado === "cerrado");
   const facturas = pagos.filter((p) => p.tipo === "factura");
