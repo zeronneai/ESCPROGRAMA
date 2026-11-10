@@ -76,6 +76,11 @@ export function pagosSuite() {
       const filas = (await q(w.buyer1, "select estado, monto::float as monto, pago_monto::float as pagado from public.pagos where oc_id=$1 and numero_factura='PI-9' order by estado", [oc])).rows;
       expect(filas).toEqual([{ estado: "pagado", monto: 300, pagado: 300 }, { estado: "pendiente", monto: 700, pagado: null }]);
       expect(Number((await q("postgres", "select count(*) from public.notifications where user_id=$1", [ceo.id])).rows[0].count)).toBe(avisosCeo);
+      // Proveedor que no estaba en pagos: el comprador lo agrega y luego crea la OC con su proforma
+      const sNuevo = (await q("postgres", "insert into public.suppliers (nombre, tipo, en_pagos) values ('HUBEI PRUEBA ' || floor(random()*1e6), 'extranjero', false) returning id")).rows[0].id;
+      expect(await failure(q(w.buyer1, "insert into public.ordenes_compra (supplier_id, numero, fecha, moneda) values ($1, 'X1', current_date, 'USD')", [sNuevo]))).toBeTruthy();
+      await q(w.buyer1, "update public.suppliers set en_pagos = true where id = $1", [sNuevo]);
+      await q(w.buyer1, "insert into public.ordenes_compra (supplier_id, numero, fecha, moneda, monto, proforma_numero, proforma_fecha, proforma_monto) values ($1, 'X1', current_date, 'USD', 100, 'PI-1', current_date, 100)", [sNuevo]);
       // Proforma como referencia de la OC
       await q(w.buyer1, "update public.ordenes_compra set proforma_numero='PI-1', proforma_monto=10000, proforma_path=$2 where id=$1", [oc, `${oc}/proforma-x.pdf`]);
       await q(w.buyer1, "insert into storage.objects (bucket_id, name) values ('pagos', $1)", [`${oc}/proforma-x.pdf`]);
