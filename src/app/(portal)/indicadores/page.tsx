@@ -163,7 +163,7 @@ async function calidadGrupo(c: Ctx): Promise<Grupo> {
     c.supabase.from("quejas").select("estado, created_at, cerrada_at").limit(10000),
     c.supabase.from("acciones_correctivas").select("id", { count: "exact", head: true }).in("estado", ["abierta", "en_proceso", "verificacion"]),
   ]);
-  const q = qs ?? [];
+  const q = (qs ?? []).filter((x) => x.estado !== "no_aplica");
   const mes = q.filter((x) => x.created_at >= c.m0.toUTC().toISO()!);
   const cerradas = q.filter((x) => x.cerrada_at);
   const dias = cerradas.length ? cerradas.reduce((a, x) => a + (Date.parse(x.cerrada_at!) - Date.parse(x.created_at)) / 86_400_000, 0) / cerradas.length : null;
@@ -171,6 +171,7 @@ async function calidadGrupo(c: Ctx): Promise<Grupo> {
     titulo: "Calidad",
     items: [
       { titulo: "Quejas abiertas", valor: String(q.filter((x) => x.estado !== "cerrada").length), tono: q.some((x) => x.estado !== "cerrada") ? "amber" : "green" },
+      { titulo: "Quejas por revisar (¿aplican?)", valor: String(q.filter((x) => x.estado === "por_revisar").length), tono: q.some((x) => x.estado === "por_revisar") ? "red" : "green" },
       { titulo: "Quejas recibidas este mes", valor: String(mes.length) },
       { titulo: "Días promedio para cerrar una queja", valor: dias !== null ? String(Math.round(dias * 10) / 10) : "-", tono: dias === null ? "default" : dias <= 7 ? "green" : dias <= 15 ? "amber" : "red" },
       { titulo: "Acciones correctivas abiertas", valor: String(sacAb ?? 0), tono: (sacAb ?? 0) > 0 ? "amber" : "green" },

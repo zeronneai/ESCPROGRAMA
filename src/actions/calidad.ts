@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
-import { CALIDAD_FILE_TYPES, MAX_FILE_BYTES, quejaSchema, sacSchema, type QuejaEstado, type QuejaInput, type SacInput } from "@/lib/ops/calidad";
+import { CALIDAD_FILE_TYPES, MAX_FILE_BYTES, QUEJA_ESTADOS_MANUALES, quejaSchema, sacSchema, type QuejaEstado, type QuejaInput, type SacInput } from "@/lib/ops/calidad";
 import { friendlyError } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Result } from "./requests";
@@ -36,10 +36,25 @@ export async function saveQuejaAction(id: string | null, input: QuejaInput): Pro
   return { ok: true, id: data.id };
 }
 
+/** El coordinador ISO decide si la queja aplica. Si aplica se desbloquea todo; si no, queda el motivo. */
+export async function quejaDictamenAction(id: string, aplica: boolean, nota: string, vendedorId: string | null): Promise<Result> {
+  const u = await requireUser();
+  if (u.rol !== "coordinador_iso") return { ok: false, error: "Solo el coordinador ISO decide si la queja aplica." };
+  if (!uuid.safeParse(id).success) return { ok: false, error: "Queja inválida" };
+  if (vendedorId && !uuid.safeParse(vendedorId).success) return { ok: false, error: "Vendedor inválido" };
+  if (!aplica && nota.trim().length < 3) return { ok: false, error: "Escribe por qué no aplica." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("queja_dictaminar", { p_id: id, p_aplica: aplica, p_nota: nota.trim().slice(0, 2000) || null, p_vendedor: vendedorId || null });
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  refresh(`/calidad/quejas/${id}`);
+  return { ok: true };
+}
+
 export async function quejaEstadoAction(id: string, estado: QuejaEstado, solucion: string): Promise<Result> {
   const u = await requireUser();
   if (u.rol !== "coordinador_iso") return { ok: false, error: "Solo el coordinador ISO cambia el estatus." };
   if (!uuid.safeParse(id).success) return { ok: false, error: "Queja inválida" };
+  if (!(QUEJA_ESTADOS_MANUALES as readonly string[]).includes(estado)) return { ok: false, error: "Usa el botón Sí aplica / No aplica." };
   if (estado === "cerrada" && solucion.trim().length < 3) return { ok: false, error: "Para cerrar escribe la solución o respuesta al cliente." };
   const supabase = await createClient();
   const { error } = await supabase.from("quejas").update({ estado, solucion: solucion.trim().slice(0, 4000) || null }).eq("id", id);

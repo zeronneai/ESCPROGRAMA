@@ -103,6 +103,10 @@ describe("decideRoute", () => {
     expect(d("/calidad/riesgos/nuevo", { ...alm, rol: "supervisor_finanzas" })).toEqual({ type: "next" });
     expect(d("/calidad/riesgos", { ...alm, rol: "marketplaces" })).toEqual({ type: "redirect", to: "/inicio" });
     expect(d("/encuesta/abc", null, false)).toEqual({ type: "next" });
+    // Link de quejas para clientes: sin sesion y tambien con sesion de cualquier puesto.
+    expect(d("/quejas", null, false)).toEqual({ type: "next" });
+    expect(d("/quejas", alm)).toEqual({ type: "next" });
+    expect(d("/quejas/x", null, false)).toEqual({ type: "redirect", to: "/login" });
   });
 });
 

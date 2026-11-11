@@ -5,12 +5,12 @@ import { QuejaPanel } from "@/components/calidad/queja-panel";
 import { Chip, Dl } from "@/components/ops-ui";
 import { Card } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guards";
-import { QUEJA_ESTADOS, SAC_ESTADOS, VIAS, type QuejaEstado, type SacEstado, type Via } from "@/lib/ops/calidad";
+import { QUEJA_ESTADOS, quejaBloqueada, SAC_ESTADOS, VIAS, type QuejaEstado, type SacEstado, type Via } from "@/lib/ops/calidad";
 import { fmtDate, fmtDay, signedUrl } from "@/lib/ops/server";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 
-const EV: Record<string, string> = { alta: "Queja registrada", estado: "Estatus", sac: "Se abrió la acción correctiva", archivo: "Evidencia" };
+const EV: Record<string, string> = { alta: "Queja registrada", estado: "Estatus", sac: "Se abrió la acción correctiva", archivo: "Evidencia", dictamen: "Revisión del coordinador ISO" };
 
 export default async function Queja({ params }: { params: Promise<{ id: string }> }) {
   const u = await requireUser();
@@ -30,6 +30,7 @@ export default async function Queja({ params }: { params: Promise<{ id: string }
   const { data: sellers } = iso ? await supabase.from("profiles").select("id, nombre").eq("rol", "vendedor").order("nombre") : { data: null };
   const vendedor = sellers?.find((s) => s.id === q.vendedor_id)?.nombre;
   const estado = q.estado as QuejaEstado;
+  const bloqueada = quejaBloqueada(estado);
   return (
     <div className="space-y-4">
       <Link href="/calidad" className="text-sm text-slate-500 hover:text-slate-800">← Quejas</Link>
@@ -50,8 +51,18 @@ export default async function Queja({ params }: { params: Promise<{ id: string }
             ["Persona de contacto", q.contacto_nombre],
             ["Teléfono / correo", q.contacto_medio],
             ["Pedido / factura / OC", q.referencia],
+            ["Revisó si aplica", q.dictamen_nombre ? `${q.dictamen_nombre}${q.dictamen_at ? ` · ${fmtDate(q.dictamen_at, cfg.timezone)}` : ""}` : null],
           ]}
         />
+        {iso && q.origen === "link" && estado === "por_revisar" && (
+          <p className="rounded-md bg-orange-50 px-3 py-2 text-sm text-orange-900">El cliente la mandó desde el link de quejas. Revisa los datos y decide si aplica.</p>
+        )}
+        {q.dictamen_nota && (
+          <div className={`rounded-md p-3 ${estado === "no_aplica" ? "bg-slate-100" : "bg-sky-50"}`}>
+            <p className={`text-xs font-medium ${estado === "no_aplica" ? "text-slate-600" : "text-sky-800"}`}>{estado === "no_aplica" ? "Por qué no aplica" : "Comentario de la revisión"}</p>
+            <p className="whitespace-pre-line text-sm text-slate-900">{q.dictamen_nota}</p>
+          </div>
+        )}
         <div>
           <p className="text-xs text-slate-500">Descripción del problema / queja</p>
           <p className="whitespace-pre-line text-sm text-slate-900">{q.descripcion}</p>
@@ -74,10 +85,10 @@ export default async function Queja({ params }: { params: Promise<{ id: string }
         )}
       </Card>
       <QuejaPanel
-        q={{ id: q.id, estado, solucion: q.solucion }}
+        q={{ id: q.id, estado, solucion: q.solucion, vendedor_id: q.vendedor_id }}
         role={u.rol}
-        canEdit={iso || (u.rol === "vendedor" && q.created_by === u.id && estado === "abierta")}
-        canWrite={iso || (u.rol === "vendedor" && isOwner)}
+        canEdit={iso || (u.rol === "vendedor" && q.created_by === u.id && (estado === "abierta" || estado === "por_revisar"))}
+        canWrite={!bloqueada && (iso || (u.rol === "vendedor" && isOwner))}
         today={DateTime.now().setZone(cfg.timezone).toISODate()!}
         sellers={sellers ?? undefined}
         form={{ fecha_recepcion: q.fecha_recepcion, via_recepcion: q.via_recepcion, responsable_nombre: q.responsable_nombre ?? "", customer_id: q.customer_id, cliente_nombre: q.cliente_nombre, contacto_nombre: q.contacto_nombre ?? "", contacto_medio: q.contacto_medio ?? "", referencia: q.referencia ?? "", descripcion: q.descripcion, vendedor_id: q.vendedor_id }}

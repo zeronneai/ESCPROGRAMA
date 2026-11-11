@@ -211,6 +211,17 @@ export const FAQ: Faq[] = [
     links: [{ label: "Nueva queja", href: "/calidad/quejas/nueva" }],
   },
   {
+    id: "queja-aplica", q: "Llegó una queja \"Por revisar\": ¿qué hago?", roles: ISO, paths: ["/calidad"],
+    keys: ["por revisar", "aplica", "no aplica", "revisar", "link", "queja", "dictamen", "desbloquear"],
+    a: [
+      "Todas las quejas que mandan los clientes por el link y las que capturan los vendedores llegan como Por revisar.",
+      "Ábrela y toca \"Sí aplica\" (puedes asignar el vendedor) o \"No aplica\" (escribe por qué).",
+      "Mientras está por revisar no se puede cambiar el estatus, abrir acción correctiva, comentar ni subir evidencia. Al marcar que aplica se desbloquea todo.",
+      "Si marcaste que no aplica y cambias de opinión, ábrela y toca \"Sí aplica\".",
+    ],
+    links: [{ label: "Quejas", href: "/calidad" }],
+  },
+  {
     id: "queja-estatus", q: "¿Cómo cambio el estatus de una queja?", roles: ISO, paths: ["/calidad"],
     keys: ["estatus", "cerrar", "analisis", "solucion", "queja", "cambiar"],
     a: ["Abre la queja y en el recuadro de Coordinador ISO elige el estatus.", "Para cerrarla escribe la solución o respuesta al cliente.", "Al vendedor le llega aviso de cada cambio."],
@@ -219,6 +230,16 @@ export const FAQ: Faq[] = [
     id: "sac", q: "¿Cómo lleno una acción correctiva?", roles: ISO, paths: ["/calidad"],
     keys: ["sac", "accion", "correctiva", "6m", "causa", "raiz", "plan", "verificacion", "ishikawa"],
     a: ["Desde la queja toca \"Crear acción correctiva\" (o en Calidad > Acción correctiva).", "Llena por secciones: datos generales, reacción, 6M y causa raíz, plan de acción, verificación y cierre.", "Puedes guardar y seguir después. Sube evidencias abajo. El vendedor de la queja la ve en solo lectura."],
+  },
+  {
+    id: "link-quejas", q: "¿Cuál es el link para que los clientes manden quejas?", roles: ["vendedor", "jefe_ventas", "gerente", "ceo", "comprador", "coordinador_iso"], paths: ["/calidad"],
+    keys: ["link", "queja", "quejas", "firma", "correo", "tarjeta", "qr", "cliente", "reclamacion"],
+    a: [
+      "Está arriba en la página de Quejas: \"Link de quejas para clientes\".",
+      "\"Copiar para firma de correo\" lo pega como texto con liga en Outlook. \"Código QR\" te deja descargarlo para tarjetas.",
+      "El cliente llena el formato sin cuenta y le sale un folio. La queja llega al coordinador ISO como Por revisar.",
+    ],
+    links: [{ label: "Quejas", href: "/calidad" }],
   },
   {
     id: "sac-vendedor", q: "¿Dónde veo la acción correctiva de mi queja?", roles: V,

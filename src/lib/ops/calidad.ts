@@ -1,15 +1,38 @@
 import { z } from "zod";
 
-export const VIAS = { telefono: "Teléfono", correo: "Correo", whatsapp: "WhatsApp", visita: "Visita", sitio_web: "Sitio web", otro: "Otro" } as const;
+export const VIAS = { telefono: "Teléfono", correo: "Correo", whatsapp: "WhatsApp", visita: "Visita", sitio_web: "Sitio web", link: "Link de quejas", otro: "Otro" } as const;
 export type Via = keyof typeof VIAS;
+/** Vias que se eligen al capturar (el "Link de quejas" solo lo pone el formulario publico). */
+export const VIAS_CAPTURA = Object.fromEntries(Object.entries(VIAS).filter(([k]) => k !== "link")) as Record<Exclude<Via, "link">, string>;
+
+/** Link publico para que los clientes manden quejas (tarjetas, firmas de correo). */
+export const QUEJAS_LINK_RUTA = "/quejas";
 
 export const QUEJA_ESTADOS = {
+  por_revisar: { label: "Por revisar", chip: "bg-orange-100 text-orange-900" },
+  no_aplica: { label: "No aplica", chip: "bg-slate-200 text-slate-700" },
   abierta: { label: "Abierta", chip: "bg-amber-100 text-amber-900" },
   en_analisis: { label: "En análisis", chip: "bg-sky-100 text-sky-900" },
   con_sac: { label: "Con acción correctiva", chip: "bg-purple-100 text-purple-900" },
   cerrada: { label: "Cerrada", chip: "bg-green-100 text-green-800" },
 } as const;
 export type QuejaEstado = keyof typeof QUEJA_ESTADOS;
+/** Estatus que el coordinador ISO mueve a mano (por revisar / no aplica se deciden con el boton Aplica / No aplica). */
+export const QUEJA_ESTADOS_MANUALES = ["abierta", "en_analisis", "con_sac", "cerrada"] as const satisfies readonly QuejaEstado[];
+/** Todavia no se decide si aplica (o no aplico): todo lo demas esta bloqueado. */
+export const quejaBloqueada = (e: QuejaEstado) => e === "por_revisar" || e === "no_aplica";
+/** Ya no esta pendiente: cerrada o no aplica. */
+export const quejaTerminada = (e: QuejaEstado) => e === "cerrada" || e === "no_aplica";
+
+/** Lo que manda el cliente desde el link publico. */
+export const quejaLinkSchema = z.object({
+  cliente_nombre: z.string().trim().min(2, "Escriba el nombre de su empresa").max(200),
+  contacto_nombre: z.string().trim().min(2, "Escriba su nombre").max(150),
+  contacto_medio: z.string().trim().min(5, "Escriba un teléfono o correo para contactarle").max(200),
+  referencia: z.string().trim().max(200).optional().default(""),
+  descripcion: z.string().trim().min(10, "Describa con más detalle el problema").max(4000),
+});
+export type QuejaLinkInput = z.input<typeof quejaLinkSchema>;
 
 export const FUENTES = {
   revision_gerencial: "1. Revisiones gerenciales",

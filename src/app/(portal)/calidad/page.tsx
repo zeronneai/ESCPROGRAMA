@@ -1,9 +1,12 @@
 import Link from "next/link";
+import { headers } from "next/headers";
+import QRCode from "qrcode";
+import { QuejasLinkCard } from "@/components/calidad/quejas-link-card";
 import { Icon } from "@/components/icons";
 import { Chip } from "@/components/ops-ui";
 import { Card, EmptyState, FilterChip, PageHeader, StatCard } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guards";
-import { FUENTES, QUEJA_ESTADOS, SAC_ESTADOS, VIAS, type Fuente, type QuejaEstado, type SacEstado, type Via } from "@/lib/ops/calidad";
+import { FUENTES, QUEJA_ESTADOS, QUEJAS_LINK_RUTA, quejaTerminada, SAC_ESTADOS, VIAS, type Fuente, type QuejaEstado, type SacEstado, type Via } from "@/lib/ops/calidad";
 import { fmtDay } from "@/lib/ops/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -21,9 +24,15 @@ export default async function Calidad({ searchParams }: { searchParams: Promise<
   const acciones = (sacs ?? []) as unknown as { id: string; numero: string; fecha: string; fuente: Fuente; descripcion: string; estado: SacEstado; solicitante: string; plan: { hecho: boolean }[]; quejas: { numero: string; cliente_nombre: string } | null }[];
   const iso = u.rol === "coordinador_iso";
   const canQueja = iso || u.rol === "vendedor";
-  const closedQ = (e: QuejaEstado) => e === "cerrada";
+  const closedQ = quejaTerminada;
+  const porRevisar = quejas.filter((q) => q.estado === "por_revisar").length;
+  const h = await headers();
+  const linkQuejas = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host")}${QUEJAS_LINK_RUTA}`;
+  const qr = await QRCode.toDataURL(linkQuejas, { width: 600, margin: 2, color: { dark: "#0f2f7a", light: "#ffffff" } });
   const closedS = (e: SacEstado) => e === "cerrada" || e === "cancelada";
-  const qRows = quejas.filter((q) => (ver === "todas" ? true : ver === "cerradas" ? closedQ(q.estado) : !closedQ(q.estado)));
+  const qRows = quejas
+    .filter((q) => (ver === "todas" ? true : ver === "cerradas" ? closedQ(q.estado) : !closedQ(q.estado)))
+    .sort((a, b) => Number(b.estado === "por_revisar") - Number(a.estado === "por_revisar"));
   const sRows = acciones.filter((s) => (ver === "todas" ? true : ver === "cerradas" ? closedS(s.estado) : !closedS(s.estado)));
   const base = (t: string, v?: string) => `/calidad?${new URLSearchParams({ ...(t === "sac" ? { tab: "sac" } : {}), ...(v ? { ver: v } : {}) })}`;
 
@@ -57,7 +66,9 @@ export default async function Calidad({ searchParams }: { searchParams: Promise<
           </div>
         }
       />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <QuejasLinkCard url={linkQuejas} qr={qr} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <StatCard label={iso ? "Por revisar (¿aplica?)" : "Por revisar"} value={porRevisar} tone={porRevisar ? "red" : "default"} />
         <StatCard label="Quejas abiertas" value={quejas.filter((q) => q.estado === "abierta").length} tone={quejas.some((q) => q.estado === "abierta") ? "amber" : "default"} />
         <StatCard label="En análisis o con AC" value={quejas.filter((q) => q.estado === "en_analisis" || q.estado === "con_sac").length} />
         <StatCard label="Acciones correctivas abiertas" value={acciones.filter((s) => !closedS(s.estado)).length} />
@@ -69,7 +80,7 @@ export default async function Calidad({ searchParams }: { searchParams: Promise<
       </div>
       <div className="flex gap-2">
         <FilterChip href={base(tab)} active={ver === "abiertas"}>Abiertas</FilterChip>
-        <FilterChip href={base(tab, "cerradas")} active={ver === "cerradas"}>Cerradas</FilterChip>
+        <FilterChip href={base(tab, "cerradas")} active={ver === "cerradas"}>{tab === "quejas" ? "Cerradas o no aplica" : "Cerradas"}</FilterChip>
         <FilterChip href={base(tab, "todas")} active={ver === "todas"}>Todas</FilterChip>
       </div>
       <Card className="p-0">
@@ -82,7 +93,7 @@ export default async function Calidad({ searchParams }: { searchParams: Promise<
                     <div className="min-w-0">
                       <p className="font-medium text-slate-900">{q.numero} · {q.cliente_nombre}</p>
                       <p className="truncate text-sm text-slate-600">{q.descripcion}</p>
-                      <p className="text-xs text-slate-500">{fmtDay(q.fecha_recepcion)} · {VIAS[q.via_recepcion]}{q.responsable_nombre && ` · Recibió ${q.responsable_nombre}`}{q.referencia && ` · ${q.referencia}`}</p>
+                      <p className="text-xs text-slate-500">{fmtDay(q.fecha_recepcion)} · {VIAS[q.via_recepcion]}{q.responsable_nombre && q.via_recepcion !== "link" && ` · Recibió ${q.responsable_nombre}`}{q.referencia && ` · ${q.referencia}`}</p>
                     </div>
                     <Chip cls={QUEJA_ESTADOS[q.estado].chip}>{QUEJA_ESTADOS[q.estado].label}</Chip>
                   </Link>

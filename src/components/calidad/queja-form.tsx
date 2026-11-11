@@ -4,7 +4,7 @@ import { useState } from "react";
 import { saveQuejaAction } from "@/actions/calidad";
 import { areaCls, CustomerLookup, useRun } from "@/components/ops-ui";
 import { Alert, Button, Field, Input, Select } from "@/components/ui";
-import { VIAS, type QuejaInput } from "@/lib/ops/calidad";
+import { VIAS, VIAS_CAPTURA, type QuejaInput } from "@/lib/ops/calidad";
 
 type F = Record<keyof QuejaInput, string | null>;
 
@@ -37,7 +37,7 @@ export function QuejaForm({
         <Field label="Vía de recepción *">
           <Select value={s("via_recepcion")} onChange={set("via_recepcion")}>
             <option value="">Elige</option>
-            {Object.entries(VIAS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            {Object.entries(v.via_recepcion === "link" ? VIAS : VIAS_CAPTURA).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
           </Select>
         </Field>
         <Field label="Responsable de la recepción"><Input value={s("responsable_nombre")} onChange={set("responsable_nombre")} placeholder="Si lo dejas vacío, quedas tú" /></Field>

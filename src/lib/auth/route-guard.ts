@@ -38,6 +38,8 @@ export function decideRoute(input: {
   if (pathname.startsWith("/encuesta/")) return { type: "next" };
   // Catalogo: se le manda al cliente por WhatsApp o correo, se abre sin cuenta.
   if (pathname === "/catalogo" || pathname === "/catalogo-esc-2026.pdf") return { type: "next" };
+  // Link de quejas: el cliente manda su queja sin cuenta (va en tarjetas y firmas de correo).
+  if (pathname === "/quejas") return { type: "next" };
 
   if (!hasUser) {
     if (pathname === LOGIN_PATH) return { type: "next" };

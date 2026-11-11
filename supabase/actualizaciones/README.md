@@ -54,6 +54,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 37 | `0042_pagos_parciales.sql` | Pagos: el CEO puede **pagar en partes** (anticipo). Lo que no paga queda como saldo Por pagar en un renglón nuevo. |
 | 38 | `0043_proforma_oc_anticipos.sql` | Pagos: la **proforma** queda como documento de referencia de la OC (se reemplaza o quita; no se paga ni se suma). Las facturas reales **descuentan el anticipo** ya pagado y el CEO paga solo lo neto. |
 | 39 | `0044_analisis_riesgo.sql` | **Análisis y evaluación de riesgo** (formato de calidad) para los jefes de área: varios modos de falla por actividad, S/O/D con criterios, ROE automático, tratamiento y riesgo residual. |
+| 40 | `0045_quejas_link_dictamen.sql` | **Link de quejas para clientes** (`/quejas`, sin cuenta, para tarjetas y firmas de correo) y botón **Sí aplica / No aplica** del coordinador ISO: hasta que aplica, la queja queda bloqueada. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

@@ -12,7 +12,7 @@ export default async function NuevaSac({ searchParams }: { searchParams: Promise
   const { queja } = await searchParams;
   const supabase = await createClient();
   const cfg = await getBusinessSettings(supabase);
-  const { data: quejas } = await supabase.from("quejas").select("id, numero, cliente_nombre, descripcion").neq("estado", "cerrada").order("created_at", { ascending: false }).limit(200);
+  const { data: quejas } = await supabase.from("quejas").select("id, numero, cliente_nombre, descripcion").not("estado", "in", "(cerrada,por_revisar,no_aplica)").order("created_at", { ascending: false }).limit(200);
   const q = (quejas ?? []).find((x) => x.id === queja) ?? null;
   return (
     <div className="space-y-4">

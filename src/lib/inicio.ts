@@ -184,21 +184,24 @@ async function prospeccion(c: Ctx, propias: boolean): Promise<Bloque> {
 
 async function calidad(c: Ctx, propias: boolean): Promise<Bloque> {
   const [{ data: qs }, { data: sacs }] = await Promise.all([
-    (propias ? c.sb.from("quejas").select("estado, fecha_recepcion").or(`vendedor_id.eq.${c.uid},created_by.eq.${c.uid}`) : c.sb.from("quejas").select("estado, fecha_recepcion")).neq("estado", "cerrada").limit(5000),
+    (propias ? c.sb.from("quejas").select("estado, fecha_recepcion").or(`vendedor_id.eq.${c.uid},created_by.eq.${c.uid}`) : c.sb.from("quejas").select("estado, fecha_recepcion")).not("estado", "in", "(cerrada,no_aplica)").limit(5000),
     propias ? Promise.resolve({ data: [] }) : c.sb.from("acciones_correctivas").select("estado").not("estado", "in", "(cerrada,cancelada)").limit(5000),
   ]);
   const quejas = (qs ?? []) as { estado: string; fecha_recepcion: string }[];
   const abiertas = quejas.filter((q) => q.estado === "abierta").length;
+  const porRevisar = quejas.filter((q) => q.estado === "por_revisar").length;
   const analisis = quejas.filter((q) => q.estado === "en_analisis" || q.estado === "con_sac").length;
   const viejas = quejas.filter((q) => q.estado === "abierta" && q.fecha_recepcion <= DateTime.fromISO(c.today).minus({ days: 3 }).toISODate()!).length;
   const sacAbiertas = (sacs ?? []).length;
   const alertas: Alerta[] = [];
+  if (!propias && porRevisar) alertas.push({ texto: `${porRevisar} queja(s) por revisar: decide si aplican`, href: "/calidad", tono: "red" });
   if (!propias && abiertas) alertas.push({ texto: `${abiertas} queja(s) de cliente sin atender${viejas ? ` (${viejas} con más de 3 días)` : ""}`, href: "/calidad", tono: viejas ? "red" : "amber" });
   return {
     alertas,
     seccion: {
       id: "calidad", titulo: propias ? "Mis quejas de cliente" : "Quejas y acciones correctivas", icon: "alert", href: "/calidad",
       metricas: [
+        { label: "Por revisar", valor: porRevisar, tono: tonoSi(porRevisar, "red") },
         { label: "Quejas abiertas", valor: abiertas, tono: tonoSi(abiertas, viejas ? "red" : "amber") },
         { label: "En análisis o con AC", valor: analisis },
         ...(propias ? [] : [{ label: "Acciones correctivas abiertas", valor: sacAbiertas, tono: tonoSi(sacAbiertas) }]),

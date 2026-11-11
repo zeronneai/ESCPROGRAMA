@@ -32,13 +32,14 @@ export function operacionesSuite() {
     it("quejas: el vendedor y el ISO capturan; solo el ISO cambia estatus; otros vendedores no la ven", async () => {
       const r = await q(w.seller1, "insert into public.quejas (via_recepcion, cliente_nombre, descripcion) values ('telefono','Foxconn','Producto llego dañado') returning id, numero, vendedor_id, estado, responsable_nombre");
       const qid = r.rows[0].id;
-      expect(r.rows[0]).toMatchObject({ vendedor_id: w.ids.s1, estado: "abierta" });
+      expect(r.rows[0]).toMatchObject({ vendedor_id: w.ids.s1, estado: "por_revisar" });
       expect(r.rows[0].numero).toMatch(/^QC-\d{4}-\d{4}$/);
       expect(await notif(people.iso.id, "queja_nueva", qid)).toBe(1);
       expect((await q(w.seller2, "select id from public.quejas where id=$1", [qid])).rowCount).toBe(0);
       for (const k of ["iso", "gerente", "jefa"]) expect((await q(A(k), "select id from public.quejas where id=$1", [qid])).rowCount).toBe(1);
       expect(await failure(q(w.seller1, "update public.quejas set estado='cerrada' where id=$1", [qid]))).toMatch(/coordinador ISO/);
       expect((await q(A("gerente"), "update public.quejas set descripcion='xxxxxx' where id=$1", [qid])).rowCount).toBe(0);
+      await q(A("iso"), "select public.queja_dictaminar($1, true, null, null)", [qid]);
       await q(A("iso"), "update public.quejas set estado='en_analisis' where id=$1", [qid]);
       expect(await notif(w.ids.s1, "queja_estado", qid)).toBe(1);
       // Ya no esta abierta: el vendedor no la edita, pero si comenta.
@@ -46,14 +47,52 @@ export function operacionesSuite() {
       await q(w.seller1, "insert into public.calidad_eventos (queja_id, tipo, nota) values ($1,'comentario','El cliente manda fotos')", [qid]);
       expect(await failure(q(A("gerente"), "insert into public.calidad_eventos (queja_id, tipo, nota) values ($1,'comentario','x')", [qid]))).toMatch(/row-level security/);
       const ev = await q(w.seller1, "select tipo, autor_nombre from public.calidad_eventos where queja_id=$1 order by created_at", [qid]);
-      expect(ev.rows.map((e) => e.tipo)).toEqual(["alta", "estado", "comentario"]);
-      expect(ev.rows[2].autor_nombre).toMatch(/Vend A/);
+      expect(ev.rows.map((e) => e.tipo)).toEqual(["alta", "dictamen", "estado", "comentario"]);
+      expect(ev.rows[3].autor_nombre).toMatch(/Vend A/);
       expect(await failure(q(A("mkt"), "insert into public.quejas (via_recepcion, cliente_nombre, descripcion) values ('telefono','X','Algo paso')"))).toMatch(/row-level security/);
+    });
+
+    it("link de quejas: el cliente la manda sin cuenta, llega Por revisar y todo esta bloqueado hasta que el ISO dice que aplica", async () => {
+      const anonA: Actor = { id: "", role: "anon" };
+      const num = (await q(anonA, "select public.queja_link_crear('Lear Corp','Ana Ruiz','ana@lear.mx','OC 9911','Llegaron guantes rotos en 3 cajas') as n")).rows[0].n;
+      expect(num).toMatch(/^QC-\d{4}-\d{4}$/);
+      // Doble clic: mismo folio
+      expect((await q(anonA, "select public.queja_link_crear('Lear Corp','Ana Ruiz','ana@lear.mx','OC 9911','Llegaron guantes rotos en 3 cajas') as n")).rows[0].n).toBe(num);
+      expect(await failure(q(anonA, "select public.queja_link_crear('L','Ana','ana@lear.mx','','Algo paso con el pedido')"))).toMatch(/empresa/);
+      expect(await failure(q(anonA, "select id from public.quejas"))).toMatch(/permission denied/);
+      expect(await failure(q(anonA, "select public.queja_dictaminar(gen_random_uuid(), true, null, null)"))).toMatch(/permission denied/);
+      const r = (await q("postgres", "select id, estado, origen, via_recepcion, created_by, responsable_nombre from public.quejas where numero=$1", [num])).rows[0];
+      expect(r).toMatchObject({ estado: "por_revisar", origen: "link", via_recepcion: "link", created_by: null, responsable_nombre: "Link de quejas" });
+      expect(await notif(people.iso.id, "queja_nueva", r.id)).toBe(1);
+      expect((await q(A("iso"), "select id from public.quejas where id=$1", [r.id])).rowCount).toBe(1);
+      // Bloqueado: estatus, comentarios y accion correctiva
+      expect(await failure(q(A("iso"), "update public.quejas set estado='en_analisis' where id=$1", [r.id]))).toMatch(/Primero decide/);
+      expect(await failure(q(A("iso"), "insert into public.calidad_eventos (queja_id, tipo, nota) values ($1,'comentario','x')", [r.id]))).toMatch(/row-level security/);
+      expect(await failure(q(A("iso"), "insert into public.acciones_correctivas (solicitante, fuente, queja_id, descripcion) values ('ISO','queja_cliente',$1,'x')", [r.id]))).toMatch(/todavía no se marca/);
+      // Solo el ISO dictamina; "no aplica" pide motivo
+      expect(await failure(q(A("gerente"), "select public.queja_dictaminar($1, true, null, null)", [r.id]))).toMatch(/coordinador ISO/);
+      expect(await failure(q(A("iso"), "select public.queja_dictaminar($1, false, '', null)", [r.id]))).toMatch(/por qué no aplica/);
+      await q(A("iso"), "select public.queja_dictaminar($1, false, 'Es de otro proveedor', null)", [r.id]);
+      expect((await q(A("iso"), "select estado, dictamen_nota from public.quejas where id=$1", [r.id])).rows[0]).toMatchObject({ estado: "no_aplica", dictamen_nota: "Es de otro proveedor" });
+      expect(await failure(q(A("iso"), "update public.quejas set estado='abierta' where id=$1", [r.id]))).toMatch(/Primero decide/);
+      // Se reconsidera: si aplica, con vendedor asignado
+      await q(A("iso"), "select public.queja_dictaminar($1, true, 'Sí es nuestro lote', $2)", [r.id, w.ids.s1]);
+      expect((await q(w.seller1, "select estado, vendedor_id from public.quejas where id=$1", [r.id])).rows[0]).toMatchObject({ estado: "abierta", vendedor_id: w.ids.s1 });
+      expect(await notif(w.ids.s1, "queja_nueva", r.id)).toBe(1);
+      expect(await failure(q(A("iso"), "select public.queja_dictaminar($1, false, 'x', null)", [r.id]))).toMatch(/ya se marcó/);
+      await q(A("iso"), "insert into public.calidad_eventos (queja_id, tipo, nota) values ($1,'comentario','Se llamó a la clienta')", [r.id]);
+      await q(A("iso"), "update public.quejas set estado='en_analisis' where id=$1", [r.id]);
+      expect(await failure(q(A("iso"), "update public.quejas set estado='no_aplica' where id=$1", [r.id]))).toMatch(/botón No aplica/);
+      expect(await failure(q(A("iso"), "update public.quejas set dictamen_nota='x' where id=$1", [r.id]))).toMatch(/permission denied/);
+      // La que captura el ISO ya aplica
+      expect((await q(A("iso"), "insert into public.quejas (via_recepcion, cliente_nombre, descripcion) values ('telefono','Bosch','Faltaron piezas') returning estado")).rows[0].estado).toBe("abierta");
     });
 
     it("acciones correctivas: solo el ISO crea; el vendedor de la queja la ve y le llega aviso", async () => {
       const qid = (await q(w.seller1, "insert into public.quejas (via_recepcion, cliente_nombre, descripcion) values ('correo','Lear','Cantidad incompleta') returning id")).rows[0].id;
       expect(await failure(q(w.seller1, "insert into public.acciones_correctivas (solicitante, fuente, descripcion) values ('Vend','queja_cliente','Faltante')"))).toMatch(/row-level security/);
+      expect(await failure(q(A("iso"), "insert into public.acciones_correctivas (solicitante, fuente, queja_id, descripcion) values ('Coord ISO','queja_cliente',$1,'Faltante')", [qid]))).toMatch(/todavía no se marca/);
+      await q(A("iso"), "select public.queja_dictaminar($1, true, null, null)", [qid]);
       const sac = (await q(A("iso"), "insert into public.acciones_correctivas (solicitante, fuente, queja_id, descripcion) values ('Coord ISO','queja_cliente',$1,'Faltante en embarque') returning id, numero", [qid])).rows[0];
       expect(sac.numero).toMatch(/^SAC-\d{2,}$/);
       expect((await q(w.seller1, "select estado from public.quejas where id=$1", [qid])).rows[0].estado).toBe("con_sac");
