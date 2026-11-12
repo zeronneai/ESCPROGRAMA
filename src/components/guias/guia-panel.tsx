@@ -97,7 +97,7 @@ export function GuiaPanel({ g, role, isOwner, events }: { g: GuiaPanelData; role
           )}
           {g.estado !== "requiere_datos" && (
             <div className="space-y-2">
-              <p className="text-xs text-slate-600">{g.estado === "lista" ? "Reemplazar el archivo de la guía" : "Sube la guía (PDF o imagen) y el número de rastreo"}</p>
+              <p className="text-xs text-slate-600">{g.estado === "lista" ? "Reemplazar el archivo de la guía" : "Sube la guía (PDF o imagen) y escribe el número de guía"}</p>
               <Input value={rastreo} onChange={(e) => setRastreo(e.target.value)} placeholder="Número de guía *" className="sm:w-72!" />
               <FileUpload action={subirGuiaAction} fields={{ id: g.id }} accept="application/pdf,image/png,image/jpeg" label="Subir guía" extra={(fd) => fd.set("rastreo", rastreo)} />
             </div>

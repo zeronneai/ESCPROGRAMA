@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { GuiaPanel } from "@/components/guias/guia-panel";
-import { Chip, Dl } from "@/components/ops-ui";
-import { Card } from "@/components/ui";
+import { GuiaDatosView } from "@/components/guias/guia-datos";
+import { Chip } from "@/components/ops-ui";
 import { requireUser } from "@/lib/auth/guards";
 import { elapsedText, empaqueLabel, GUIA_ESTADOS, guiaAlert, guiaTitle, hoursPending, partidasDeGuia, resumenPartidas, SERVICIOS, type GuiaEstado, type Servicio } from "@/lib/ops/guias";
 import { fmtDate, signedUrl } from "@/lib/ops/server";
@@ -48,7 +48,20 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
     key: `p${i}`, empaque: p.empaque, cantidad: String(p.cantidad), peso_kg: String(p.peso_kg),
     largo_cm: s0(p.largo_cm), ancho_cm: s0(p.ancho_cm), alto_cm: s0(p.alto_cm), descripcion: p.descripcion ?? "",
   }));
+  const mkt = u.rol === "marketplaces";
   const medidas = [g.largo_cm, g.ancho_cm, g.alto_cm].every(Boolean) ? `${n(g.largo_cm)} × ${n(g.ancho_cm)} × ${n(g.alto_cm)} cm` : "";
+  const datos = (
+    <GuiaDatosView
+      d={{
+        factura: g.factura, paqueteria: g.paqueteria === "Otra" ? g.paqueteria_otra ?? "Otra" : g.paqueteria, servicio: SERVICIOS[g.servicio as Servicio] ?? g.servicio,
+        urgente: g.urgente, asegurar: g.asegurar, destinatario: g.destinatario, contacto_nombre: g.contacto_nombre, telefono: g.telefono, correo: g.correo,
+        calle_numero: g.calle_numero, colonia: g.colonia, cp: g.cp, ciudad: g.ciudad, estado_geo: g.estado_geo, referencias: g.referencias,
+        partidas, conPartidas, resumenViejo: empaqueLabel(g.empaque, g.bultos), medidasViejas: medidas, peso_total: n(g.peso_kg),
+        contenido: g.contenido, notas: g.notas,
+        valor: g.valor_declarado !== null ? `$${Number(g.valor_declarado).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${g.valor_moneda === "USD" ? "USD" : "MXN"}` : null,
+      }}
+    />
+  );
 
   return (
     <div className="space-y-4">
@@ -74,6 +87,8 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
         </div>
       )}
 
+      {mkt && datos}
+
       <GuiaPanel
         g={{ id: g.id, estado, solicitada_at: g.solicitada_at, ultimo_recordatorio_at: g.ultimo_recordatorio_at, mensaje: g.mensaje, archivo_url: url, archivo_nombre: g.archivo_nombre, numero_rastreo: g.numero_rastreo, atendida_nombre: g.atendida_nombre, form, partidas: partidasForm }}
         role={u.rol}
@@ -81,50 +96,7 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
         events={(ev ?? []).map((e) => ({ id: e.id, texto: e.tipo === "comentario" ? e.nota : `${EV[e.tipo] ?? e.tipo}${e.nota ? `: ${e.nota}` : ""}`, autor: e.autor_nombre, fecha: e.created_at, comentario: e.tipo === "comentario" }))}
       />
 
-      <Card className="space-y-4 p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Datos del envío</h2>
-        <Dl
-          items={[
-            ["Factura", g.factura],
-            ["Paquetería", `${g.paqueteria === "Otra" ? g.paqueteria_otra : g.paqueteria} · ${SERVICIOS[g.servicio as Servicio]}`],
-            ["Persona o negocio", g.destinatario],
-            ["Recibe", g.contacto_nombre],
-            ["Teléfono", g.telefono],
-            ["Correo", g.correo],
-            ["Dirección", [g.calle_numero, g.colonia && `Col. ${g.colonia}`, `CP ${g.cp}`, `${g.ciudad}, ${g.estado_geo}`].filter(Boolean).join(", ")],
-            ["Referencias", g.referencias],
-            ["Paquete y peso", `${conPartidas ? resumenPartidas(partidas) : empaqueLabel(g.empaque, g.bultos)} · ${n(g.peso_kg)} kg en total`],
-            ["Medidas", conPartidas ? "" : medidas],
-            ["Contenido", g.contenido],
-            ["Valor declarado", g.valor_declarado !== null ? `$${Number(g.valor_declarado).toLocaleString("es-MX")} ${g.valor_moneda === "USD" ? "USD" : "MXN"}` : ""],
-            ["Seguro", g.asegurar ? "Sí, asegurar" : ""],
-            ["Notas", g.notas],
-          ]}
-        />
-        {conPartidas && (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[520px] text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
-                  <th className="py-2 pr-3">#</th><th className="py-2 pr-3">Partida</th><th className="py-2 pr-3 text-right">Peso c/u</th>
-                  <th className="py-2 pr-3">Medidas (L × A × Al)</th><th className="py-2">Qué lleva</th>
-                </tr>
-              </thead>
-              <tbody>
-                {partidas.map((p, i) => (
-                  <tr key={i} className="border-b border-slate-100 last:border-0">
-                    <td className="py-2 pr-3 text-slate-500">{i + 1}</td>
-                    <td className="py-2 pr-3 font-medium text-slate-900">{empaqueLabel(p.empaque, p.cantidad)}</td>
-                    <td className="py-2 pr-3 text-right">{p.peso_kg} kg</td>
-                    <td className="py-2 pr-3">{p.largo_cm && p.ancho_cm && p.alto_cm ? `${p.largo_cm} × ${p.ancho_cm} × ${p.alto_cm} cm` : "Sin medidas"}</td>
-                    <td className="py-2 text-slate-600">{p.descripcion ?? ""}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+      {!mkt && datos}
     </div>
   );
 }
