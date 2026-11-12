@@ -128,6 +128,16 @@ export function almacenSuite() {
       const r2 = (await q(w.seller1, "select public.venta_desde_factura($1::jsonb) as r", [datos({ folio: folio + "X", nombre: "OTRO NOMBRE", lineas: [{ clave: null, descripcion: "Servicio", cantidad: 1 }] })])).rows[0].r;
       expect(r2).toMatchObject({ customer_id: r.customer_id, cliente_nuevo: false, salida_id: null });
       await q("postgres", "update public.company_profile set almacen_ventas=false where id=true");
+      // Domicilio de entrega: se crea la sucursal del mismo cliente (por RFC) y la venta va a la sucursal.
+      const e1 = (await q(w.seller1, "select public.venta_desde_factura($1::jsonb) as r", [datos({ folio: folio + "E1", uuid: randomUUID(), entrega_nombre: "Encapsuladoras México", entrega_direccion: "C.Apicultura 12403, Col. Zootecnia" })])).rows[0].r;
+      expect(e1.sucursal_nueva).toBe(true);
+      const suc = (await q("postgres", "select parent_id, sucursal, nombre, rfc, direccion from public.customers where id=$1", [e1.sucursal_id])).rows[0];
+      expect(suc).toMatchObject({ parent_id: r.customer_id, sucursal: "Encapsuladoras México", rfc, direccion: "C.Apicultura 12403, Col. Zootecnia" });
+      expect(suc.nombre).toMatch(/ · Encapsuladoras México$/);
+      expect((await q("postgres", "select customer_id from public.ventas where id=$1", [e1.venta_id])).rows[0].customer_id).toBe(e1.sucursal_id);
+      // Otra factura con la misma entrega: misma sucursal
+      const e2 = (await q(w.seller1, "select public.venta_desde_factura($1::jsonb) as r", [datos({ folio: folio + "E2", uuid: randomUUID(), entrega_nombre: "ENCAPSULADORAS MÉXICO", entrega_direccion: "c.apicultura 12403, col. zootecnia" })])).rows[0].r;
+      expect(e2).toMatchObject({ sucursal_id: e1.sucursal_id, sucursal_nueva: false });
       expect(await failure(q(w.seller2, "select public.salida_crear($1, null, null, null, null, null, null, null, $2::jsonb)", [folio + "X", JSON.stringify([{ clave: "ESC-GLPFGG-L", cantidad: 1 }])]))).toMatch(/registrada como venta/);
       // Al terminar la carga, la venta queda entregada
       await q(alm.a, "select public.salida_escanear($1,$2)", [r.salida_id, cod]);

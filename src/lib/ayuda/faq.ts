@@ -156,7 +156,7 @@ export const FAQ: Faq[] = [
   {
     id: "pedir-guia", q: "¿Cómo pido una guía de paquetería?", roles: V, paths: ["/guias"],
     keys: ["guia", "guias", "paqueteria", "envio", "mandar", "paquete", "dhl", "estafeta", "paquete express", "tinypack", "porteo"],
-    a: ["Ve a Guías > \"Pedir guía\".", "Pon la factura, la paquetería y los datos de quien recibe (puedes buscar al cliente para que se llenen solos).", "Agrega las partidas (bultos o tarimas, peso y medidas; una por cada tipo distinto). Marca \"Es urgente\" si aplica.", "Marketplaces la genera y te llega aviso cuando esté lista para descargar."],
+    a: ["Ve a Guías > \"Pedir guía\".", "Escribe o elige la factura: si ya la subiste como venta, se llenan solos el cliente, su domicilio (o el de entrega), el teléfono, lo que lleva y el valor.", "Elige la paquetería y revisa los datos de quien recibe.", "Agrega las partidas (bultos o tarimas, peso y medidas; una por cada tipo distinto). Marca \"Es urgente\" si aplica.", "Marketplaces la genera y te llega aviso con el número de guía (el archivo lo maneja Marketplaces)."],
     links: [{ label: "Pedir guía", href: "/guias/nueva" }],
   },
   {
@@ -182,7 +182,7 @@ export const FAQ: Faq[] = [
   {
     id: "mkt-atender", q: "¿Cómo atiendo una guía?", roles: MKT, paths: ["/guias"],
     keys: ["atender", "tomar", "generar", "subir", "guia", "rastreo", "pdf", "archivo"],
-    a: ["En Guías > Pendientes abre la guía (las urgentes y más viejas van primero).", "Toca \"Tomar y generar\" para que el vendedor sepa que ya la estás haciendo.", "Si falta algo, usa \"Faltan datos\" y escribe qué necesitas.", "Cuando la tengas, escribe el número de rastreo, elige el archivo (PDF o imagen) y toca \"Subir guía\"."],
+    a: ["En Guías > Pendientes abre la guía (las urgentes y más viejas van primero).", "Toca \"Tomar y generar\" para que el vendedor sepa que ya la estás haciendo.", "Si falta algo, usa \"Faltan datos\" y escribe qué necesitas.", "Cuando la tengas, escribe el número de guía (es lo único que ve el vendedor), elige el archivo (PDF o imagen) y toca \"Subir guía\"."],
   },
 
   // ----- Consumo interno

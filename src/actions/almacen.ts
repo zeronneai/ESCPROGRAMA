@@ -230,6 +230,8 @@ const ventaFacturaSchema = z.object({
   rfc: z.string().trim().max(20).default(""),
   direccion: z.string().trim().max(300).default(""),
   telefono: z.string().trim().max(40).default(""),
+  entrega_nombre: z.string().trim().max(80).nullable().optional(),
+  entrega_direccion: z.string().trim().max(300).nullable().optional(),
   total: z.coerce.number({ message: "Escribe el total de la factura" }).positive("Escribe el total de la factura").max(999_999_999),
   moneda: z.enum(["MXN", "USD"]),
   pago: z.enum(["contado", "credito"]),

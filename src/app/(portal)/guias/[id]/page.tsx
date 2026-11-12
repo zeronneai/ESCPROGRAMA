@@ -32,7 +32,8 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
   const now = new Date();
   const alert = guiaAlert(g, now);
   const h = hoursPending(g, now);
-  const url = await signedUrl(supabase, "guias", g.archivo_path, g.archivo_nombre);
+  // El vendedor solo ve el numero de guia; el archivo lo descargan Marketplaces y los jefes.
+  const url = u.rol === "vendedor" ? null : await signedUrl(supabase, "guias", g.archivo_path, g.archivo_nombre);
   const n = (v: unknown) => (v === null || v === undefined ? "" : String(Number(v)));
   const form = {
     factura: g.factura, destinatario: g.destinatario, paqueteria: g.paqueteria, paqueteria_otra: g.paqueteria_otra ?? "", servicio: g.servicio,

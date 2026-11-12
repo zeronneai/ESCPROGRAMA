@@ -23,6 +23,8 @@ export interface FacturaLeida {
   razonSocial?: string | null;
   nombreComercial?: string | null;
   direccion?: string | null;
+  /** Domicilio de entrega (columna de en medio en el PDF de ESC): otro lugar del mismo cliente. */
+  entrega?: { nombre: string | null; direccion: string } | null;
   telefono?: string | null;
   moneda?: "MXN" | "USD" | null;
   metodo?: "PUE" | "PPD" | null;
@@ -102,6 +104,13 @@ export function leerFacturaTexto(renglones: string[], filas?: Celda[][]): Factur
     }
   }
 
+  // El vendedor puede venir en el mismo renglon que el cliente, en la columna de "Vendedor".
+  if (!vendedor && ci >= 0) {
+    const xv = celdas[ci]?.find((k) => /Vendedor/i.test(k.s))?.x;
+    const cand = xv !== undefined ? celdas[ci + 1]?.find((k) => Math.abs(k.x - xv) < 40)?.s.trim() : undefined;
+    if (cand && /^[A-ZÁÉÍÓÚÑ .]{3,40}$/.test(cand)) vendedor = cand;
+  }
+
   const lineas: LineaFactura[] = [];
   for (let i = 0; i < lines.length; i++) {
     const tokens = lines[i].trim().split(/\s{2,}/);
@@ -161,6 +170,25 @@ export function leerFacturaTexto(renglones: string[], filas?: Celda[][]): Factur
     }
     direccion = trozos.length ? limpiar(trozos.join(", ")) : null;
   }
+  // Domicilio de entrega: la columna de en medio (entre el cliente y "Vendedor").
+  let entrega: FacturaLeida["entrega"] = null;
+  const x0c = ci >= 0 ? celdas[ci + 1]?.[0]?.x : undefined;
+  if (ci >= 0 && x0c !== undefined) {
+    const xVend = celdas[ci]?.find((k) => /Vendedor/i.test(k.s))?.x ?? Infinity;
+    const enMedio = (k: Celda) => k.x > x0c + 80 && k.x < xVend - 60;
+    const nombreE = celdas[ci + 1]?.find(enMedio)?.s.trim() || null;
+    const trozos: string[] = [];
+    for (let i = ci + 2; i < lines.length; i++) {
+      if (/^\s*(Clave SAT|R[ée]gimen)/i.test(lines[i]) || /^\d{8}\b/.test(lines[i].trim())) break;
+      for (const k of celdas[i] ?? []) if (enMedio(k) && !ETIQ.test(k.s.trim())) trozos.push(k.s.trim());
+    }
+    const dir = limpiar(trozos.join(", "))
+      .replace(/\s+-\s+-\s*/g, ", ")
+      .replace(/[,;\s]*C\.?\s*P\.?\s*:?[,;\s]*$/i, "")
+      .replace(/(\s*[,;]\s*)+/g, ", ")
+      .replace(/^[,;\s-]+|[,;\s-]+$/g, "");
+    if (dir.length >= 5) entrega = { nombre: nombreE && nombreE !== vendedor ? limpiar(nombreE) : null, direccion: dir.slice(0, 300) };
+  }
   const telefono = (ci >= 0 ? lines.slice(ci).join("\n") : todo).match(/\bTEL\s*\.?\s*:[ \t]*([()\d][()\d \t-]{6,19})/i)?.[1]?.trim() ?? null;
   const moneda = (todo.match(/Moneda:\s*(MXN|USD)\b/i)?.[1]?.toUpperCase() as "MXN" | "USD" | undefined) ?? null;
   const metodo = (todo.match(/M[ée]todo de pago:\s*\(?(PUE|PPD)\)?/i)?.[1]?.toUpperCase() as "PUE" | "PPD" | undefined) ?? null;
@@ -178,7 +206,7 @@ export function leerFacturaTexto(renglones: string[], filas?: Celda[][]): Factur
 
   return {
     folio: folio ? folio.toUpperCase() : null, fecha, cliente, vendedor, lineas, avisos,
-    uuid, rfc, razonSocial, nombreComercial, direccion, telefono, moneda, metodo, condiciones, pago, diasCredito: dias, vence, subtotal, total,
+    uuid, rfc, razonSocial, nombreComercial: entrega ? null : nombreComercial, direccion, entrega, telefono, moneda, metodo, condiciones, pago, diasCredito: dias, vence, subtotal, total,
   };
 }
 

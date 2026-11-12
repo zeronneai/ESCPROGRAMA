@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { saveGuiaAction } from "@/actions/guias";
+import { useRef, useState } from "react";
+import { datosFacturaGuiaAction, saveGuiaAction } from "@/actions/guias";
 import { areaCls, CustomerLookup, useRun } from "@/components/ops-ui";
 import { Alert, Button, Field, Input, Select } from "@/components/ui";
-import { PAQUETERIAS, SERVICIOS, guiaTitle, resumenPartidas, type GuiaInput } from "@/lib/ops/guias";
+import { PAQUETERIAS, SERVICIOS, guiaTitle, partirDireccion, resumenPartidas, type GuiaInput } from "@/lib/ops/guias";
 import { ESTADOS_MX } from "@/lib/validation/customer";
 
 type F = Record<Exclude<keyof GuiaInput, "partidas">, string | boolean | null>;
@@ -20,8 +20,29 @@ const nuevaPartida = (empaque: "bulto" | "tarima" = "bulto"): PartidaForm => ({
 });
 const numero = (x: string) => Number(x.replace(",", "."));
 
-export function GuiaForm({ id, initial, partidas: iniciales, onDone }: { id: string | null; initial?: Partial<F>; partidas?: PartidaForm[]; onDone?: () => void }) {
+export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDone }: { id: string | null; initial?: Partial<F>; partidas?: PartidaForm[]; facturas?: { folio: string; cliente: string }[]; onDone?: () => void }) {
   const [v, setV] = useState<F>({ ...EMPTY, ...initial });
+  const [deFactura, setDeFactura] = useState<string | null>(null);
+  const buscada = useRef("");
+  // La factura ya se subio como venta: se llenan los datos del cliente o de su domicilio de entrega.
+  async function llenarDeFactura(folio: string) {
+    const f = folio.trim();
+    if (!f || f.toUpperCase() === buscada.current) return;
+    buscada.current = f.toUpperCase();
+    const d = await datosFacturaGuiaAction(f).catch(() => null);
+    if (!d) return setDeFactura(null);
+    setV((x) => {
+      const llena = (k: keyof F, val: string | null) => (val && !String(x[k] ?? "").trim() ? { [k]: val } : {});
+      return {
+        ...x,
+        ...(x.customer_id ? {} : { customer_id: d.customer_id }),
+        ...llena("destinatario", d.destinatario), ...llena("contacto_nombre", d.contacto_nombre), ...llena("telefono", d.telefono), ...llena("correo", d.correo),
+        ...llena("calle_numero", d.calle_numero), ...llena("colonia", d.colonia), ...llena("cp", d.cp), ...llena("ciudad", d.ciudad), ...llena("estado_geo", d.estado_geo),
+        ...llena("contenido", d.contenido), ...llena("valor_declarado", d.valor_declarado),
+      };
+    });
+    setDeFactura(`${d.folio} · ${d.destinatario}${d.entrega ? " (domicilio de entrega)" : ""}`);
+  }
   const [ps, setPs] = useState<PartidaForm[]>(iniciales?.length ? iniciales : [nuevaPartida()]);
   const setP = (i: number, k: keyof PartidaForm, val: string) => setPs((a) => a.map((p, j) => (j === i ? { ...p, [k]: val } : p)));
   const validas = ps.filter((p) => numero(p.cantidad) > 0);
@@ -50,7 +71,11 @@ export function GuiaForm({ id, initial, partidas: iniciales, onDone }: { id: str
       {title && <p className="rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-800">Título: {title}</p>}
 
       <fieldset className="grid gap-3 sm:grid-cols-3">
-        <Field label="Factura *"><Input value={s("factura")} onChange={set("factura")} placeholder="Ej. A-1234" /></Field>
+        <Field label="Factura *">
+          <Input value={s("factura")} onChange={(e) => { set("factura")(e); if (facturas.some((x) => x.folio.toUpperCase() === e.target.value.trim().toUpperCase())) void llenarDeFactura(e.target.value); }}
+            onBlur={(e) => void llenarDeFactura(e.target.value)} placeholder="Ej. F11341" list="facturas-guia" autoComplete="off" />
+          <datalist id="facturas-guia">{facturas.map((x) => <option key={x.folio} value={x.folio}>{x.cliente}</option>)}</datalist>
+        </Field>
         <Field label="Paquetería *">
           <Select value={s("paqueteria")} onChange={set("paqueteria")}>
             <option value="">Elige</option>
@@ -68,6 +93,11 @@ export function GuiaForm({ id, initial, partidas: iniciales, onDone }: { id: str
         )}
       </fieldset>
 
+      {deFactura && (
+        <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-900">
+          Llenamos los datos con la factura <b>{deFactura}</b>. Revisa que el domicilio y el teléfono estén completos.
+        </p>
+      )}
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-800">Destinatario</h3>
         <CustomerLookup
@@ -79,8 +109,12 @@ export function GuiaForm({ id, initial, partidas: iniciales, onDone }: { id: str
               contacto_nombre: c.contacto_nombre ?? x.contacto_nombre,
               telefono: c.contacto_telefono ?? x.telefono,
               correo: c.contacto_correo ?? x.correo,
-              calle_numero: c.direccion ?? x.calle_numero,
-              estado_geo: c.estado_geo ?? x.estado_geo,
+              ...(() => {
+                const d = partirDireccion(c.direccion);
+                return c.direccion
+                  ? { calle_numero: d.calle_numero || c.direccion, colonia: d.colonia || x.colonia, cp: d.cp || x.cp, ciudad: d.ciudad || x.ciudad, estado_geo: d.estado_geo || c.estado_geo || x.estado_geo }
+                  : { estado_geo: c.estado_geo ?? x.estado_geo };
+              })(),
             }))
           }
         />

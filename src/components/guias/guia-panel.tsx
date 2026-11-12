@@ -44,15 +44,19 @@ export function GuiaPanel({ g, role, isOwner, events }: { g: GuiaPanelData; role
         </Card>
       )}
 
-      {g.archivo_url && (
+      {(g.archivo_url || g.estado === "lista") && (
         <Card className="flex flex-col gap-3 border-green-300 bg-green-50 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-green-900">
             <p className="font-semibold">La guía está lista</p>
-            <p>{g.numero_rastreo ? `Número de rastreo: ${g.numero_rastreo}` : g.archivo_nombre}</p>
+            {g.numero_rastreo ? (
+              <p>Número de guía: <span className="select-all font-mono text-base font-semibold">{g.numero_rastreo}</span></p>
+            ) : (
+              <p>{g.archivo_url ? g.archivo_nombre : "Marketplaces todavía no captura el número de guía."}</p>
+            )}
           </div>
-          <a href={g.archivo_url} className="inline-flex items-center justify-center gap-2 rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800">
+          {g.archivo_url && <a href={g.archivo_url} className="inline-flex items-center justify-center gap-2 rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800">
             <Icon name="download" className="h-4 w-4" /> Descargar guía
-          </a>
+          </a>}
         </Card>
       )}
 
@@ -94,7 +98,7 @@ export function GuiaPanel({ g, role, isOwner, events }: { g: GuiaPanelData; role
           {g.estado !== "requiere_datos" && (
             <div className="space-y-2">
               <p className="text-xs text-slate-600">{g.estado === "lista" ? "Reemplazar el archivo de la guía" : "Sube la guía (PDF o imagen) y el número de rastreo"}</p>
-              <Input value={rastreo} onChange={(e) => setRastreo(e.target.value)} placeholder="Número de rastreo" className="sm:w-72!" />
+              <Input value={rastreo} onChange={(e) => setRastreo(e.target.value)} placeholder="Número de guía *" className="sm:w-72!" />
               <FileUpload action={subirGuiaAction} fields={{ id: g.id }} accept="application/pdf,image/png,image/jpeg" label="Subir guía" extra={(fd) => fd.set("rastreo", rastreo)} />
             </div>
           )}

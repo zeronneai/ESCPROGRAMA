@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
-import { GUIA_FILE_TYPES, guiaSchema, resumenPartidas, type GuiaInput } from "@/lib/ops/guias";
+import { GUIA_FILE_TYPES, guiaSchema, partirDireccion, resumenPartidas, type GuiaInput } from "@/lib/ops/guias";
 import { friendlyError } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Result } from "./requests";
@@ -14,11 +14,24 @@ const refresh = (id?: string) => {
   if (id) revalidatePath(`/guias/${id}`);
 };
 
+const CAMPOS_GUIA: Record<string, string> = {
+  factura: "la factura", destinatario: "el destinatario", paqueteria: "la paquetería", servicio: "el servicio", customer_id: "el cliente",
+  telefono: "el teléfono", correo: "el correo", calle_numero: "la calle y número", cp: "el código postal", ciudad: "la ciudad",
+  estado_geo: "el estado", partidas: "las partidas", valor_declarado: "el valor declarado", contenido: "el contenido",
+};
+
 export async function saveGuiaAction(id: string | null, input: GuiaInput): Promise<Result<{ id: string }>> {
   const u = await requireUser();
   if (u.rol !== "vendedor") return { ok: false, error: "Las guías las piden los vendedores." };
   const parsed = guiaSchema.safeParse(input);
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
+  if (!parsed.success) {
+    const i = parsed.error.issues[0];
+    // Por si sale un mensaje generico ("Invalid input"): decir en que campo.
+    const generico = /invalid|expected|required/i.test(i.message);
+    const campo = CAMPOS_GUIA[String(i.path[0])] ?? String(i.path[0] ?? "");
+    const partida = i.path[0] === "partidas" && typeof i.path[1] === "number" ? ` (partida ${i.path[1] + 1})` : "";
+    return { ok: false, error: generico ? `Revisa ${campo || "los datos"}${partida}.` : `${i.message}${partida}` };
+  }
   const supabase = await createClient();
   let datos: Record<string, unknown> = parsed.data;
   // Sin la actualizacion 0049 todavia: se guardan los totales y las partidas van en el contenido.
@@ -74,6 +87,7 @@ export async function subirGuiaAction(formData: FormData): Promise<Result> {
   if (u.rol !== "marketplaces") return { ok: false, error: "Solo Marketplaces sube las guías." };
   const id = String(formData.get("id") ?? "");
   const rastreo = String(formData.get("rastreo") ?? "").trim().slice(0, 80);
+  if (rastreo.length < 3) return { ok: false, error: "Escribe el número de guía: es lo único que ve el vendedor." };
   const file = formData.get("file");
   if (!uuid.safeParse(id).success) return { ok: false, error: "Guía inválida" };
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Elige el archivo de la guía" };
@@ -120,4 +134,64 @@ export async function commentGuiaAction(id: string, nota: string): Promise<Resul
   if (error) return { ok: false, error: friendlyError(error.message) };
   refresh(id);
   return { ok: true };
+}
+
+export type DatosFacturaGuia = {
+  folio: string;
+  customer_id: string | null;
+  destinatario: string;
+  contacto_nombre: string;
+  telefono: string;
+  correo: string;
+  calle_numero: string;
+  colonia: string;
+  cp: string;
+  ciudad: string;
+  estado_geo: string;
+  contenido: string;
+  valor_declarado: string;
+  /** "Cliente · Sucursal" si se mando al domicilio de entrega. */
+  entrega: boolean;
+};
+
+type CustGuia = { id: string; nombre: string; sucursal: string | null; parent_id: string | null; direccion: string | null; estado_geo: string | null; contacto_nombre: string | null; contacto_telefono: string | null; contacto_correo: string | null };
+
+/** La factura ya se subio como venta: se toman el cliente (o la sucursal de entrega), su domicilio y lo que lleva. */
+export async function datosFacturaGuiaAction(folio: string): Promise<DatosFacturaGuia | null> {
+  await requireUser();
+  const f = folio.trim().toUpperCase();
+  if (!f || f.length > 40) return null;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("ventas")
+    .select("factura, monto, customer_id, customers(id, nombre, sucursal, parent_id, direccion, estado_geo, contacto_nombre, contacto_telefono, contacto_correo), venta_lineas(descripcion, cantidad)")
+    .ilike("factura", f)
+    .is("cancelada_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data) return null;
+  const v = data as unknown as { factura: string; monto: number | null; customer_id: string | null; customers: CustGuia | null; venta_lineas: { descripcion: string; cantidad: number | null }[] };
+  const c = v.customers;
+  let matriz: CustGuia | null = null;
+  if (c?.parent_id) {
+    const { data: m } = await supabase.from("customers").select("id, nombre, sucursal, parent_id, direccion, estado_geo, contacto_nombre, contacto_telefono, contacto_correo").eq("id", c.parent_id).maybeSingle();
+    matriz = (m as CustGuia | null) ?? null;
+  }
+  const dir = partirDireccion(c?.direccion ?? matriz?.direccion);
+  const lineas = (v.venta_lineas ?? []).filter((l) => l.descripcion && !/^flete$/i.test(l.descripcion.trim()));
+  const contenido = lineas.map((l) => `${l.cantidad != null ? `${Number(l.cantidad)} ` : ""}${l.descripcion}`).join("; ");
+  return {
+    folio: v.factura,
+    customer_id: c?.id ?? null,
+    destinatario: c?.nombre ?? "",
+    contacto_nombre: c?.contacto_nombre ?? matriz?.contacto_nombre ?? "",
+    telefono: c?.contacto_telefono ?? matriz?.contacto_telefono ?? "",
+    correo: c?.contacto_correo ?? matriz?.contacto_correo ?? "",
+    ...dir,
+    estado_geo: dir.estado_geo || c?.estado_geo || matriz?.estado_geo || "",
+    contenido: contenido.length > 300 ? `${contenido.slice(0, 297)}...` : contenido,
+    valor_declarado: v.monto != null ? String(v.monto) : "",
+    entrega: !!c?.parent_id,
+  };
 }

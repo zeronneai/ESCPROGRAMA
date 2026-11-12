@@ -59,6 +59,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 42 | `0047_almacen_conectado.sql` | Interruptor **"Almacén conectado a ventas"** en Configuración (viene apagado): la venta con factura ya no manda carga a almacén y se esconden Entregas e Inventario hasta que esté el inventario. |
 | 43 | `0048_demo_quitar_where.sql` | Arregla **Quitar demostración** ("DELETE requires a WHERE clause"). Se puede correr en cualquier momento. |
 | 44 | `0049_guias_partidas.sql` | **Guías con partidas**: varias tarimas o bultos distintos en un mismo envío, cada uno con su peso y medidas. Se puede correr en cualquier momento. |
+| 45 | `0050_entrega_sucursal_guias.sql` | Venta con factura: el **domicilio de entrega** se registra como **sucursal** del cliente. Guías: el vendedor ve el número de guía pero **no descarga el archivo**. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

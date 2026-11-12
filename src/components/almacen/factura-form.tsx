@@ -65,6 +65,8 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
   const [catalogo, setCatalogo] = useState<Record<string, string>>({});
   const [dup, setDup] = useState<{ folio: string; usado: FolioUsado; mensaje: string } | null>(null);
   const [cli, setCli] = useState<Cliente>({ nombre: "", razon: "", rfc: "", direccion: "", telefono: "" });
+  // Domicilio de entrega de la factura: se registra como sucursal del cliente.
+  const [entrega, setEntrega] = useState<{ nombre: string; direccion: string; usar: boolean } | null>(null);
   const [match, setMatch] = useState<ClienteFactura | null>(null);
   const [elegido, setElegido] = useState<{ id: string; nombre: string } | null>(cliente);
   const [cambiar, setCambiar] = useState(false);
@@ -126,6 +128,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
       telefono: f.telefono ?? "",
     };
     setCli(c);
+    setEntrega(f.entrega ? { nombre: f.entrega.nombre ?? "", direccion: f.entrega.direccion, usar: true } : null);
     setCobro({
       total: f.total != null ? String(f.total) : "",
       moneda: f.moneda ?? "MXN",
@@ -176,6 +179,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
     setLineas([]);
     setDup(null);
     setCli({ nombre: "", razon: "", rfc: "", direccion: "", telefono: "" });
+    setEntrega(null);
     setMatch(null);
     setElegido(cliente);
     setCobro({ total: "", moneda: "MXN", pago: "contado", dias: "" });
@@ -206,6 +210,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
         folio: v.folio, fecha: v.fecha || null, uuid: v.uuid || null, vendedor_factura: v.vendedor || null, notas_almacen: almacen ? v.notas || null : null,
         comentarios: v.comentarios || null, pedido: v.pedido || null,
         customer_id: elegido?.id ?? null, nombre: cli.nombre, razon_social: cli.razon, rfc: cli.rfc, direccion: cli.direccion, telefono: cli.telefono,
+        entrega_nombre: entrega?.usar ? entrega.nombre || null : null, entrega_direccion: entrega?.usar ? entrega.direccion || null : null,
         total: Number(cobro.total), moneda: cobro.moneda, pago: cobro.pago, dias_credito: cobro.pago === "credito" ? Number(cobro.dias) || 30 : null,
         lineas: datosLineas(),
       }));
@@ -328,6 +333,25 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
                   <Field label="Teléfono"><Input value={cli.telefono} readOnly={fijo.telefono} onChange={setC("telefono")} className={`${fijo.telefono ? FIJO_CLS : ""}`} /></Field>
                 </div>
                 <Field label="Dirección fiscal"><Input value={cli.direccion} readOnly={fijo.direccion} onChange={setC("direccion")} className={fijo.direccion ? FIJO_CLS : ""} /></Field>
+                {entrega && (
+                  <div className="space-y-2 rounded-lg border border-violet-200 bg-violet-50/60 p-3">
+                    <label className="flex items-start gap-2 text-sm">
+                      <input type="checkbox" className="mt-0.5" checked={entrega.usar} onChange={(e) => setEntrega({ ...entrega, usar: e.target.checked })} />
+                      <span>
+                        <span className="font-semibold text-violet-900">La factura trae otro domicilio de entrega</span>
+                        <span className="block text-violet-900/80">
+                          Se registra como sucursal: <b>{(elegido?.nombre ?? match?.nombre ?? (cli.nombre || cli.razon)) || "el cliente"} · {entrega.nombre || "Entrega"}</b>, y la venta queda en esa sucursal. Si ya existe, se usa la misma.
+                        </span>
+                      </span>
+                    </label>
+                    {entrega.usar && (
+                      <div className="grid gap-3 sm:grid-cols-[1fr_2fr]">
+                        <Field label="Nombre de la sucursal"><Input value={entrega.nombre} onChange={(e) => setEntrega({ ...entrega, nombre: e.target.value })} maxLength={80} placeholder="Ej. Planta Zootecnia" /></Field>
+                        <Field label="Domicilio de entrega"><Input value={entrega.direccion} onChange={(e) => setEntrega({ ...entrega, direccion: e.target.value })} maxLength={300} /></Field>
+                      </div>
+                    )}
+                  </div>
+                )}
               </Card>
 
               <Card className="space-y-3 p-4 sm:p-5">
