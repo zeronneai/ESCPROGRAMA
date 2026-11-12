@@ -93,6 +93,10 @@ export function decideRoute(input: {
   if (!riesgo && under("/calidad") && ["marketplaces", "almacen", "supervisor_almacen", "supervisor_finanzas"].includes(profile.rol)) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
+  // Pedidos Pegatron: la jefa de ventas los sube; comprador, gerente y CEO los ven.
+  if (under("/pedidos-pegatron") && !["jefe_ventas", "comprador", "gerente", "ceo"].includes(profile.rol)) {
+    return { type: "redirect", to: homeFor(profile.rol) };
+  }
   // Pagos a proveedores extranjeros: comprador y CEO.
   if (under("/pagos") && profile.rol !== "comprador" && profile.rol !== "ceo") {
     return { type: "redirect", to: homeFor(profile.rol) };

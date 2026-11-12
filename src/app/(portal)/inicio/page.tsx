@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FondoAzul, Wordmark } from "@/components/marca";
 import { CATALOGO, CATALOGO_VISIBLE } from "@/lib/marca";
+import { DejarComentarioCatalogo } from "@/components/catalogo-popup";
 import { EnviarCatalogo } from "@/components/catalogo";
 import { DateTime } from "luxon";
 import { Icon } from "@/components/icons";
@@ -115,6 +116,9 @@ export default async function Inicio() {
           <span className="text-sm text-slate-600">Mándalo a un cliente:</span>
           <EnviarCatalogo compacto />
         </div>
+      )}
+      {u.rol !== "comprador" && (
+        <div className="mx-3 -mt-2 sm:mx-6"><DejarComentarioCatalogo /></div>
       )}
       </>)}
 

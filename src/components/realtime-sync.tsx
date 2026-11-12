@@ -18,6 +18,7 @@ const TABLAS = [
   "salidas", "salida_lineas", "recepciones", "etiquetas",
   "pagos", "ordenes_compra",
   "consumo_solicitudes", "quejas", "acciones_correctivas", "calidad_eventos", "control_cambios", "documentos", "minutas", "encuestas_cliente", "riesgo_analisis",
+  "pegatron_oc", "pegatron_oc_lineas", "catalogo_comentarios",
 ];
 
 /** Evento que avisan otros componentes (ej. la campana de notificaciones). */

@@ -5,6 +5,7 @@ import { NavigationProgress } from "@/components/navigation-progress";
 import { HelpChat } from "@/components/help-chat";
 import { FirmaCorreo } from "@/components/firma/firma-correo";
 import { PagosAviso } from "@/components/pagos/pagos-aviso";
+import { CatalogoAviso } from "@/components/catalogo-aviso";
 import { NotificationBell } from "@/components/notification-bell";
 import { RealtimeSync } from "@/components/realtime-sync";
 import { RIESGO_ROLES } from "@/lib/riesgos";
@@ -22,6 +23,8 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/comprador", label: "Pendientes", icon: "inbox", match: ["/comprador/solicitudes"] },
     { href: "/comprador/historial", label: "Historial", icon: "history", secondary: true },
     { href: "/comprador/por-comprar", label: "Por comprar", short: "Comprar", icon: "cart" },
+    { href: "/pedidos-pegatron", label: "Pedidos Pegatron", short: "Pegatron", icon: "clipboard", secondary: true },
+    { href: "/comprador/catalogo", label: "Comentarios del catálogo", icon: "chat", secondary: true },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/pagos", label: "Pagos", icon: "dollar" },
     { href: "/comprador/estadisticas", label: "Estadísticas", short: "Stats", icon: "chart", secondary: true },
@@ -62,6 +65,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/ventas", label: "Resumen", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/ventas/clientes", label: "Clientes", icon: "building" },
+    { href: "/pedidos-pegatron", label: "Pedidos Pegatron", short: "Pegatron", icon: "cart" },
     { href: "/guias", label: "Guías", icon: "package", secondary: true },
     { href: "/calidad", label: "Quejas y acciones correctivas", icon: "alert", secondary: true },
     { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
@@ -78,6 +82,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/guias", label: "Guías", icon: "package" },
     { href: "/ventas/clientes", label: "Clientes", icon: "building", secondary: true },
+    { href: "/pedidos-pegatron", label: "Pedidos Pegatron", icon: "cart", secondary: true },
     { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
     { href: "/evaluaciones/proveedores", label: "Evaluación de proveedores", icon: "truck", secondary: true },
     { href: "/evaluaciones/clientes", label: "Evaluación de clientes", icon: "users", secondary: true },
@@ -141,6 +146,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/consumo", label: "Consumo interno", icon: "clipboard", secondary: true },
     { href: "/guias", label: "Guías", icon: "package", secondary: true },
     { href: "/ventas/clientes", label: "Clientes", icon: "building", secondary: true },
+    { href: "/pedidos-pegatron", label: "Pedidos Pegatron", icon: "cart", secondary: true },
     { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
     { href: "/evaluaciones/proveedores", label: "Evaluación de proveedores", icon: "truck", secondary: true },
     { href: "/evaluaciones/clientes", label: "Evaluación de clientes", icon: "users", secondary: true },
@@ -183,6 +189,9 @@ export default async function PortalLayout({ children }: { children: React.React
       </Suspense>
       <Suspense fallback={null}>
         <FirmaCorreo user={user} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <CatalogoAviso userId={user.id} rol={user.rol} />
       </Suspense>
     </div>
   );

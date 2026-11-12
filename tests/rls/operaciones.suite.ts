@@ -88,6 +88,40 @@ export function operacionesSuite() {
       expect((await q(A("iso"), "insert into public.quejas (via_recepcion, cliente_nombre, descripcion) values ('telefono','Bosch','Faltaron piezas') returning estado")).rows[0].estado).toBe("abierta");
     });
 
+    it("pedidos Pegatron: la jefa sube la OC con articulo ESC; el comprador marca pedido; otros no ven", async () => {
+      const po = "09" + Math.floor(Math.random() * 1e8);
+      const datos = (x: object = {}) => JSON.stringify({ po_numero: po, fecha: "2026-11-12", moneda: "USD", lineas: [
+        { item: "10", numero_parte: "48M0-01N9000", descripcion: "WIPER PAPER ROLL (PMX)", cantidad: 1257, unidad: "RL", entrega: "2026-11-30", articulo_esc: "Rollo wiper cuarto limpio" },
+        { item: "20", descripcion: "GLOVE NITRILE M", cantidad: 500, unidad: "BX", articulo_esc: "Guante nitrilo talla M" },
+      ], ...x });
+      expect(await failure(q(w.seller1, "select public.pegatron_crear($1::jsonb)", [datos()]))).toMatch(/jefa de ventas/);
+      expect(await failure(q(A("jefa"), "select public.pegatron_crear($1::jsonb)", [datos({ lineas: [{ descripcion: "X", cantidad: 1, articulo_esc: "" }] })]))).toMatch(/articulo ESC/);
+      const id = (await q(A("jefa"), "select public.pegatron_crear($1::jsonb) as id", [datos()])).rows[0].id;
+      expect(await failure(q(A("jefa"), "select public.pegatron_crear($1::jsonb)", [datos()]))).toMatch(/ya se subio/);
+      expect(await notif(w.ids.b1, "pegatron_oc", id)).toBe(1);
+      const ls = (await q(w.buyer1, "select id, articulo_esc, descripcion, cantidad from public.pegatron_oc_lineas where oc_id=$1 order by posicion", [id])).rows;
+      expect(ls).toHaveLength(2);
+      expect(Number(ls[0].cantidad)).toBe(1257);
+      expect((await q(w.seller1, "select id from public.pegatron_oc where id=$1", [id])).rowCount).toBe(0);
+      // La jefa corrige el articulo; el comprador marca pedido y ya no se puede cambiar
+      await q(A("jefa"), "update public.pegatron_oc_lineas set articulo_esc='Rollo wiper 10m' where id=$1", [ls[0].id]);
+      expect(await failure(q(A("jefa"), "select public.pegatron_pedido($1, true)", [ls[0].id]))).toMatch(/comprador/);
+      await q(w.buyer1, "select public.pegatron_pedido($1, true)", [ls[0].id]);
+      expect(await notif(people.jefa.id, "pegatron_pedido", id)).toBe(1);
+      expect((await q(A("jefa"), "update public.pegatron_oc_lineas set articulo_esc='otro' where id=$1", [ls[0].id])).rowCount).toBe(0);
+      expect((await q(A("jefa"), "select pedido_nombre from public.pegatron_oc_lineas where id=$1", [ls[0].id])).rows[0].pedido_nombre).toBeTruthy();
+    });
+
+    it("catalogo: cada quien marca visto; los comentarios los ve el comprador", async () => {
+      await q(w.seller1, "insert into public.catalogo_vistos (version) values ('t1')");
+      expect((await q(w.seller1, "select count(*)::int as n from public.catalogo_vistos where version='t1'")).rows[0].n).toBe(1);
+      const c = (await q(w.seller1, "insert into public.catalogo_comentarios (version, texto) values ('t1', 'Falta la talla XL en guantes') returning id, autor_nombre")).rows[0];
+      expect(c.autor_nombre).toMatch(/Vend/);
+      expect(await notif(w.ids.b1, "catalogo_comentario", c.id)).toBe(1);
+      expect((await q(w.buyer1, "select id from public.catalogo_comentarios where id=$1", [c.id])).rowCount).toBe(1);
+      expect((await q(w.seller2, "select id from public.catalogo_comentarios where id=$1", [c.id])).rowCount).toBe(0);
+    });
+
     it("firma de correo: cada quien guarda la suya; anonimo no", async () => {
       await q(w.seller1, "select public.guardar_mi_firma($1::jsonb)", [JSON.stringify({ nombre: "Vend A", telefono: "656 000 0000" })]);
       const r = (await q(w.seller1, "select firma->>'nombre' as n, firma_at is not null as f from public.profiles where id=$1", [w.ids.s1])).rows[0];

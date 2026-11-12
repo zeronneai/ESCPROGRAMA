@@ -92,6 +92,9 @@ describe("decideRoute", () => {
     expect(d("/consumo", p("marketplaces"))).toEqual({ type: "next" });
     expect(d("/vendedor", p("gerente"))).toEqual({ type: "redirect", to: "/inicio" });
     expect(d("/comprador", p("coordinador_iso"))).toEqual({ type: "redirect", to: "/inicio" });
+    // Pedidos Pegatron: jefa de ventas, comprador, gerente y CEO.
+    for (const r of ["jefe_ventas", "comprador", "gerente", "ceo"] as const) expect(d("/pedidos-pegatron/nueva", p(r))).toEqual({ type: "next" });
+    for (const r of ["vendedor", "marketplaces", "almacen", "coordinador_iso"] as const) expect(d("/pedidos-pegatron", p(r))).toEqual({ type: "redirect", to: "/inicio" });
   });
 
   it("almacen va a evaluacion de proveedores; la encuesta del cliente se abre sin sesion", () => {
@@ -107,9 +110,9 @@ describe("decideRoute", () => {
     expect(d("/quejas", null, false)).toEqual({ type: "next" });
     expect(d("/quejas", alm)).toEqual({ type: "next" });
     expect(d("/quejas/x", null, false)).toEqual({ type: "redirect", to: "/login" });
-    // Catalogo oculto mientras se termina: la liga no abre.
-    expect(d("/catalogo", null, false)).toEqual({ type: "redirect", to: "/login" });
-    expect(d("/catalogo-esc-2026.pdf", alm)).toEqual({ type: "redirect", to: "/inicio" });
+    // Catalogo visible: la liga abre con o sin sesion.
+    expect(d("/catalogo", null, false)).toEqual({ type: "next" });
+    expect(d("/catalogo-esc-2026.pdf", alm)).toEqual({ type: "next" });
     // Cerrar sesion con la sesion vencida: no da error, el handler regresa al login.
     expect(d("/api/auth/logout", null, false)).toEqual({ type: "next" });
   });

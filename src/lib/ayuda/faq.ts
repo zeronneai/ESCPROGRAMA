@@ -23,6 +23,33 @@ const MKT: Rol[] = ["marketplaces"];
 export const FAQ: Faq[] = [
   // ----- General
   {
+    id: "catalogo-2026", q: "¿Dónde está el Catálogo ESC 2026 y cómo dejo un comentario?",
+    keys: ["catalogo", "catálogo", "2026", "pdf", "comentario", "sugerencia", "correccion"],
+    a: ["Está en Inicio (\"Ver catálogo\") y en el menú \"Catálogo 2026\". Ya lo puedes usar y mandar a tus clientes.", "Si ves algo que corregir o una sugerencia, toca \"Dejar comentario o sugerencia\" en Inicio: le llega a compras."],
+    links: [{ label: "Inicio", href: "/inicio" }],
+  },
+  {
+    id: "catalogo-comentarios", q: "¿Dónde veo los comentarios del catálogo?",
+    keys: ["comentarios", "catalogo", "sugerencias", "revisado"],
+    a: ["En \"Comentarios del catálogo\" (menú Más). Cada comentario te avisa con la campanita.", "Cuando lo atiendas, toca \"Marcar revisado\" para que salga de la lista de pendientes."],
+    links: [{ label: "Comentarios del catálogo", href: "/comprador/catalogo" }],
+    roles: C, paths: ["/comprador/catalogo"],
+  },
+  {
+    id: "pegatron-subir", q: "¿Cómo subo una orden de compra de Pegatron?",
+    keys: ["pegatron", "orden", "compra", "po", "p/o", "subir", "pedido", "articulo esc"],
+    a: ["Entra a \"Pedidos Pegatron\" y toca \"+ Nueva OC\". Arrastra el PDF de la orden: se leen el P/O, la descripción y la cantidad de cada renglón.", "En cada renglón escribe el \"Nombre / artículo ESC\" (como lo conocemos nosotros); es obligatorio. Luego \"Guardar y mandar a compras\".", "Cuando compras lo pida, el renglón aparece como \"Pedido\" y te llega aviso."],
+    links: [{ label: "Pedidos Pegatron", href: "/pedidos-pegatron" }],
+    roles: J, paths: ["/pedidos-pegatron"],
+  },
+  {
+    id: "pegatron-pedir", q: "¿Cómo marco que ya pedí un artículo de Pegatron?",
+    keys: ["pegatron", "pedido", "marcar", "pedir", "orden"],
+    a: ["En \"Pedidos Pegatron\" abre la orden. Cada renglón trae el artículo ESC, la descripción de Pegatron y la cantidad.", "Toca \"Marcar como pedido\" en cada uno; la jefa de ventas ve que ya está pedido."],
+    links: [{ label: "Pedidos Pegatron", href: "/pedidos-pegatron" }],
+    roles: C, paths: ["/pedidos-pegatron"],
+  },
+  {
     id: "inicio", q: "¿Qué es la página de Inicio?",
     keys: ["inicio", "tablero", "dashboard", "pendientes", "urgente", "resumen", "atencion"],
     a: ["Es tu tablero: arriba, en \"Requiere tu atención\", lo urgente (en rojo) y lo pendiente (en amarillo).", "Abajo, un resumen de cada sección que te toca. Toca cualquier dato o \"Ver detalle\" para entrar."],

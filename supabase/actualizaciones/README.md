@@ -62,6 +62,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 45 | `0050_entrega_sucursal_guias.sql` | Venta con factura: el **domicilio de entrega** se registra como **sucursal** del cliente. Guías: el vendedor ve el número de guía pero **no descarga el archivo**. |
 | 46 | `0051_guias_moneda.sql` | Guías: **moneda del valor declarado** (MXN o USD); si la factura es en dólares se llena en USD. Se puede correr en cualquier momento. |
 | 47 | `0052_cotizaciones_foto_guias_palomeo.sql` | Solicitudes: **imagen o link opcional**. **Imagen de confirmación** del comprador por partida (el vendedor la descarga). Guías: Marketplaces **palomea cada partida**. |
+| 48 | `0053_catalogo_aviso_pegatron.sql` | **Catálogo 2026**: aviso a todos y comentarios para el comprador. **Pedidos Pegatron**: la jefa de ventas sube la OC y pone el artículo ESC; el comprador marca lo pedido. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 
