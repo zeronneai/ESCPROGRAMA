@@ -11,7 +11,7 @@ export const CATALOGO_VISIBLE = true;
 
 /** Catalogo vigente: archivo publico (se puede mandar a clientes sin que inicien sesion). */
 /** version: al cambiarla sale otra vez el aviso del catalogo nuevo a todos. */
-export const CATALOGO = { nombre: "Catálogo ESC 2026", archivo: "/catalogo-esc-2026.pdf?v=20261112b", ruta: "/catalogo", version: "2026-11-12" };
+export const CATALOGO = { nombre: "Catálogo ESC 2026", archivo: "/catalogo-esc-2026.pdf?v=20261112c", ruta: "/catalogo", version: "2026-11-12" };
 
 /** Mensaje para mandar el catalogo a un cliente. */
 export function mensajeCatalogo(url: string, contacto?: string | null) {
