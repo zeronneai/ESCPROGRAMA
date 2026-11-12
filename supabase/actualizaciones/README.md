@@ -63,3 +63,5 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 
 Si una ejecucion falla, **no sigas con la siguiente**: copia el mensaje de error y mandamelo.
+
+**Limpieza de una sola vez (no es actualización):** `limpiar_prospectos_sitio_web.sql` borra los prospectos de prueba que entraron por el formulario del sitio web y las empresas que se dieron de alta solas con ellos (si no tienen nada más).
