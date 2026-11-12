@@ -62,6 +62,60 @@ export function elapsedText(h: number): string {
 const txt = (max: number) => z.string().trim().max(max).optional().transform((v) => v || null);
 const num = (msg: string) => z.union([z.literal(""), z.coerce.number({ message: msg }).positive(msg)]).optional().transform((v) => (v === "" || v === undefined ? null : v));
 
+/** Una partida del envio: N tarimas o bultos iguales (mismo peso y medidas). */
+export const partidaSchema = z.object({
+  empaque: z.enum(["bulto", "tarima"], { message: "Elige bulto o tarima" }).default("bulto"),
+  cantidad: z.coerce.number({ message: "Cantidad inválida" }).int("Cantidad entera").min(1, "Mínimo 1").max(999),
+  peso_kg: z.coerce.number({ message: "Peso inválido" }).positive("Escribe el peso de cada uno"),
+  largo_cm: num("Medida inválida"),
+  ancho_cm: num("Medida inválida"),
+  alto_cm: num("Medida inválida"),
+  descripcion: txt(150),
+});
+export type Partida = z.infer<typeof partidaSchema>;
+export type PartidaInput = z.input<typeof partidaSchema>;
+
+/** Totales de las partidas para las columnas de resumen de la guia. */
+export function totalesPartidas(ps: Partida[]) {
+  const tipos = new Set(ps.map((p) => p.empaque));
+  const bultos = Math.min(999, ps.reduce((a, p) => a + p.cantidad, 0));
+  const peso = Math.round(ps.reduce((a, p) => a + p.cantidad * p.peso_kg, 0) * 100) / 100;
+  const una = ps.length === 1 ? ps[0] : null;
+  return {
+    empaque: (tipos.size > 1 ? "mixto" : [...tipos][0]) as "bulto" | "tarima" | "mixto",
+    bultos,
+    peso_kg: peso,
+    largo_cm: una?.largo_cm ?? null,
+    ancho_cm: una?.ancho_cm ?? null,
+    alto_cm: una?.alto_cm ?? null,
+  };
+}
+
+/** "2 tarimas y 3 bultos". */
+export function resumenPartidas(ps: { empaque: string; cantidad: number }[]) {
+  const t = ps.filter((p) => p.empaque === "tarima").reduce((a, p) => a + p.cantidad, 0);
+  const b = ps.filter((p) => p.empaque !== "tarima").reduce((a, p) => a + p.cantidad, 0);
+  return [t ? empaqueLabel("tarima", t) : "", b ? empaqueLabel("bulto", b) : ""].filter(Boolean).join(" y ");
+}
+
+/** Las partidas guardadas, o una partida armada con los datos de antes (guias viejas). */
+export function partidasDeGuia(g: { partidas?: unknown; empaque?: string | null; bultos: number; peso_kg: number | string; largo_cm?: number | string | null; ancho_cm?: number | string | null; alto_cm?: number | string | null }): Partida[] {
+  if (Array.isArray(g.partidas)) {
+    const out = g.partidas.map((p) => partidaSchema.safeParse(p)).filter((r) => r.success).map((r) => r.data);
+    if (out.length) return out;
+  }
+  const n = Math.max(1, Number(g.bultos) || 1);
+  return [{
+    empaque: g.empaque === "tarima" ? "tarima" : "bulto",
+    cantidad: n,
+    peso_kg: Math.max(0.01, Math.round((Number(g.peso_kg) / n) * 100) / 100),
+    largo_cm: g.largo_cm == null ? null : Number(g.largo_cm),
+    ancho_cm: g.ancho_cm == null ? null : Number(g.ancho_cm),
+    alto_cm: g.alto_cm == null ? null : Number(g.alto_cm),
+    descripcion: null,
+  }];
+}
+
 export const guiaSchema = z
   .object({
     factura: z.string().trim().min(1, "Escribe la factura").max(60),
@@ -79,23 +133,19 @@ export const guiaSchema = z
     ciudad: z.string().trim().min(2, "Escribe la ciudad").max(120),
     estado_geo: z.string().trim().min(2, "Elige el estado").max(60),
     referencias: txt(300),
-    empaque: z.enum(["bulto", "tarima"], { message: "Elige bulto o tarima" }).default("bulto"),
-    bultos: z.coerce.number({ message: "Cantidad inválida" }).int("Cantidad entera").min(1, "Mínimo 1").max(999),
-    peso_kg: z.coerce.number({ message: "Peso inválido" }).positive("Escribe el peso aproximado"),
-    largo_cm: num("Medida inválida"),
-    ancho_cm: num("Medida inválida"),
-    alto_cm: num("Medida inválida"),
+    partidas: z.array(partidaSchema, { message: "Agrega al menos una partida" }).min(1, "Agrega al menos una partida").max(30, "Máximo 30 partidas"),
     contenido: txt(300),
     valor_declarado: z.union([z.literal(""), z.coerce.number({ message: "Valor inválido" }).min(0)]).optional().transform((v) => (v === "" || v === undefined ? null : v)),
     asegurar: z.boolean().default(false),
     urgente: z.boolean().default(false),
     notas: txt(1000),
   })
-  .refine((v) => v.paqueteria !== "Otra" || !!v.paqueteria_otra, { message: "Escribe cuál paquetería", path: ["paqueteria_otra"] });
+  .refine((v) => v.paqueteria !== "Otra" || !!v.paqueteria_otra, { message: "Escribe cuál paquetería", path: ["paqueteria_otra"] })
+  .transform((v) => ({ ...v, ...totalesPartidas(v.partidas) }));
 export type GuiaInput = z.input<typeof guiaSchema>;
 
 export const GUIA_FILE_TYPES = ["application/pdf", "image/png", "image/jpeg"];
 
 /** "3 bultos", "1 tarima". */
 export const empaqueLabel = (empaque: string | null | undefined, n: number) =>
-  `${n} ${empaque === "tarima" ? (n === 1 ? "tarima" : "tarimas") : n === 1 ? "bulto" : "bultos"}`;
+  empaque === "mixto" ? `${n} piezas (tarimas y bultos)` : `${n} ${empaque === "tarima" ? (n === 1 ? "tarima" : "tarimas") : n === 1 ? "bulto" : "bultos"}`;

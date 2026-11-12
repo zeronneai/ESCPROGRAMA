@@ -175,6 +175,12 @@ export function operacionesSuite() {
       await q(w.seller1, "insert into public.guia_eventos (guia_id, tipo, nota) values ($1,'comentario','Es urgente, sale hoy')", [g2.id]);
       expect(await failure(q(w.seller2, "insert into public.guia_eventos (guia_id, tipo, nota) values ($1,'comentario','x')", [g2.id]))).toMatch(/row-level security/);
       expect(await failure(q(A("mkt"), "insert into public.guias (factura, destinatario, paqueteria, telefono, calle_numero, cp, ciudad, estado_geo, peso_kg) values ('F','X','DHL','6561234567','Av. Uno 100','32000','Juarez','Chihuahua',1)"))).toMatch(/row-level security/);
+      // Partidas: dos tarimas distintas y bultos en la misma guia
+      const partidas = JSON.stringify([{ empaque: "tarima", cantidad: 1, peso_kg: 350 }, { empaque: "tarima", cantidad: 1, peso_kg: 200 }, { empaque: "bulto", cantidad: 3, peso_kg: 12.5 }]);
+      const gp = (await q(w.seller1, "insert into public.guias (factura, destinatario, paqueteria, telefono, calle_numero, cp, ciudad, estado_geo, peso_kg, bultos, empaque, partidas) values ('F-P','Foxconn','DHL','6561234567','Av. Uno 100','32000','Juarez','Chihuahua',587.5,5,'mixto',$1::jsonb) returning id, empaque", [partidas])).rows[0];
+      expect(gp.empaque).toBe("mixto");
+      await q(w.seller1, "update public.guias set partidas=$2::jsonb where id=$1", [gp.id, JSON.stringify([{ empaque: "bulto", cantidad: 1, peso_kg: 2 }])]);
+      expect(await failure(q(w.seller1, "update public.guias set partidas='[]'::jsonb where id=$1", [gp.id]))).toMatch(/check/);
     });
 
     it("gerente e ISO leen ventas y bitacora de todos, sin escribir", async () => {

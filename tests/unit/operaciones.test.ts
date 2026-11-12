@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sacSchema } from "@/lib/ops/calidad";
 import { avanceLabel, consumoSchema } from "@/lib/ops/consumo";
-import { canRemind, elapsedText, guiaAlert, guiaSchema, guiaTitle } from "@/lib/ops/guias";
+import { canRemind, elapsedText, guiaAlert, guiaSchema, guiaTitle, partidasDeGuia, resumenPartidas } from "@/lib/ops/guias";
 
 const now = new Date("2026-11-02T18:00:00Z");
 const ago = (h: number) => new Date(now.getTime() - h * 3_600_000).toISOString();
@@ -27,11 +27,29 @@ describe("guias", () => {
     expect(elapsedText(72)).toBe("3 días");
   });
   it("valida datos minimos para generar la guia", () => {
-    const base = { factura: "A-1", destinatario: "Foxconn", paqueteria: "DHL", servicio: "estandar", telefono: "6561234567", calle_numero: "Av. 1 100", cp: "32000", ciudad: "Juárez", estado_geo: "Chihuahua", bultos: "1", peso_kg: "2.5" };
+    const base = { factura: "A-1", destinatario: "Foxconn", paqueteria: "DHL", servicio: "estandar", telefono: "6561234567", calle_numero: "Av. 1 100", cp: "32000", ciudad: "Juárez", estado_geo: "Chihuahua", partidas: [{ empaque: "bulto", cantidad: "1", peso_kg: "2.5" }] };
     expect(guiaSchema.safeParse(base).success).toBe(true);
     expect(guiaSchema.safeParse({ ...base, cp: "320" }).error?.issues[0].message).toMatch(/5 dígitos/);
     expect(guiaSchema.safeParse({ ...base, paqueteria: "Otra" }).error?.issues[0].message).toMatch(/cuál/);
-    expect(guiaSchema.parse({ ...base, largo_cm: "" }).largo_cm).toBeNull();
+    expect(guiaSchema.parse({ ...base, partidas: [{ empaque: "bulto", cantidad: "1", peso_kg: "2.5", largo_cm: "" }] }).largo_cm).toBeNull();
+    expect(guiaSchema.safeParse({ ...base, partidas: [] }).error?.issues[0].message).toMatch(/partida/);
+  });
+  it("partidas: dos tarimas distintas y bultos; totales y tipo mixto", () => {
+    const base = { factura: "A-1", destinatario: "Foxconn", paqueteria: "DHL", servicio: "estandar", telefono: "6561234567", calle_numero: "Av. 1 100", cp: "32000", ciudad: "Juárez", estado_geo: "Chihuahua" };
+    const g = guiaSchema.parse({ ...base, partidas: [
+      { empaque: "tarima", cantidad: "1", peso_kg: "350", largo_cm: "120", ancho_cm: "100", alto_cm: "150" },
+      { empaque: "tarima", cantidad: "1", peso_kg: "200", largo_cm: "100", ancho_cm: "100", alto_cm: "90" },
+      { empaque: "bulto", cantidad: "3", peso_kg: "12.5" },
+    ] });
+    expect(g).toMatchObject({ empaque: "mixto", bultos: 5, peso_kg: 587.5, largo_cm: null });
+    expect(g.partidas).toHaveLength(3);
+    expect(resumenPartidas(g.partidas)).toBe("2 tarimas y 3 bultos");
+    // Una sola partida: las medidas pasan a la guia
+    expect(guiaSchema.parse({ ...base, partidas: [{ empaque: "tarima", cantidad: "2", peso_kg: "100", largo_cm: "120", ancho_cm: "100", alto_cm: "80" }] })).toMatchObject({ empaque: "tarima", bultos: 2, peso_kg: 200, largo_cm: 120 });
+    // Guia de antes (sin partidas): se arma una partida con sus datos
+    expect(partidasDeGuia({ empaque: "tarima", bultos: 2, peso_kg: "300", largo_cm: "120", ancho_cm: null, alto_cm: null })).toEqual([
+      { empaque: "tarima", cantidad: 2, peso_kg: 150, largo_cm: 120, ancho_cm: null, alto_cm: null, descripcion: null },
+    ]);
   });
 });
 

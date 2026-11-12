@@ -156,7 +156,7 @@ export const FAQ: Faq[] = [
   {
     id: "pedir-guia", q: "¿Cómo pido una guía de paquetería?", roles: V, paths: ["/guias"],
     keys: ["guia", "guias", "paqueteria", "envio", "mandar", "paquete", "dhl", "estafeta", "paquete express", "tinypack", "porteo"],
-    a: ["Ve a Guías > \"Pedir guía\".", "Pon la factura, la paquetería y los datos de quien recibe (puedes buscar al cliente para que se llenen solos).", "Agrega bultos, peso y medidas. Marca \"Es urgente\" si aplica.", "Marketplaces la genera y te llega aviso cuando esté lista para descargar."],
+    a: ["Ve a Guías > \"Pedir guía\".", "Pon la factura, la paquetería y los datos de quien recibe (puedes buscar al cliente para que se llenen solos).", "Agrega las partidas (bultos o tarimas, peso y medidas; una por cada tipo distinto). Marca \"Es urgente\" si aplica.", "Marketplaces la genera y te llega aviso cuando esté lista para descargar."],
     links: [{ label: "Pedir guía", href: "/guias/nueva" }],
   },
   {
@@ -172,7 +172,7 @@ export const FAQ: Faq[] = [
   {
     id: "tarima", q: "¿Puedo pedir la guía para una tarima?", roles: [...V, ...MKT],
     keys: ["tarima", "tarimas", "bulto", "bultos", "pallet", "medidas", "peso", "dimensiones"],
-    a: ["Sí. En el paquete elige \"Bultos\" o \"Tarima\".", "Pon cuántos, el peso total y las medidas (largo, ancho y alto en cm)."],
+    a: ["Sí. Cada partida es \"Bultos\" o \"Tarima\": pon cuántos, el peso de cada uno y sus medidas (largo, ancho y alto en cm).", "Si van tarimas o bultos distintos (otro tamaño u otro peso), toca \"+ Agregar partida\" y captura cada uno por separado. El total se suma solo."],
   },
   {
     id: "asegurar", q: "¿Qué es asegurar el envío?",

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
-import { GUIA_FILE_TYPES, guiaSchema, type GuiaInput } from "@/lib/ops/guias";
+import { GUIA_FILE_TYPES, guiaSchema, resumenPartidas, type GuiaInput } from "@/lib/ops/guias";
 import { friendlyError } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Result } from "./requests";
@@ -20,16 +20,32 @@ export async function saveGuiaAction(id: string | null, input: GuiaInput): Promi
   const parsed = guiaSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const supabase = await createClient();
+  let datos: Record<string, unknown> = parsed.data;
+  // Sin la actualizacion 0049 todavia: se guardan los totales y las partidas van en el contenido.
+  const sinPartidas = (msg: string) => /partidas|guias_empaque_check/.test(msg);
+  const respaldo = () => {
+    const { partidas, ...resto } = parsed.data;
+    const detalle = partidas.length > 1
+      ? partidas.map((p) => `${p.cantidad} ${p.empaque === "tarima" ? "tarima(s)" : "bulto(s)"} ${p.peso_kg} kg c/u${p.largo_cm && p.ancho_cm && p.alto_cm ? ` ${p.largo_cm}x${p.ancho_cm}x${p.alto_cm} cm` : ""}${p.descripcion ? ` (${p.descripcion})` : ""}`).join("; ")
+      : "";
+    return {
+      ...resto,
+      empaque: resto.empaque === "mixto" ? "tarima" : resto.empaque,
+      contenido: [detalle && `${resumenPartidas(partidas)}: ${detalle}`, resto.contenido].filter(Boolean).join(" · ").slice(0, 300) || null,
+    };
+  };
   if (id) {
     if (!uuid.safeParse(id).success) return { ok: false, error: "Guía inválida" };
-    const { data, error } = await supabase.from("guias").update(parsed.data).eq("id", id).select("id");
+    let { data, error } = await supabase.from("guias").update(datos).eq("id", id).select("id");
+    if (error && sinPartidas(error.message)) ({ data, error } = await supabase.from("guias").update((datos = respaldo())).eq("id", id).select("id"));
     if (error) return { ok: false, error: friendlyError(error.message) };
     if (!data?.length) return { ok: false, error: "Ya no puedes editar esta guía." };
     refresh(id);
     return { ok: true, id };
   }
-  const { data, error } = await supabase.from("guias").insert(parsed.data).select("id").single();
-  if (error) return { ok: false, error: friendlyError(error.message) };
+  let { data, error } = await supabase.from("guias").insert(datos).select("id").single();
+  if (error && sinPartidas(error.message)) ({ data, error } = await supabase.from("guias").insert(respaldo()).select("id").single());
+  if (error || !data) return { ok: false, error: friendlyError(error?.message ?? "No se pudo guardar") };
   refresh();
   return { ok: true, id: data.id };
 }

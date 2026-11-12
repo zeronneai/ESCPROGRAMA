@@ -4,18 +4,29 @@ import { useState } from "react";
 import { saveGuiaAction } from "@/actions/guias";
 import { areaCls, CustomerLookup, useRun } from "@/components/ops-ui";
 import { Alert, Button, Field, Input, Select } from "@/components/ui";
-import { PAQUETERIAS, SERVICIOS, guiaTitle, type GuiaInput } from "@/lib/ops/guias";
+import { PAQUETERIAS, SERVICIOS, guiaTitle, resumenPartidas, type GuiaInput } from "@/lib/ops/guias";
 import { ESTADOS_MX } from "@/lib/validation/customer";
 
-type F = Record<keyof GuiaInput, string | boolean | null>;
+type F = Record<Exclude<keyof GuiaInput, "partidas">, string | boolean | null>;
 const EMPTY: F = {
   factura: "", destinatario: "", paqueteria: "", paqueteria_otra: "", servicio: "estandar", customer_id: null, contacto_nombre: "",
-  telefono: "", correo: "", calle_numero: "", colonia: "", cp: "", ciudad: "", estado_geo: "", referencias: "", empaque: "bulto", bultos: "1",
-  peso_kg: "", largo_cm: "", ancho_cm: "", alto_cm: "", contenido: "", valor_declarado: "", asegurar: false, urgente: false, notas: "",
+  telefono: "", correo: "", calle_numero: "", colonia: "", cp: "", ciudad: "", estado_geo: "", referencias: "",
+  contenido: "", valor_declarado: "", asegurar: false, urgente: false, notas: "",
 };
+/** Partida en el formulario (texto mientras se escribe). */
+export type PartidaForm = { key: string; empaque: "bulto" | "tarima"; cantidad: string; peso_kg: string; largo_cm: string; ancho_cm: string; alto_cm: string; descripcion: string };
+const nuevaPartida = (empaque: "bulto" | "tarima" = "bulto"): PartidaForm => ({
+  key: Math.random().toString(36).slice(2), empaque, cantidad: "1", peso_kg: "", largo_cm: "", ancho_cm: "", alto_cm: "", descripcion: "",
+});
+const numero = (x: string) => Number(x.replace(",", "."));
 
-export function GuiaForm({ id, initial, onDone }: { id: string | null; initial?: Partial<F>; onDone?: () => void }) {
+export function GuiaForm({ id, initial, partidas: iniciales, onDone }: { id: string | null; initial?: Partial<F>; partidas?: PartidaForm[]; onDone?: () => void }) {
   const [v, setV] = useState<F>({ ...EMPTY, ...initial });
+  const [ps, setPs] = useState<PartidaForm[]>(iniciales?.length ? iniciales : [nuevaPartida()]);
+  const setP = (i: number, k: keyof PartidaForm, val: string) => setPs((a) => a.map((p, j) => (j === i ? { ...p, [k]: val } : p)));
+  const validas = ps.filter((p) => numero(p.cantidad) > 0);
+  const totPeso = validas.reduce((a, p) => a + (numero(p.cantidad) || 0) * (numero(p.peso_kg) || 0), 0);
+  const resumen = resumenPartidas(validas.map((p) => ({ empaque: p.empaque, cantidad: Math.floor(numero(p.cantidad)) || 0 })));
   const { run, busy, notice, router } = useRun();
   const set = (k: keyof F) => (e: { target: { value: string } }) => setV((s) => ({ ...s, [k]: e.target.value }));
   const s = (k: keyof F) => (v[k] ?? "") as string;
@@ -26,7 +37,8 @@ export function GuiaForm({ id, initial, onDone }: { id: string | null; initial?:
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
-        run("save", () => saveGuiaAction(id, v as unknown as GuiaInput), (r) => {
+        const datos = { ...v, partidas: ps.map(({ key: _k, ...p }) => p) } as unknown as GuiaInput;
+        run("save", () => saveGuiaAction(id, datos), (r) => {
           if (onDone) {
             onDone();
             router.refresh();
@@ -93,31 +105,43 @@ export function GuiaForm({ id, initial, onDone }: { id: string | null; initial?:
 
       <div className="space-y-3">
         <h3 className="text-sm font-semibold text-slate-800">Paquete</h3>
-        <div className="space-y-1">
-          <span className="block text-sm font-medium text-slate-700">¿Cómo se manda? *</span>
-          <div className="grid grid-cols-2 gap-2 sm:max-w-md">
-            {(["bulto", "tarima"] as const).map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setV((x) => ({ ...x, empaque: k }))}
-                className={`rounded-lg border px-3 py-2 text-left text-sm ${v.empaque === k ? "border-brand-600 bg-brand-50 ring-1 ring-brand-600" : "border-slate-200 bg-white"}`}
-              >
-                <span className="block font-semibold">{k === "bulto" ? "Bultos" : "Tarima"}</span>
-                <span className="block text-xs text-slate-500">{k === "bulto" ? "Cajas o paquetes sueltos" : "Mercancía emplayada sobre tarima"}</span>
-              </button>
-            ))}
-          </div>
+        <p className="text-xs text-slate-500">Agrega una partida por cada tipo distinto: por ejemplo, una tarima de 1.20 m y otra de 1 m van en partidas separadas. El peso y las medidas son de cada pieza.</p>
+        <div className="space-y-3">
+          {ps.map((p, i) => (
+            <div key={p.key} className="space-y-2 rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-slate-800">Partida {i + 1}</span>
+                <div className="flex items-center gap-2">
+                  <div className="inline-flex overflow-hidden rounded-md border border-slate-300 bg-white text-sm">
+                    {(["bulto", "tarima"] as const).map((k) => (
+                      <button key={k} type="button" onClick={() => setP(i, "empaque", k)}
+                        className={`px-3 py-1.5 font-medium ${p.empaque === k ? "bg-brand-600 text-white" : "text-slate-700 hover:bg-slate-50"}`}>
+                        {k === "bulto" ? "Bultos" : "Tarima"}
+                      </button>
+                    ))}
+                  </div>
+                  {ps.length > 1 && (
+                    <button type="button" onClick={() => setPs((a) => a.filter((_, j) => j !== i))} className="rounded-md px-2 py-1 text-sm text-red-700 hover:bg-red-50">Quitar</button>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                <Field label={p.empaque === "tarima" ? "Tarimas *" : "Bultos *"}><Input value={p.cantidad} onChange={(e) => setP(i, "cantidad", e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" /></Field>
+                <Field label={`Peso de c/u kg *`}><Input value={p.peso_kg} onChange={(e) => setP(i, "peso_kg", e.target.value)} inputMode="decimal" /></Field>
+                <Field label="Largo cm"><Input value={p.largo_cm} onChange={(e) => setP(i, "largo_cm", e.target.value)} inputMode="decimal" /></Field>
+                <Field label="Ancho cm"><Input value={p.ancho_cm} onChange={(e) => setP(i, "ancho_cm", e.target.value)} inputMode="decimal" /></Field>
+                <Field label="Alto cm"><Input value={p.alto_cm} onChange={(e) => setP(i, "alto_cm", e.target.value)} inputMode="decimal" /></Field>
+              </div>
+              <Field label="Qué lleva (opcional)"><Input value={p.descripcion} onChange={(e) => setP(i, "descripcion", e.target.value)} maxLength={150} placeholder={p.empaque === "tarima" ? "Ej. Tarima con 40 cajas de guantes" : "Ej. Cajas de batas ESD"} /></Field>
+            </div>
+          ))}
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <Field label={v.empaque === "tarima" ? "Tarimas *" : "Bultos *"}><Input value={s("bultos")} onChange={set("bultos")} inputMode="numeric" /></Field>
-          <Field label="Peso total kg *"><Input value={s("peso_kg")} onChange={set("peso_kg")} inputMode="decimal" /></Field>
-          <Field label={v.empaque === "tarima" ? "Largo cm (tarima)" : "Largo cm"}><Input value={s("largo_cm")} onChange={set("largo_cm")} inputMode="decimal" /></Field>
-          <Field label="Ancho cm"><Input value={s("ancho_cm")} onChange={set("ancho_cm")} inputMode="decimal" /></Field>
-          <Field label="Alto cm"><Input value={s("alto_cm")} onChange={set("alto_cm")} inputMode="decimal" /></Field>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Button type="button" variant="secondary" disabled={ps.length >= 30} onClick={() => setPs((a) => [...a, nuevaPartida(a[a.length - 1]?.empaque ?? "bulto")])}>+ Agregar partida</Button>
+          {resumen && <span className="text-sm font-medium text-slate-700">Total: {resumen}{totPeso > 0 ? ` · ${Math.round(totPeso * 100) / 100} kg` : ""}</span>}
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Contenido"><Input value={s("contenido")} onChange={set("contenido")} placeholder="Ej. 10 cajas de guantes de nitrilo" /></Field>
+          <Field label="Contenido general"><Input value={s("contenido")} onChange={set("contenido")} placeholder="Ej. 10 cajas de guantes de nitrilo" /></Field>
           <Field label="Valor declarado (MXN)"><Input value={s("valor_declarado")} onChange={set("valor_declarado")} inputMode="decimal" /></Field>
         </div>
         <div className="flex flex-wrap gap-4 text-sm">

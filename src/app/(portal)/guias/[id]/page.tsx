@@ -4,7 +4,7 @@ import { GuiaPanel } from "@/components/guias/guia-panel";
 import { Chip, Dl } from "@/components/ops-ui";
 import { Card } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guards";
-import { elapsedText, empaqueLabel, GUIA_ESTADOS, guiaAlert, guiaTitle, hoursPending, SERVICIOS, type GuiaEstado, type Servicio } from "@/lib/ops/guias";
+import { elapsedText, empaqueLabel, GUIA_ESTADOS, guiaAlert, guiaTitle, hoursPending, partidasDeGuia, resumenPartidas, SERVICIOS, type GuiaEstado, type Servicio } from "@/lib/ops/guias";
 import { fmtDate, signedUrl } from "@/lib/ops/server";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
@@ -37,10 +37,16 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
   const form = {
     factura: g.factura, destinatario: g.destinatario, paqueteria: g.paqueteria, paqueteria_otra: g.paqueteria_otra ?? "", servicio: g.servicio,
     customer_id: g.customer_id, contacto_nombre: g.contacto_nombre ?? "", telefono: g.telefono, correo: g.correo ?? "", calle_numero: g.calle_numero,
-    colonia: g.colonia ?? "", cp: g.cp, ciudad: g.ciudad, estado_geo: g.estado_geo, referencias: g.referencias ?? "", empaque: g.empaque ?? "bulto", bultos: String(g.bultos),
-    peso_kg: n(g.peso_kg), largo_cm: n(g.largo_cm), ancho_cm: n(g.ancho_cm), alto_cm: n(g.alto_cm), contenido: g.contenido ?? "",
+    colonia: g.colonia ?? "", cp: g.cp, ciudad: g.ciudad, estado_geo: g.estado_geo, referencias: g.referencias ?? "", contenido: g.contenido ?? "",
     valor_declarado: n(g.valor_declarado), asegurar: g.asegurar, urgente: g.urgente, notas: g.notas ?? "",
   };
+  const partidas = partidasDeGuia(g);
+  const conPartidas = Array.isArray(g.partidas);
+  const s0 = (x: number | null) => (x == null ? "" : String(x));
+  const partidasForm = partidas.map((p, i) => ({
+    key: `p${i}`, empaque: p.empaque, cantidad: String(p.cantidad), peso_kg: String(p.peso_kg),
+    largo_cm: s0(p.largo_cm), ancho_cm: s0(p.ancho_cm), alto_cm: s0(p.alto_cm), descripcion: p.descripcion ?? "",
+  }));
   const medidas = [g.largo_cm, g.ancho_cm, g.alto_cm].every(Boolean) ? `${n(g.largo_cm)} × ${n(g.ancho_cm)} × ${n(g.alto_cm)} cm` : "";
 
   return (
@@ -68,7 +74,7 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
       )}
 
       <GuiaPanel
-        g={{ id: g.id, estado, solicitada_at: g.solicitada_at, ultimo_recordatorio_at: g.ultimo_recordatorio_at, mensaje: g.mensaje, archivo_url: url, archivo_nombre: g.archivo_nombre, numero_rastreo: g.numero_rastreo, atendida_nombre: g.atendida_nombre, form }}
+        g={{ id: g.id, estado, solicitada_at: g.solicitada_at, ultimo_recordatorio_at: g.ultimo_recordatorio_at, mensaje: g.mensaje, archivo_url: url, archivo_nombre: g.archivo_nombre, numero_rastreo: g.numero_rastreo, atendida_nombre: g.atendida_nombre, form, partidas: partidasForm }}
         role={u.rol}
         isOwner={u.id === g.vendedor_id}
         events={(ev ?? []).map((e) => ({ id: e.id, texto: e.tipo === "comentario" ? e.nota : `${EV[e.tipo] ?? e.tipo}${e.nota ? `: ${e.nota}` : ""}`, autor: e.autor_nombre, fecha: e.created_at, comentario: e.tipo === "comentario" }))}
@@ -86,14 +92,37 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
             ["Correo", g.correo],
             ["Dirección", [g.calle_numero, g.colonia && `Col. ${g.colonia}`, `CP ${g.cp}`, `${g.ciudad}, ${g.estado_geo}`].filter(Boolean).join(", ")],
             ["Referencias", g.referencias],
-            ["Paquete y peso", `${empaqueLabel(g.empaque, g.bultos)} · ${n(g.peso_kg)} kg`],
-            ["Medidas", medidas],
+            ["Paquete y peso", `${conPartidas ? resumenPartidas(partidas) : empaqueLabel(g.empaque, g.bultos)} · ${n(g.peso_kg)} kg en total`],
+            ["Medidas", conPartidas ? "" : medidas],
             ["Contenido", g.contenido],
             ["Valor declarado", g.valor_declarado !== null ? `$${Number(g.valor_declarado).toLocaleString("es-MX")} MXN` : ""],
             ["Seguro", g.asegurar ? "Sí, asegurar" : ""],
             ["Notas", g.notas],
           ]}
         />
+        {conPartidas && (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px] text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <th className="py-2 pr-3">#</th><th className="py-2 pr-3">Partida</th><th className="py-2 pr-3 text-right">Peso c/u</th>
+                  <th className="py-2 pr-3">Medidas (L × A × Al)</th><th className="py-2">Qué lleva</th>
+                </tr>
+              </thead>
+              <tbody>
+                {partidas.map((p, i) => (
+                  <tr key={i} className="border-b border-slate-100 last:border-0">
+                    <td className="py-2 pr-3 text-slate-500">{i + 1}</td>
+                    <td className="py-2 pr-3 font-medium text-slate-900">{empaqueLabel(p.empaque, p.cantidad)}</td>
+                    <td className="py-2 pr-3 text-right">{p.peso_kg} kg</td>
+                    <td className="py-2 pr-3">{p.largo_cm && p.ancho_cm && p.alto_cm ? `${p.largo_cm} × ${p.ancho_cm} × ${p.alto_cm} cm` : "Sin medidas"}</td>
+                    <td className="py-2 text-slate-600">{p.descripcion ?? ""}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );

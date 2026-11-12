@@ -58,6 +58,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 41 | `0046_firma_correo.sql` | **Firma de correo**: cada usuario llena sus datos y descarga la imagen con la leyenda y el link de quejas. A vendedores y jefa de ventas les aparece sola al entrar. |
 | 42 | `0047_almacen_conectado.sql` | Interruptor **"Almacén conectado a ventas"** en Configuración (viene apagado): la venta con factura ya no manda carga a almacén y se esconden Entregas e Inventario hasta que esté el inventario. |
 | 43 | `0048_demo_quitar_where.sql` | Arregla **Quitar demostración** ("DELETE requires a WHERE clause"). Se puede correr en cualquier momento. |
+| 44 | `0049_guias_partidas.sql` | **Guías con partidas**: varias tarimas o bultos distintos en un mismo envío, cada uno con su peso y medidas. Se puede correr en cualquier momento. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

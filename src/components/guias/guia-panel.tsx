@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cancelarGuiaAction, commentGuiaAction, pedirDatosGuiaAction, recordarGuiaAction, subirGuiaAction, tomarGuiaAction } from "@/actions/guias";
-import { GuiaForm } from "@/components/guias/guia-form";
+import { GuiaForm, type PartidaForm } from "@/components/guias/guia-form";
 import { Icon } from "@/components/icons";
 import { areaCls, FileUpload, Timeline, useRun, type TimelineEvent } from "@/components/ops-ui";
 import { Alert, Button, Card, Input } from "@/components/ui";
@@ -19,6 +19,7 @@ export interface GuiaPanelData {
   numero_rastreo: string | null;
   atendida_nombre: string | null;
   form: Record<string, string | boolean | null>;
+  partidas: PartidaForm[];
 }
 
 export function GuiaPanel({ g, role, isOwner, events }: { g: GuiaPanelData; role: string; isOwner: boolean; events: TimelineEvent[] }) {
@@ -79,7 +80,7 @@ export function GuiaPanel({ g, role, isOwner, events }: { g: GuiaPanelData; role
       )}
       {isOwner && editing && (
         <Card className="p-4 sm:p-6">
-          <GuiaForm id={g.id} initial={g.form} onDone={() => setEditing(false)} />
+          <GuiaForm id={g.id} initial={g.form} partidas={g.partidas} onDone={() => setEditing(false)} />
         </Card>
       )}
 
