@@ -57,6 +57,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 40 | `0045_quejas_link_dictamen.sql` | **Link de quejas para clientes** (`/quejas`, sin cuenta, para tarjetas y firmas de correo) y botón **Sí aplica / No aplica** del coordinador ISO: hasta que aplica, la queja queda bloqueada. |
 | 41 | `0046_firma_correo.sql` | **Firma de correo**: cada usuario llena sus datos y descarga la imagen con la leyenda y el link de quejas. A vendedores y jefa de ventas les aparece sola al entrar. |
 | 42 | `0047_almacen_conectado.sql` | Interruptor **"Almacén conectado a ventas"** en Configuración (viene apagado): la venta con factura ya no manda carga a almacén y se esconden Entregas e Inventario hasta que esté el inventario. |
+| 43 | `0048_demo_quitar_where.sql` | Arregla **Quitar demostración** ("DELETE requires a WHERE clause"). Se puede correr en cualquier momento. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 
