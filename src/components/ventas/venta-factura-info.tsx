@@ -33,7 +33,7 @@ export async function VentaFacturaInfo({ ventaId, nueva }: { ventaId: string; nu
               <Link href={`/entregas/${s.id}`} className="text-brand-700 underline">Ver entrega</Link>
             </>
           ) : (
-            <span className="text-slate-500">Sin artículos para cargar en almacén</span>
+            <span className="text-slate-500">No se mandó a almacén: márcala Entregada cuando la entregues</span>
           )}
         </span>
       </Card>

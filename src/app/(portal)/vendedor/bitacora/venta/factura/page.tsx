@@ -3,6 +3,7 @@ import { DateTime } from "luxon";
 import { FacturaForm } from "@/components/almacen/factura-form";
 import { PageHeader } from "@/components/ui";
 import { requireRoles } from "@/lib/auth/sales";
+import { almacenVentasActivo } from "@/lib/almacen-ventas";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -10,7 +11,7 @@ export default async function VentaConFactura({ searchParams }: { searchParams: 
   await requireRoles(["vendedor"]);
   const { cliente } = await searchParams;
   const supabase = await createClient();
-  const cfg = await getBusinessSettings(supabase);
+  const [cfg, almacen] = await Promise.all([getBusinessSettings(supabase), almacenVentasActivo(supabase)]);
   const { data: c } = cliente && /^[0-9a-f-]{36}$/i.test(cliente) ? await supabase.from("customers").select("id, nombre").eq("id", cliente).maybeSingle() : { data: null };
   return (
     <div className="space-y-4">
@@ -20,9 +21,9 @@ export default async function VentaConFactura({ searchParams }: { searchParams: 
       </div>
       <PageHeader
         title="Registrar venta con factura"
-        subtitle="Sube la factura: se registra la venta (fecha, total, contado o crédito), se da de alta o completa el cliente y, si lleva artículos, se manda a almacén para cargar."
+        subtitle={`Sube la factura: se registra la venta (fecha, total, contado o crédito) y se da de alta o completa el cliente${almacen ? " y, si lleva artículos, se manda a almacén para cargar" : ""}.`}
       />
-      <FacturaForm modo="venta" cliente={c ?? null} today={DateTime.now().setZone(cfg.timezone).toISODate()!} />
+      <FacturaForm modo="venta" almacen={almacen} cliente={c ?? null} today={DateTime.now().setZone(cfg.timezone).toISODate()!} />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
 import { ALMACEN, SUBEN_FACTURA, type TipoRecepcion } from "@/lib/almacen";
 import { friendlyError } from "@/lib/quotes/server";
+import { almacenVentasActivo } from "@/lib/almacen-ventas";
 import { createClient } from "@/lib/supabase/server";
 import type { Result } from "./requests";
 
@@ -123,6 +124,7 @@ export async function crearSalidaAction(fd: FormData): Promise<Result<{ id: stri
   const p = salidaSchema.safeParse(datos);
   if (!p.success) return { ok: false, error: p.error.issues[0].message };
   const supabase = await createClient();
+  if (!(await almacenVentasActivo(supabase))) return { ok: false, error: "Almacén todavía no está conectado a ventas. El comprador lo prende en Configuración." };
   // Antes de subir archivos: el folio no se puede repetir.
   const usado = await buscarFolio(supabase, p.data.folio);
   if (usado) return { ok: false, error: mensajeFolio(usado) };

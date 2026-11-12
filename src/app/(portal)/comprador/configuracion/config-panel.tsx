@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { addHolidayAction, removeHolidayAction, saveCompanyAction, savePricingAction, saveSettingsAction } from "@/actions/config";
+import { addHolidayAction, removeHolidayAction, saveCompanyAction, savePricingAction, saveSettingsAction, setAlmacenVentasAction } from "@/actions/config";
 import type { CompanyProfile } from "@/lib/quotes/server";
 import type { Result } from "@/actions/requests";
 import { Alert, Button, Card, Field, Input } from "@/components/ui";
@@ -19,6 +19,7 @@ export function ConfigPanel(props: {
   settings: { timezone: string; sla_business_hours: number; warn_business_hours: number; vigencia_dias: number };
   company: CompanyProfile;
   holidays: { fecha: string; descripcion: string | null }[];
+  almacenVentas: boolean;
 }) {
   const cur = props.history[0];
   const [pending, start] = useTransition();
@@ -39,6 +40,7 @@ export function ConfigPanel(props: {
     condiciones_default: props.company.condiciones_default, pie: props.company.pie_lineas.join("\n"), leyenda_envio: props.company.leyenda_envio,
   });
   const [holiday, setHoliday] = useState({ fecha: "", descripcion: "" });
+  const [almacen, setAlmacen] = useState(props.almacenVentas);
 
   function run(fn: () => Promise<Result>, okText: string, after?: () => void) {
     setNotice(null);
@@ -61,6 +63,33 @@ export function ConfigPanel(props: {
     <div className="space-y-6">
       <h1 className="text-xl font-semibold tracking-tight">Configuracion</h1>
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
+
+      <Card className={`space-y-3 ${almacen ? "" : "border-amber-200"}`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="max-w-2xl">
+            <h2 className="font-medium">Almacén conectado a ventas</h2>
+            <p className="text-sm text-slate-600">
+              {almacen
+                ? "Prendido: la venta con factura manda la carga a almacén para escanear, y la venta queda Entregada al terminar de cargar. Se ven Entregas e Inventario."
+                : "Apagado: la venta con factura se registra igual, pero no se manda a almacén; el vendedor marca Entregada a mano. Entregas e Inventario no aparecen en los menús. Almacén sigue con recepciones, etiquetas y evaluación de proveedores."}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={almacen}
+            aria-label="Almacén conectado a ventas"
+            disabled={pending}
+            onClick={() => {
+              const nuevo = !almacen;
+              run(() => setAlmacenVentasAction(nuevo), nuevo ? "Almacén conectado: las ventas con factura ya se mandan a cargar." : "Almacén desconectado de ventas.", () => setAlmacen(nuevo));
+            }}
+            className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition disabled:opacity-60 ${almacen ? "bg-green-600" : "bg-slate-300"}`}
+          >
+            <span className={`inline-block h-6 w-6 rounded-full bg-white shadow transition ${almacen ? "translate-x-7" : "translate-x-1"}`} />
+          </button>
+        </div>
+      </Card>
 
       <Card className="space-y-3">
         <h2 className="font-medium">Tabulador de precios</h2>

@@ -52,7 +52,7 @@ const sumarDias = (fecha: string, dias: number) => {
  * modo "entrega": solo se manda a almacen. modo "venta" (vendedor): se registra la venta, se da de alta o
  * completa el cliente y, si hay articulos del catalogo, tambien se manda a almacen.
  */
-export function FacturaForm({ modo = "entrega", today, cliente = null }: { modo?: "entrega" | "venta"; today?: string; cliente?: { id: string; nombre: string } | null }) {
+export function FacturaForm({ modo = "entrega", today, cliente = null, almacen = true }: { modo?: "entrega" | "venta"; today?: string; cliente?: { id: string; nombre: string } | null; almacen?: boolean }) {
   const venta = modo === "venta";
   const [pdf, setPdf] = useState<File | null>(null);
   const [xml, setXml] = useState<File | null>(null);
@@ -186,7 +186,8 @@ export function FacturaForm({ modo = "entrega", today, cliente = null }: { modo?
 
   const setL = (i: number, k: keyof Linea, val: string) => setLineas((x) => x.map((l, j) => (j === i ? { ...l, [k]: k === "clave" ? val.toUpperCase() : val } : l)));
   const setC = (k: keyof Cliente) => (e: React.ChangeEvent<HTMLInputElement>) => setCli((s) => ({ ...s, [k]: k === "rfc" ? e.target.value.toUpperCase() : e.target.value }));
-  const escaneables = lineas.filter((l) => l.clave && catalogo[l.clave.toUpperCase()]);
+  // Almacen desconectado (Configuracion): la venta no se manda a cargar, nada se escanea.
+  const escaneables = almacen ? lineas.filter((l) => l.clave && catalogo[l.clave.toUpperCase()]) : [];
   const clienteFinal = elegido ?? match;
   const lineasOk = lineas.length > 0 && lineas.every((l) => Number(l.cantidad) > 0);
   const ventaOk = !venta || ((!!clienteFinal || !!(cli.nombre.trim() || cli.razon.trim())) && Number(cobro.total) > 0);
@@ -202,7 +203,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null }: { modo?
         return crearSalidaAction(fd);
       }
       fd.set("datos", JSON.stringify({
-        folio: v.folio, fecha: v.fecha || null, uuid: v.uuid || null, vendedor_factura: v.vendedor || null, notas_almacen: v.notas || null,
+        folio: v.folio, fecha: v.fecha || null, uuid: v.uuid || null, vendedor_factura: v.vendedor || null, notas_almacen: almacen ? v.notas || null : null,
         comentarios: v.comentarios || null, pedido: v.pedido || null,
         customer_id: elegido?.id ?? null, nombre: cli.nombre, razon_social: cli.razon, rfc: cli.rfc, direccion: cli.direccion, telefono: cli.telefono,
         total: Number(cobro.total), moneda: cobro.moneda, pago: cobro.pago, dias_credito: cobro.pago === "credito" ? Number(cobro.dias) || 30 : null,
@@ -279,7 +280,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null }: { modo?
                         ) : (
                           <p className="text-slate-800">{enCat || l.descripcion || "Sin descripción"}</p>
                         )}
-                        <p className={`text-xs ${enCat ? "text-green-700" : "text-amber-700"}`}>{enCat ? "En el catálogo: se escanea al cargar" : l.clave ? "Esa clave no está en el catálogo: no se escanea" : "Sin clave ESC (servicio o flete): no se escanea"}</p>
+                        {almacen && <p className={`text-xs ${enCat ? "text-green-700" : "text-amber-700"}`}>{enCat ? "En el catálogo: se escanea al cargar" : l.clave ? "Esa clave no está en el catálogo: no se escanea" : "Sin clave ESC (servicio o flete): no se escanea"}</p>}
                       </div>
                       <input value={l.cantidad} readOnly={!!fijo.cant[i]} onChange={(e) => setL(i, "cantidad", e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="Cant." className={`w-20 rounded border border-slate-300 px-2 py-1.5 text-right text-sm ${fijo.cant[i] ? FIJO_CLS : FALTA_CLS}`} aria-label="Cantidad" />
                       <span className="w-24 truncate text-xs text-slate-500">{l.unidad}</span>
@@ -361,7 +362,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null }: { modo?
             <Button loading={busy === "s"} disabled={!confirmado || !v.folio.trim() || !!dup || !lineasOk || !ventaOk} onClick={guardar}>
               {venta ? (escaneables.length ? "Registrar venta y mandar a almacén" : "Registrar venta") : "Mandar a almacén para cargar"}
             </Button>
-            <span className="text-sm text-slate-500">{escaneables.length} de {lineas.length} partida(s) se escanean en almacén</span>
+            {almacen && <span className="text-sm text-slate-500">{escaneables.length} de {lineas.length} partida(s) se escanean en almacén</span>}
             <Button variant="ghost" className="!text-red-700" onClick={reiniciar}>Cancelar y subir otra</Button>
           </div>
         </>

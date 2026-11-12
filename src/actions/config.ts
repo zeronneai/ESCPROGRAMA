@@ -146,3 +146,16 @@ export async function saveCompanyAction(input: CompanyInput): Promise<Result> {
   revalidatePath("/comprador/configuracion");
   return { ok: true };
 }
+
+/** Prende o apaga "Almacen conectado a ventas". */
+export async function setAlmacenVentasAction(activo: boolean): Promise<Result> {
+  const u = await requireBuyer();
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("company_profile")
+    .update({ almacen_ventas: activo, updated_by: u.id, updated_at: new Date().toISOString() })
+    .eq("id", true);
+  if (error) return { ok: false, error: /almacen_ventas/.test(error.message) ? "Primero corre la actualización 0047_almacen_conectado.sql en Supabase." : friendlyError(error.message) };
+  revalidatePath("/", "layout");
+  return { ok: true };
+}

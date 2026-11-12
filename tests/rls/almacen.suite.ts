@@ -107,6 +107,13 @@ export function almacenSuite() {
       });
       // Solo vendedores
       expect(await failure(q(alm.a, "select public.venta_desde_factura($1::jsonb)", [datos()]))).toMatch(/vendedores/);
+      // Almacen desconectado (asi viene): la venta se registra pero no se manda a cargar.
+      const off = (await q(w.seller1, "select public.venta_desde_factura($1::jsonb) as r", [datos({ folio: folio + "OFF", uuid: randomUUID(), rfc: null, nombre: "SIN ALMACEN " + folio, razon_social: null })])).rows[0].r;
+      expect(off.venta_id).toBeTruthy();
+      expect(off.salida_id).toBeNull();
+      // Solo el comprador lo prende
+      expect((await q(w.seller1, "update public.company_profile set almacen_ventas=true where id=true")).rowCount).toBe(0);
+      expect((await q(w.buyer1, "update public.company_profile set almacen_ventas=true where id=true")).rowCount).toBe(1);
       const r = (await q(w.seller1, "select public.venta_desde_factura($1::jsonb) as r", [datos()])).rows[0].r;
       expect(r.cliente_nuevo).toBe(true);
       expect(r.salida_id).toBeTruthy();
@@ -120,6 +127,7 @@ export function almacenSuite() {
       // Otra factura del mismo cliente: se encuentra por RFC (y desde Entregas tampoco se puede repetir)
       const r2 = (await q(w.seller1, "select public.venta_desde_factura($1::jsonb) as r", [datos({ folio: folio + "X", nombre: "OTRO NOMBRE", lineas: [{ clave: null, descripcion: "Servicio", cantidad: 1 }] })])).rows[0].r;
       expect(r2).toMatchObject({ customer_id: r.customer_id, cliente_nuevo: false, salida_id: null });
+      await q("postgres", "update public.company_profile set almacen_ventas=false where id=true");
       expect(await failure(q(w.seller2, "select public.salida_crear($1, null, null, null, null, null, null, null, $2::jsonb)", [folio + "X", JSON.stringify([{ clave: "ESC-GLPFGG-L", cantidad: 1 }])]))).toMatch(/registrada como venta/);
       // Al terminar la carga, la venta queda entregada
       await q(alm.a, "select public.salida_escanear($1,$2)", [r.salida_id, cod]);

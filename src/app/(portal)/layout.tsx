@@ -12,6 +12,8 @@ import { AddCustomerButton } from "@/components/customers";
 import { AddSupplierButton } from "@/components/eval/supplier-tools";
 import { PortalNav, type NavItem } from "@/components/portal-nav";
 import { requireUser } from "@/lib/auth/guards";
+import { almacenVentasActivo, RUTAS_ALMACEN_VENTAS } from "@/lib/almacen-ventas";
+import { createClient } from "@/lib/supabase/server";
 import type { Rol } from "@/lib/auth/route-guard";
 
 const NAV: Record<Rol, NavItem[]> = {
@@ -158,12 +160,14 @@ const NAV: Record<Rol, NavItem[]> = {
 
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
+  const almacenOn = await almacenVentasActivo(await createClient());
+  const nav = NAV[user.rol].filter((i) => almacenOn || !RUTAS_ALMACEN_VENTAS.includes(i.href));
   return (
     <div className="min-h-screen">
       <Suspense fallback={null}>
         <NavigationProgress />
       </Suspense>
-      <PortalNav items={[{ href: "/inicio", label: "Inicio", icon: "home" }, ...NAV[user.rol], ...(RIESGO_ROLES.includes(user.rol) ? [{ href: "/calidad/riesgos", label: "Análisis de riesgo", icon: "chart" as const, secondary: true }] : []), { href: "/catalogo-esc-2026.pdf", label: "Catálogo 2026", icon: "download", secondary: true }]} user={{ nombre: user.nombre, rol: user.rol }} bell={
+      <PortalNav items={[{ href: "/inicio", label: "Inicio", icon: "home" }, ...nav, ...(RIESGO_ROLES.includes(user.rol) ? [{ href: "/calidad/riesgos", label: "Análisis de riesgo", icon: "chart" as const, secondary: true }] : []), { href: "/catalogo-esc-2026.pdf", label: "Catálogo 2026", icon: "download", secondary: true }]} user={{ nombre: user.nombre, rol: user.rol }} bell={
           <>
             {user.rol === "comprador" && <AddSupplierButton />}
             {(user.rol === "vendedor" || user.rol === "jefe_ventas" || user.rol === "comprador") && <AddCustomerButton />}

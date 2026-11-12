@@ -1,4 +1,5 @@
 import { requireBuyer } from "@/lib/auth/guards";
+import { almacenVentasActivo } from "@/lib/almacen-ventas";
 import { getCompanyProfile } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 import { DemoPanel } from "@/components/demo/demo-panel";
@@ -37,6 +38,7 @@ export default async function Configuracion() {
       .eq("activo", true)
       .eq("must_change_password", false),
   ]);
+  const almacenVentas = await almacenVentasActivo(supabase);
   const listos = (users ?? []).reduce<Record<string, number>>(
     (a, u) => ({ ...a, [u.rol]: (a[u.rol] ?? 0) + 1 }),
     {},
@@ -53,6 +55,7 @@ export default async function Configuracion() {
         settings={settings!}
         holidays={holidays ?? []}
         company={company}
+        almacenVentas={almacenVentas}
       />
     </div>
   );

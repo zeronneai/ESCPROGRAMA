@@ -1,4 +1,5 @@
 import "server-only";
+import { almacenVentasActivo } from "@/lib/almacen-ventas";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DateTime } from "luxon";
 import type { IconName } from "@/components/icons";
@@ -299,6 +300,8 @@ async function pagos(c: Ctx): Promise<Bloque> {
 }
 
 async function entregas(c: Ctx, modo: "almacen" | "propias"): Promise<Bloque> {
+  // Almacen sin conectar a ventas (todavia no hay inventario): no hay cargas que mostrar.
+  if (!(await almacenVentasActivo(c.sb))) return { alertas: [], seccion: null };
   let q = c.sb.from("salidas").select("estado, incompleta, espera, cargada_at, created_by, created_at").neq("estado", "cancelada").order("created_at", { ascending: false });
   if (modo === "propias") q = q.eq("created_by", c.uid);
   const { data } = await q.limit(3000);
