@@ -6,7 +6,7 @@ import { EnviarCatalogo } from "@/components/catalogo";
 import { DateTime } from "luxon";
 import { Icon } from "@/components/icons";
 import { requireUser } from "@/lib/auth/guards";
-import { cargarTablero, type Metrica, type Tono } from "@/lib/inicio";
+import { cargarTablero, type Metrica, type Seccion, type Tono } from "@/lib/inicio";
 import { ROL_LABEL } from "@/lib/ops/roles";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
@@ -58,6 +58,32 @@ const ACCESOS: Partial<Record<string, { href: string; label: string }[]>> = {
   supervisor_finanzas: [{ href: "/minutas/nueva", label: "Nueva minuta" }, { href: "/documentos", label: "Documentos" }],
 };
 
+/** Tarjeta grande de lo mas directo: el numero principal y dos datos chicos. */
+function Directo({ s }: { s: Seccion }) {
+  const [m, ...rest] = s.metricas;
+  const tono = m.tono ?? "default";
+  const color = tono === "red" ? "text-red-700" : tono === "amber" ? "text-amber-700" : tono === "green" ? "text-green-700" : "text-slate-900";
+  return (
+    <Link prefetch={false} href={m.href ?? s.href} className="group flex flex-col rounded-xl bg-white p-4 shadow-md ring-1 ring-slate-200 transition hover:shadow-lg hover:ring-brand-300">
+      <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><Icon name={s.icon} className="h-4 w-4" /></span>
+        {s.titulo}
+      </span>
+      <span className="mt-3 flex items-baseline gap-2">
+        <span className={`text-4xl font-bold leading-none ${color}`}>{m.valor}</span>
+        <span className="text-sm text-slate-600">{m.label}</span>
+      </span>
+      {m.hint && <span className="mt-1 truncate text-xs text-slate-500">{m.hint}</span>}
+      <span className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+        {rest.slice(0, 2).map((r) => (
+          <span key={r.label}><span className={`font-semibold ${r.tono === "red" && Number(r.valor) > 0 ? "text-red-700" : "text-slate-900"}`}>{r.valor}</span> {r.label.toLowerCase()}</span>
+        ))}
+      </span>
+      <span className="mt-auto pt-3 text-xs font-semibold text-brand-700 group-hover:underline">Abrir →</span>
+    </Link>
+  );
+}
+
 function Dato({ m, href }: { m: Metrica; href: string }) {
   return (
     <Link prefetch={false} href={m.href ?? href} className={`block rounded-lg px-3 py-2.5 ring-1 transition hover:brightness-95 ${TONO[m.tono ?? "default"]}`}>
@@ -102,8 +128,14 @@ export default async function Inicio() {
         </div>
       </section>
 
+      {t.directo.length > 0 && (
+        <div className="relative -mt-12 grid gap-3 px-3 sm:px-6 md:grid-cols-3">
+          {t.directo.map((s) => <Directo key={s.id} s={s} />)}
+        </div>
+      )}
+
       {CATALOGO_VISIBLE && (<>
-      <a href={CATALOGO.archivo} target="_blank" rel="noreferrer" className="-mt-12 relative mx-3 flex items-center gap-4 rounded-xl bg-white p-3 shadow-md ring-1 ring-slate-200 transition hover:shadow-lg sm:mx-6 sm:p-4">
+      <a href={CATALOGO.archivo} target="_blank" rel="noreferrer" className={`${t.directo.length ? "" : "-mt-12 "}relative mx-3 flex items-center gap-4 rounded-xl bg-white p-3 shadow-md ring-1 ring-slate-200 transition hover:shadow-lg sm:mx-6 sm:p-4`}>
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#0f2f7a] to-[#1d5fd6] text-xs font-bold text-white">PDF</span>
         <span className="min-w-0 flex-1">
           <span className="block font-semibold text-slate-900">{CATALOGO.nombre}</span>

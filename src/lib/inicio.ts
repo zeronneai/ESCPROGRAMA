@@ -34,6 +34,8 @@ export interface Alerta {
 export interface Tablero {
   alertas: Alerta[];
   secciones: Seccion[];
+  /** Lo mas directo del puesto: va hasta arriba en tarjetas grandes (comprador). */
+  directo: Seccion[];
 }
 
 type Ctx = { sb: SupabaseClient; uid: string; rol: Rol; today: string; tz: string; nowIso: string };
@@ -269,6 +271,30 @@ async function consumo(c: Ctx, modo: "propio" | "aprobar" | "atender" | "lectura
   return { alertas, seccion: { id: "consumo", titulo: modo === "propio" ? "Mi consumo interno" : "Consumo interno", icon: "clipboard", href: "/consumo", metricas } };
 }
 
+/** Ordenes de compra de Pegatron: articulos por pedir (compras) o por confirmar (jefa de ventas). */
+async function pegatron(c: Ctx): Promise<Bloque> {
+  const { data, error } = await c.sb.from("pegatron_oc_lineas").select("oc_id, entrega, pedido_at").is("pedido_at", null).limit(5000);
+  if (error) return { seccion: null, alertas: [] };
+  const rows = (data ?? []) as { oc_id: string; entrega: string | null; pedido_at: string | null }[];
+  const ocs = new Set(rows.map((r) => r.oc_id)).size;
+  const en7 = DateTime.fromISO(c.today).plus({ days: 7 }).toISODate()!;
+  const pronto = rows.filter((r) => r.entrega && r.entrega <= en7).length;
+  const href = "/pedidos-pegatron";
+  const alertas: Alerta[] = [];
+  if (c.rol === "comprador" && rows.length) alertas.push({ texto: `${rows.length} artículo(s) de Pegatron por pedir`, href, tono: pronto ? "red" : "amber" });
+  return {
+    alertas,
+    seccion: {
+      id: "pegatron", titulo: "Órdenes de Pegatron", icon: "cart", href,
+      metricas: [
+        { label: "Artículos por pedir", valor: rows.length, tono: tonoSi(rows.length) },
+        { label: "Órdenes con pendientes", valor: ocs },
+        { label: "Entregan en 7 días o menos", valor: pronto, tono: tonoSi(pronto, "red") },
+      ],
+    },
+  };
+}
+
 async function pagos(c: Ctx): Promise<Bloque> {
   const { data } = await c.sb.from("pagos").select("estado, monto, anticipo_aplicado, fecha_limite, urgente, carga, pago_fecha, pago_monto, ordenes_compra(moneda)").in("estado", ["pendiente", "pagado"]).limit(10000);
   const rows = (data ?? []) as unknown as { estado: string; monto: number | null; anticipo_aplicado: number | null; fecha_limite: string | null; urgente: boolean; carga: string; ordenes_compra: { moneda: string } | null }[];
@@ -284,16 +310,18 @@ async function pagos(c: Ctx): Promise<Bloque> {
   if (venc) alertas.push({ texto: `${venc} pago(s) a proveedor con fecha límite vencida`, href: "/pagos?ver=por_pagar", tono: "red" });
   if (ceo && pend.length && !urg && !venc) alertas.push({ texto: `${pend.length} pago(s) a proveedores por hacer (${total})`, href: "/pagos?ver=por_pagar", tono: "amber" });
   if (!ceo && pagados) alertas.push({ texto: `${pagados} comprobante(s) de pago por descargar y mandar al proveedor`, href: "/pagos?ver=comprobantes", tono: "amber" });
+  const comprobantes: Metrica = { label: ceo ? "Pagados, compras no descarga" : "Comprobantes por descargar", valor: pagados, tono: !ceo ? tonoSi(pagados) : "default", href: "/pagos?ver=comprobantes" };
   return {
     alertas,
     seccion: {
       id: "pagos", titulo: "Pagos a proveedores extranjeros", icon: "dollar", href: "/pagos",
       metricas: [
+        ...(ceo ? [] : [comprobantes]),
         { label: "Por pagar", valor: pend.length, hint: total, tono: tonoSi(pend.length, ceo ? "red" : "amber"), href: "/pagos?ver=por_pagar" },
         { label: "Urgentes", valor: urg, tono: tonoSi(urg, "red") },
         { label: "Vencidos", valor: venc, tono: tonoSi(venc, "red") },
         { label: "Carga sin liberar", valor: sinLib, tono: tonoSi(sinLib) },
-        { label: ceo ? "Pagados, compras no descarga" : "Comprobantes por descargar", valor: pagados, tono: !ceo ? tonoSi(pagados) : "default", href: "/pagos?ver=comprobantes" },
+        ...(ceo ? [comprobantes] : []),
       ],
     },
   };
@@ -427,7 +455,7 @@ export async function cargarTablero(sb: SupabaseClient, uid: string, rol: Rol, t
       case "vendedor":
         return [cotizacionesVendedor(c), ventas(c, true), prospeccion(c, true), guias(c, true, false), entregas(c, "propias"), encuesta(c, true), calidad(c, true), consumo(c, "propio")];
       case "comprador":
-        return [cotizacionesCompras(c, false), pagos(c), consumo(c, "atender"), evalProveedores(c), soloResumen(ventas(c, false)), soloResumen(calidad(c, false)), controlCambios(c)];
+        return [cotizacionesCompras(c, false), pagos(c), pegatron(c), consumo(c, "atender"), evalProveedores(c), soloResumen(ventas(c, false)), soloResumen(calidad(c, false)), controlCambios(c)];
       case "jefe_ventas":
         return [ventas(c, false), consumo(c, "aprobar"), prospeccion(c, false), encuesta(c, false), guias(c, false, false), calidad(c, false)];
       case "ceo":
@@ -450,5 +478,10 @@ export async function cargarTablero(sb: SupabaseClient, uid: string, rol: Rol, t
   const [bloques, gen] = await Promise.all([Promise.all(plan), generales(c)]);
   const alertas = [...bloques.flatMap((b) => b.alertas), ...gen];
   alertas.sort((a, b) => Number(a.tono !== "red") - Number(b.tono !== "red"));
-  return { alertas, secciones: bloques.map((b) => b.seccion).filter((s): s is Seccion => !!s) };
+  const secciones = bloques.map((b) => b.seccion).filter((s): s is Seccion => !!s);
+  // Compras: cotizaciones, pagos y Pegatron van hasta arriba, directo.
+  const DIRECTO: Partial<Record<Rol, string[]>> = { comprador: ["cotizaciones", "pagos", "pegatron"] };
+  const ids = DIRECTO[rol] ?? [];
+  const directo = ids.map((id) => secciones.find((x) => x.id === id)).filter((x): x is Seccion => !!x);
+  return { alertas, secciones: secciones.filter((x) => !ids.includes(x.id)), directo };
 }
