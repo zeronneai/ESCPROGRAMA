@@ -88,6 +88,18 @@ export function operacionesSuite() {
       expect((await q(A("iso"), "insert into public.quejas (via_recepcion, cliente_nombre, descripcion) values ('telefono','Bosch','Faltaron piezas') returning estado")).rows[0].estado).toBe("abierta");
     });
 
+    it("firma de correo: cada quien guarda la suya; anonimo no", async () => {
+      await q(w.seller1, "select public.guardar_mi_firma($1::jsonb)", [JSON.stringify({ nombre: "Vend A", telefono: "656 000 0000" })]);
+      const r = (await q(w.seller1, "select firma->>'nombre' as n, firma_at is not null as f from public.profiles where id=$1", [w.ids.s1])).rows[0];
+      expect(r).toMatchObject({ n: "Vend A", f: true });
+      expect((await q(w.seller1, "select firma from public.profiles where id=$1", [w.ids.s2])).rows[0]?.firma ?? null).toBeNull();
+      expect(await failure(q(w.seller1, "select public.guardar_mi_firma('[1]'::jsonb)"))).toMatch(/inválida/);
+      expect(await failure(q(w.seller1, "update public.profiles set firma_at=now() where id=$1", [w.ids.s2]))).toMatch(/permission denied|row-level/);
+      await q(w.seller2, "select public.posponer_mi_firma()");
+      expect((await q("postgres", "select firma_pospuesta_at is not null as p from public.profiles where id=$1", [w.ids.s2])).rows[0].p).toBe(true);
+      expect(await failure(q({ id: "", role: "anon" }, "select public.guardar_mi_firma('{}'::jsonb)"))).toMatch(/permission denied/);
+    });
+
     it("acciones correctivas: solo el ISO crea; el vendedor de la queja la ve y le llega aviso", async () => {
       const qid = (await q(w.seller1, "insert into public.quejas (via_recepcion, cliente_nombre, descripcion) values ('correo','Lear','Cantidad incompleta') returning id")).rows[0].id;
       expect(await failure(q(w.seller1, "insert into public.acciones_correctivas (solicitante, fuente, descripcion) values ('Vend','queja_cliente','Faltante')"))).toMatch(/row-level security/);

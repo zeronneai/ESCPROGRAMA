@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { ABRIR_FIRMA } from "@/lib/firma";
 import { Icon, type IconName } from "@/components/icons";
 import type { Rol } from "@/lib/auth/route-guard";
 import { ROL_LABEL } from "@/lib/ops/roles";
@@ -92,12 +93,26 @@ export function PortalNav({
   const rolLabel = ROL_LABEL[user.rol as Rol] ?? user.rol;
 
   const logout = (
+    <>
+    <button
+      type="button"
+      onClick={() => {
+        setMenu(false);
+        setSheet(false);
+        window.dispatchEvent(new Event(ABRIR_FIRMA));
+      }}
+      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
+    >
+      <Icon name="download" className="h-4 w-4" />
+      Mi firma de correo
+    </button>
     <form action="/api/auth/logout" method="post">
       <button className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-red-700 hover:bg-red-50">
         <Icon name="logout" className="h-4 w-4" />
         Cerrar sesión
       </button>
     </form>
+    </>
   );
 
   return (

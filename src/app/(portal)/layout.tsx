@@ -3,6 +3,7 @@ import { Logo } from "@/components/logo";
 import { Wordmark } from "@/components/marca";
 import { NavigationProgress } from "@/components/navigation-progress";
 import { HelpChat } from "@/components/help-chat";
+import { FirmaCorreo } from "@/components/firma/firma-correo";
 import { PagosAviso } from "@/components/pagos/pagos-aviso";
 import { NotificationBell } from "@/components/notification-bell";
 import { RealtimeSync } from "@/components/realtime-sync";
@@ -174,6 +175,9 @@ export default async function PortalLayout({ children }: { children: React.React
       <HelpChat rol={user.rol} nombre={user.nombre} />
       <Suspense fallback={null}>
         <PagosAviso rol={user.rol} />
+      </Suspense>
+      <Suspense fallback={null}>
+        <FirmaCorreo user={user} />
       </Suspense>
     </div>
   );
