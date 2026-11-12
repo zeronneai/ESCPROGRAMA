@@ -1,7 +1,9 @@
 -- =============================================================================
 -- limpiar_prospectos_sitio_web.sql   (limpieza de una sola vez, no es actualizacion)
 -- Borra los prospectos que entraron por el formulario del SITIO WEB (pruebas):
---   * Los registros de Prospeccion con origen "sitio_web", su historial, sus articulos y sus avisos.
+--   * Los registros de Prospeccion que llegaron del sitio web (origen "sitio_web", o los de la version
+--     anterior de prospectos que nunca tomo un vendedor), su historial, sus articulos y sus avisos.
+--   * Los prospectos de la version anterior (tabla leads) que llegaron del sitio web sin vendedor.
 --   * La empresa que se dio de alta sola con ese prospecto, SOLO si no tiene nada mas
 --     (cotizaciones, ventas, quejas, guias, evaluaciones, sucursales ni otros registros).
 -- Si un prospecto web ya lo convirtieron en cotizacion o venta, esa cotizacion o venta NO se borra.
@@ -9,11 +11,14 @@
 -- =============================================================================
 do $$
 declare
-  v_b uuid[]; v_c uuid[]; n_b integer; n_c integer;
+  v_b uuid[]; v_c uuid[]; v_l uuid[]; n_b integer; n_c integer;
   t text;
-  tablas text[] := array['bitacora_articulos', 'bitacora_eventos', 'bitacora', 'customers', 'notifications'];
+  tablas text[] := array['bitacora_articulos', 'bitacora_eventos', 'bitacora', 'customers', 'notifications', 'lead_activities', 'leads'];
 begin
-  select coalesce(array_agg(id), '{}') into v_b from public.bitacora where origen = 'sitio_web';
+  select coalesce(array_agg(id), '{}') into v_b from public.bitacora
+   where origen = 'sitio_web' or (origen = 'lead' and vendedor_id is null);
+  select coalesce(array_agg(id), '{}') into v_l from public.leads
+   where vendedor_id is null and (origen::text = 'sitio_web' or externo_id is not null);
   -- Empresas que se crearon con el prospecto web y no se usan en nada mas.
   select coalesce(array_agg(c.id), '{}') into v_c
     from public.customers c
@@ -26,13 +31,15 @@ begin
      and not exists (select 1 from public.quejas q where q.customer_id = c.id)
      and not exists (select 1 from public.guias g where g.customer_id = c.id)
      and not exists (select 1 from public.encuestas_cliente e where e.customer_id = c.id)
-     and not exists (select 1 from public.leads l where l.customer_id = c.id)
+     and not exists (select 1 from public.leads l where l.customer_id = c.id and not (l.id = any (v_l)))
      and not exists (select 1 from public.customers h where h.parent_id = c.id);
 
   foreach t in array tablas loop
     execute format('alter table public.%I disable trigger user', t);
   end loop;
-  delete from public.notifications where ref_id = any (v_b);
+  delete from public.notifications where ref_id = any (v_b || v_l);
+  delete from public.lead_activities where lead_id = any (v_l);
+  delete from public.leads where id = any (v_l);
   delete from public.bitacora_articulos where bitacora_id = any (v_b);
   delete from public.bitacora_eventos where bitacora_id = any (v_b);
   delete from public.bitacora where id = any (v_b);

@@ -64,4 +64,4 @@ Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bit
 
 Si una ejecucion falla, **no sigas con la siguiente**: copia el mensaje de error y mandamelo.
 
-**Limpieza de una sola vez (no es actualización):** `limpiar_prospectos_sitio_web.sql` borra los prospectos de prueba que entraron por el formulario del sitio web y las empresas que se dieron de alta solas con ellos (si no tienen nada más).
+**Limpieza de una sola vez (no es actualización):** `../limpiezas/limpiar_prospectos_sitio_web.sql` borra los prospectos de prueba que entraron por el formulario del sitio web y las empresas que se dieron de alta solas con ellos (si no tienen nada más).
