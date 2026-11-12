@@ -40,6 +40,8 @@ export function decideRoute(input: {
   if (pathname === "/catalogo" || pathname === "/catalogo-esc-2026.pdf") return { type: "next" };
   // Link de quejas: el cliente manda su queja sin cuenta (va en tarjetas y firmas de correo).
   if (pathname === "/quejas") return { type: "next" };
+  // Cerrar sesion siempre se puede, aunque la sesion ya haya vencido: regresa al inicio de sesion.
+  if (pathname === "/api/auth/logout") return { type: "next" };
 
   if (!hasUser) {
     if (pathname === LOGIN_PATH) return { type: "next" };

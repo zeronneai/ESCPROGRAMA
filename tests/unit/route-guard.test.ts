@@ -107,6 +107,8 @@ describe("decideRoute", () => {
     expect(d("/quejas", null, false)).toEqual({ type: "next" });
     expect(d("/quejas", alm)).toEqual({ type: "next" });
     expect(d("/quejas/x", null, false)).toEqual({ type: "redirect", to: "/login" });
+    // Cerrar sesion con la sesion vencida: no da error, el handler regresa al login.
+    expect(d("/api/auth/logout", null, false)).toEqual({ type: "next" });
   });
 });
 
