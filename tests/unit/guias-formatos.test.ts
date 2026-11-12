@@ -18,3 +18,15 @@ it("partir la direccion de la factura", () => {
   expect(partirDireccion("Av. Tecnológico 1200, Cd. Juárez, Chih., C.P. 32500")).toMatchObject({ calle_numero: "Av. Tecnológico 1200", ciudad: "Cd. Juárez", estado_geo: "Chihuahua", cp: "32500" });
   expect(partirDireccion("")).toEqual({ calle_numero: "", colonia: "", cp: "", ciudad: "", estado_geo: "" });
 });
+
+import { partidasDeGuia, resumenPartidas } from "@/lib/ops/guias";
+it("se muestran todas las partidas guardadas, aunque no digan que llevan", () => {
+  const guardadas = [
+    { empaque: "bulto", cantidad: 5, peso_kg: 40, largo_cm: 28, ancho_cm: 45, alto_cm: 110, descripcion: "MEMBRANA YAZ" },
+    { empaque: "bulto", cantidad: 1, peso_kg: 85, largo_cm: null, ancho_cm: null, alto_cm: null, descripcion: null },
+    { empaque: "tarima", cantidad: 1, peso_kg: 200, largo_cm: 120, ancho_cm: 100, alto_cm: 90, descripcion: null },
+  ];
+  const ps = partidasDeGuia({ partidas: guardadas, bultos: 7, peso_kg: 485 });
+  expect(ps).toHaveLength(3);
+  expect(resumenPartidas(ps)).toBe("1 tarima y 6 bultos");
+});

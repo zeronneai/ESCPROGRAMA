@@ -59,7 +59,8 @@ export function elapsedText(h: number): string {
   return `${Math.floor(h / 24)} días`;
 }
 
-const txt = (max: number) => z.string().trim().max(max).optional().transform((v) => v || null);
+// Acepta vacio, null o undefined (lo guardado viene como null).
+const txt = (max: number) => z.string().trim().max(max).nullish().transform((v) => v || null);
 /** "$3,480.00", "120 cm", "5 kg", "1.5" -> numero; vacio -> null. */
 export function limpiaNumero(v: unknown): number | null | unknown {
   if (v == null) return null;
