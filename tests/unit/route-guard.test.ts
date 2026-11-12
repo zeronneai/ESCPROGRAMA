@@ -107,6 +107,9 @@ describe("decideRoute", () => {
     expect(d("/quejas", null, false)).toEqual({ type: "next" });
     expect(d("/quejas", alm)).toEqual({ type: "next" });
     expect(d("/quejas/x", null, false)).toEqual({ type: "redirect", to: "/login" });
+    // Catalogo oculto mientras se termina: la liga no abre.
+    expect(d("/catalogo", null, false)).toEqual({ type: "redirect", to: "/login" });
+    expect(d("/catalogo-esc-2026.pdf", alm)).toEqual({ type: "redirect", to: "/inicio" });
     // Cerrar sesion con la sesion vencida: no da error, el handler regresa al login.
     expect(d("/api/auth/logout", null, false)).toEqual({ type: "next" });
   });

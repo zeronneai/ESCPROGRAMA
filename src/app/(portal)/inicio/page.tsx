@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { FondoAzul, Wordmark } from "@/components/marca";
-import { CATALOGO } from "@/lib/marca";
+import { CATALOGO, CATALOGO_VISIBLE } from "@/lib/marca";
 import { EnviarCatalogo } from "@/components/catalogo";
 import { DateTime } from "luxon";
 import { Icon } from "@/components/icons";
@@ -101,6 +101,7 @@ export default async function Inicio() {
         </div>
       </section>
 
+      {CATALOGO_VISIBLE && (<>
       <a href={CATALOGO.archivo} target="_blank" rel="noreferrer" className="-mt-12 relative mx-3 flex items-center gap-4 rounded-xl bg-white p-3 shadow-md ring-1 ring-slate-200 transition hover:shadow-lg sm:mx-6 sm:p-4">
         <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#0f2f7a] to-[#1d5fd6] text-xs font-bold text-white">PDF</span>
         <span className="min-w-0 flex-1">
@@ -115,6 +116,7 @@ export default async function Inicio() {
           <EnviarCatalogo compacto />
         </div>
       )}
+      </>)}
 
       <section className={`rounded-xl border p-4 ${rojas ? "border-red-200 bg-red-50/60" : t.alertas.length ? "border-amber-200 bg-amber-50/50" : "border-green-200 bg-green-50/60"}`}>
         <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-600">

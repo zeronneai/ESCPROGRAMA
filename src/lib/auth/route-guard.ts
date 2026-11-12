@@ -1,6 +1,7 @@
 /**
  * Decision pura de acceso por ruta (se usa en el middleware y se prueba aparte).
  */
+import { CATALOGO_VISIBLE } from "@/lib/marca";
 export type Rol = "vendedor" | "comprador" | "jefe_ventas" | "gerente" | "coordinador_iso" | "marketplaces" | "almacen" | "supervisor_almacen" | "supervisor_finanzas" | "ceo";
 
 export interface GuardProfile {
@@ -37,7 +38,11 @@ export function decideRoute(input: {
   // Encuesta de satisfaccion: el cliente la abre con su link, sin cuenta.
   if (pathname.startsWith("/encuesta/")) return { type: "next" };
   // Catalogo: se le manda al cliente por WhatsApp o correo, se abre sin cuenta.
-  if (pathname === "/catalogo" || pathname === "/catalogo-esc-2026.pdf") return { type: "next" };
+  if (pathname === "/catalogo" || pathname === "/catalogo-esc-2026.pdf") {
+    // Oculto mientras se termina (CATALOGO_VISIBLE): la liga no abre.
+    if (!CATALOGO_VISIBLE) return { type: "redirect", to: hasUser ? "/inicio" : LOGIN_PATH };
+    return { type: "next" };
+  }
   // Link de quejas: el cliente manda su queja sin cuenta (va en tarjetas y firmas de correo).
   if (pathname === "/quejas") return { type: "next" };
   // Cerrar sesion siempre se puede, aunque la sesion ya haya vencido: regresa al inicio de sesion.

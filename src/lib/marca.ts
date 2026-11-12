@@ -3,6 +3,12 @@ export const APP_NOMBRE = "ESC One";
 export const APP_LEMA = "Todo ESC Representaciones en un solo lugar";
 export const APP_TITULO = `${APP_NOMBRE} | ESC Representaciones`;
 
+/**
+ * Catalogo visible en el portal y por liga publica. Apagado mientras se termina el PDF:
+ * se esconde en Inicio, Documentos, Prospeccion y el menu, y /catalogo no abre. Cambiar a true para mostrarlo.
+ */
+export const CATALOGO_VISIBLE = false;
+
 /** Catalogo vigente: archivo publico (se puede mandar a clientes sin que inicien sesion). */
 export const CATALOGO = { nombre: "Catálogo ESC 2026", archivo: "/catalogo-esc-2026.pdf", ruta: "/catalogo" };
 
