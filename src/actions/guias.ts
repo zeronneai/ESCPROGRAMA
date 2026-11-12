@@ -98,8 +98,25 @@ export async function subirGuiaAction(formData: FormData): Promise<Result> {
   const supabase = await createClient();
   const { error: up } = await supabase.storage.from("guias").upload(path, file, { contentType: file.type });
   if (up) return { ok: false, error: friendlyError(up.message) };
-  const { error } = await supabase.rpc("guia_mover", { p_id: id, p_estado: "lista", p_rastreo: rastreo || null, p_path: path, p_nombre: file.name.slice(0, 200) });
+  const bulto = String(formData.get("bulto") ?? "").trim().slice(0, 80);
+  // Varios archivos por guia (uno por bulto o tarima). Sin la 0054 se usa el paso de siempre (un archivo).
+  let { error } = await supabase.rpc("guia_archivo_agregar", { p_id: id, p_path: path, p_nombre: file.name.slice(0, 200), p_rastreo: rastreo, p_bulto: bulto || null });
+  if (error && /guia_archivo_agregar|function .* does not exist|schema cache/i.test(error.message)) {
+    ({ error } = await supabase.rpc("guia_mover", { p_id: id, p_estado: "lista", p_rastreo: rastreo || null, p_path: path, p_nombre: file.name.slice(0, 200) }));
+  }
   if (error) return { ok: false, error: friendlyError(error.message) };
+  refresh(id);
+  return { ok: true };
+}
+
+/** Marketplaces quita un archivo de guia que subio por error. */
+export async function quitarArchivoGuiaAction(id: string, idx: number): Promise<Result> {
+  const u = await requireUser();
+  if (u.rol !== "marketplaces") return { ok: false, error: "Solo Marketplaces quita las guías." };
+  if (!uuid.safeParse(id).success || !Number.isInteger(idx) || idx < 0) return { ok: false, error: "Archivo inválido" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("guia_archivo_quitar", { p_id: id, p_idx: idx });
+  if (error) return { ok: false, error: /guia_archivo_quitar|does not exist|schema cache/i.test(error.message) ? "Primero corre la actualización 0054 en Supabase." : friendlyError(error.message) };
   refresh(id);
   return { ok: true };
 }

@@ -200,6 +200,25 @@ export function operacionesSuite() {
       expect(done).toMatchObject({ estado: "lista", numero_rastreo: "7788990011" });
       expect(await notif(w.ids.s1, "guia_lista", g.id)).toBe(1);
       expect((await q(w.seller1, "update public.guias set factura='X' where id=$1", [g.id])).rowCount).toBe(0);
+      // Varios archivos: una guia por tarima, cada una con su numero.
+      const gm = (await q(w.seller1, GUIA, ["F-3T"])).rows[0];
+      expect(await failure(q(w.seller1, "select public.guia_archivo_agregar($1,$2,'t1.pdf','111','Tarima 1')", [gm.id, `${gm.id}/t1.pdf`]))).toMatch(/Marketplaces/);
+      expect(await failure(q(A("mkt"), "select public.guia_archivo_agregar($1,$2,'t1.pdf','','Tarima 1')", [gm.id, `${gm.id}/t1.pdf`]))).toMatch(/numero de guia/);
+      expect(await failure(q(A("mkt"), "select public.guia_archivo_agregar($1,'otra/t1.pdf','t1.pdf','111',null)", [gm.id]))).toMatch(/Sube el archivo/);
+      await q(A("mkt"), "select public.guia_archivo_agregar($1,$2,'t1.pdf','111111','Tarima 1 · 350 kg')", [gm.id, `${gm.id}/t1.pdf`]);
+      await q(A("mkt"), "select public.guia_archivo_agregar($1,$2,'t2.pdf','222222','Tarima 2 · 200 kg')", [gm.id, `${gm.id}/t2.pdf`]);
+      await q(A("mkt"), "select public.guia_archivo_agregar($1,$2,'t3.pdf','333333',null)", [gm.id, `${gm.id}/t3.pdf`]);
+      let gv = (await q(w.seller1, "select estado, numero_rastreo, archivo_path, jsonb_array_length(archivos) as n, archivos->1->>'bulto' as b from public.guias where id=$1", [gm.id])).rows[0];
+      expect(gv).toMatchObject({ estado: "lista", numero_rastreo: "111111, 222222, 333333", archivo_path: `${gm.id}/t1.pdf`, n: 3, b: "Tarima 2 · 200 kg" });
+      expect(await notif(w.ids.s1, "guia_lista", gm.id)).toBe(3);
+      expect(await failure(q(w.seller1, "update public.guias set archivos='[]'::jsonb where id=$1", [gm.id]))).toMatch(/permission denied/);
+      await q(A("mkt"), "select public.guia_archivo_quitar($1, 0)", [gm.id]);
+      gv = (await q(w.seller1, "select estado, numero_rastreo, archivo_path from public.guias where id=$1", [gm.id])).rows[0];
+      expect(gv).toMatchObject({ estado: "lista", numero_rastreo: "222222, 333333", archivo_path: `${gm.id}/t2.pdf` });
+      await q(A("mkt"), "select public.guia_archivo_quitar($1, 0)", [gm.id]);
+      await q(A("mkt"), "select public.guia_archivo_quitar($1, 0)", [gm.id]);
+      gv = (await q(w.seller1, "select estado, numero_rastreo, archivo_path, archivos from public.guias where id=$1", [gm.id])).rows[0];
+      expect(gv).toMatchObject({ estado: "en_proceso", numero_rastreo: null, archivo_path: null, archivos: [] });
       // Recordatorio: a partir de 4 horas, uno por hora.
       const g2 = (await q(w.seller1, GUIA, ["F-9"])).rows[0];
       await q("postgres", "update public.guias set solicitada_at = now() - interval '5 hours' where id=$1", [g2.id]);

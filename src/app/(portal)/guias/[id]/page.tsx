@@ -32,8 +32,16 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
   const now = new Date();
   const alert = guiaAlert(g, now);
   const h = hoursPending(g, now);
-  // El vendedor solo ve el numero de guia; el archivo lo descargan Marketplaces y los jefes.
-  const url = u.rol === "vendedor" ? null : await signedUrl(supabase, "guias", g.archivo_path, g.archivo_nombre);
+  // El vendedor solo ve los numeros de guia; los archivos los descargan Marketplaces y los jefes.
+  type ArchivoGuia = { path: string; nombre?: string; rastreo?: string; bulto?: string };
+  const lista: ArchivoGuia[] = Array.isArray(g.archivos) && g.archivos.length
+    ? (g.archivos as ArchivoGuia[])
+    : g.archivo_path ? [{ path: g.archivo_path, nombre: g.archivo_nombre ?? undefined, rastreo: g.numero_rastreo ?? undefined }] : [];
+  const archivos = await Promise.all(lista.map(async (a, i) => ({
+    nombre: a.nombre ?? `guia-${i + 1}.pdf`, rastreo: a.rastreo ?? null, bulto: a.bulto ?? null,
+    url: u.rol === "vendedor" ? null : await signedUrl(supabase, "guias", a.path, a.nombre),
+  })));
+  const varios = Array.isArray(g.archivos);
   const n = (v: unknown) => (v === null || v === undefined ? "" : String(Number(v)));
   const form = {
     factura: g.factura, destinatario: g.destinatario, paqueteria: g.paqueteria, paqueteria_otra: g.paqueteria_otra ?? "", servicio: g.servicio,
@@ -92,7 +100,7 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
       {mkt && datos}
 
       <GuiaPanel
-        g={{ id: g.id, estado, solicitada_at: g.solicitada_at, ultimo_recordatorio_at: g.ultimo_recordatorio_at, mensaje: g.mensaje, archivo_url: url, archivo_nombre: g.archivo_nombre, numero_rastreo: g.numero_rastreo, atendida_nombre: g.atendida_nombre, form, partidas: partidasForm }}
+        g={{ id: g.id, estado, solicitada_at: g.solicitada_at, ultimo_recordatorio_at: g.ultimo_recordatorio_at, mensaje: g.mensaje, archivos, varios, numero_rastreo: g.numero_rastreo, atendida_nombre: g.atendida_nombre, form, partidas: partidasForm }}
         role={u.rol}
         isOwner={u.id === g.vendedor_id}
         events={(ev ?? []).map((e) => ({ id: e.id, texto: e.tipo === "comentario" ? e.nota : `${EV[e.tipo] ?? e.tipo}${e.nota ? `: ${e.nota}` : ""}`, autor: e.autor_nombre, fecha: e.created_at, comentario: e.tipo === "comentario" }))}
