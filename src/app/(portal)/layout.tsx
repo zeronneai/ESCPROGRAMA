@@ -9,7 +9,7 @@ import { CatalogoAviso } from "@/components/catalogo-aviso";
 import { NotificationBell } from "@/components/notification-bell";
 import { RealtimeSync } from "@/components/realtime-sync";
 import { RIESGO_ROLES } from "@/lib/riesgos";
-import { CATALOGO_VISIBLE } from "@/lib/marca";
+import { CATALOGO, CATALOGO_VISIBLE } from "@/lib/marca";
 import { AddCustomerButton } from "@/components/customers";
 import { AddSupplierButton } from "@/components/eval/supplier-tools";
 import { PortalNav, type NavItem } from "@/components/portal-nav";
@@ -174,7 +174,7 @@ export default async function PortalLayout({ children }: { children: React.React
       <Suspense fallback={null}>
         <NavigationProgress />
       </Suspense>
-      <PortalNav items={[{ href: "/inicio", label: "Inicio", icon: "home" }, ...nav, ...(RIESGO_ROLES.includes(user.rol) ? [{ href: "/calidad/riesgos", label: "Análisis de riesgo", icon: "chart" as const, secondary: true }] : []), ...(CATALOGO_VISIBLE ? [{ href: "/catalogo-esc-2026.pdf", label: "Catálogo 2026", icon: "download" as const, secondary: true }] : [])]} user={{ nombre: user.nombre, rol: user.rol }} bell={
+      <PortalNav items={[{ href: "/inicio", label: "Inicio", icon: "home" }, ...nav, ...(RIESGO_ROLES.includes(user.rol) ? [{ href: "/calidad/riesgos", label: "Análisis de riesgo", icon: "chart" as const, secondary: true }] : []), ...(CATALOGO_VISIBLE ? [{ href: CATALOGO.archivo, label: "Catálogo 2026", icon: "download" as const, secondary: true }] : [])]} user={{ nombre: user.nombre, rol: user.rol }} bell={
           <>
             {user.rol === "comprador" && <AddSupplierButton />}
             {(user.rol === "vendedor" || user.rol === "jefe_ventas" || user.rol === "comprador") && <AddCustomerButton />}
