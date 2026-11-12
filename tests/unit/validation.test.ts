@@ -13,9 +13,10 @@ describe("submitProblems", () => {
     const p = submitProblems({ customer_id: "", items: [] });
     expect(p.map((x) => x.field)).toEqual(["customer", "items"]);
   });
-  it("nombre, descripcion corta, cantidad/talla y referencia son obligatorios", () => {
+  it("nombre, descripcion corta y cantidad/talla son obligatorios (la referencia no)", () => {
     const p = submitProblems({ customer_id: "c", items: [{ producto: " ", descripcion: "corta", cantidad: "", unidad: "", talla: "", refs: [] }] });
-    expect(p.map((x) => x.field)).toEqual(["producto", "descripcion", "cantidad", "referencias"]);
+    // La referencia (imagen o link) ya es opcional.
+    expect(p.map((x) => x.field)).toEqual(["producto", "descripcion", "cantidad"]);
   });
   it("talla sola basta; cantidad sin unidad no", () => {
     expect(submitProblems({ customer_id: "c", items: [{ ...ok, cantidad: "", unidad: "", talla: "M" }] })).toEqual([]);

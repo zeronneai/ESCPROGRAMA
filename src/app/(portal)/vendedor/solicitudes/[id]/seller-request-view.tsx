@@ -12,6 +12,7 @@ import { Icon } from "@/components/icons";
 import { IssuesList } from "@/components/issues-list";
 import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
 import { ItemChat } from "@/components/item-chat";
+import { FotoCompra } from "@/components/foto-compra";
 import { ItemStatusBadge, qtyText, ReferenceList, SemaforoBadge } from "@/components/status";
 import { copyRich } from "@/lib/clipboard";
 import { formatPriceTable } from "@/lib/format/price-table";
@@ -951,6 +952,7 @@ function ItemCard(props: {
             </div>
           )}
 
+          <FotoCompra itemId={item.id} requestId={props.requestId} nombre={item.foto_compra_nombre ?? null} puedeSubir={false} />
           <ItemChat itemId={item.id} requestId={props.requestId} me="vendedor" messages={item.item_messages ?? []} waitingForSeller={!!pause} />
         </>
       )}

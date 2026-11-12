@@ -36,7 +36,7 @@ export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDo
       return {
         ...x,
         ...(x.customer_id ? {} : { customer_id: d.customer_id }),
-        ...llena("destinatario", d.destinatario), ...llena("contacto_nombre", d.contacto_nombre), ...llena("telefono", d.telefono), ...llena("correo", d.correo),
+        ...llena("destinatario", d.destinatario), ...llena("correo", d.correo),
         ...llena("calle_numero", d.calle_numero), ...llena("colonia", d.colonia), ...llena("cp", d.cp), ...llena("ciudad", d.ciudad), ...llena("estado_geo", d.estado_geo),
         ...llena("contenido", d.contenido),
         // El valor y su moneda van juntos: se toman de la factura si el valor estaba vacio.
@@ -108,8 +108,6 @@ export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDo
               ...x,
               customer_id: c.id,
               destinatario: c.nombre,
-              contacto_nombre: c.contacto_nombre ?? x.contacto_nombre,
-              telefono: c.contacto_telefono ?? x.telefono,
               correo: c.contacto_correo ?? x.correo,
               ...(() => {
                 const d = partirDireccion(c.direccion);
@@ -122,8 +120,13 @@ export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDo
         />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Persona o negocio *"><Input value={s("destinatario")} onChange={set("destinatario")} /></Field>
-          <Field label="Recibe (nombre)"><Input value={s("contacto_nombre")} onChange={set("contacto_nombre")} /></Field>
-          <Field label="Teléfono *"><Input value={s("telefono")} onChange={set("telefono")} inputMode="tel" /></Field>
+          <div className="space-y-2 rounded-lg border border-amber-200 bg-amber-50/60 p-3 sm:col-span-2">
+            <p className="text-sm font-semibold text-amber-900">¿Quién recibe? <span className="font-normal text-amber-900/80">Escríbelo tú: la persona que va a estar para recibir el paquete.</span></p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Nombre de quien recibe *"><Input value={s("contacto_nombre")} onChange={set("contacto_nombre")} autoComplete="off" /></Field>
+              <Field label="Teléfono de quien recibe *"><Input value={s("telefono")} onChange={set("telefono")} inputMode="tel" autoComplete="off" /></Field>
+            </div>
+          </div>
           <Field label="Correo"><Input value={s("correo")} onChange={set("correo")} type="email" /></Field>
           <div className="sm:col-span-2"><Field label="Calle y número *"><Input value={s("calle_numero")} onChange={set("calle_numero")} /></Field></div>
           <Field label="Colonia"><Input value={s("colonia")} onChange={set("colonia")} /></Field>

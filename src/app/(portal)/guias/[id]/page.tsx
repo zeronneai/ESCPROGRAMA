@@ -52,7 +52,9 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
   const medidas = [g.largo_cm, g.ancho_cm, g.alto_cm].every(Boolean) ? `${n(g.largo_cm)} × ${n(g.ancho_cm)} × ${n(g.alto_cm)} cm` : "";
   const datos = (
     <GuiaDatosView
+      palomear={mkt && (estado === "solicitada" || estado === "en_proceso" || estado === "requiere_datos")}
       d={{
+        id: g.id, listas: Array.isArray(g.partidas_listas) ? (g.partidas_listas as number[]) : [],
         factura: g.factura, paqueteria: g.paqueteria === "Otra" ? g.paqueteria_otra ?? "Otra" : g.paqueteria, servicio: SERVICIOS[g.servicio as Servicio] ?? g.servicio,
         urgente: g.urgente, asegurar: g.asegurar, destinatario: g.destinatario, contacto_nombre: g.contacto_nombre, telefono: g.telefono, correo: g.correo,
         calle_numero: g.calle_numero, colonia: g.colonia, cp: g.cp, ciudad: g.ciudad, estado_geo: g.estado_geo, referencias: g.referencias,

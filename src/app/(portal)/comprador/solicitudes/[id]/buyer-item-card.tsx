@@ -6,6 +6,7 @@ import { requestClarificationAction } from "@/actions/clarifications";
 import { respondNotFoundAction, respondQuoteAction } from "@/actions/responses";
 import { respondRevisionAction } from "@/actions/revisions";
 import { getSourcingBaseAction, saveSourcingAction, type SimilarQuote } from "@/actions/sourcing";
+import { FotoCompra } from "@/components/foto-compra";
 import { ItemChat } from "@/components/item-chat";
 import { QuoteForm, type Factors } from "@/components/quote-form";
 import { SimilarQuotes } from "@/components/similar-quotes";
@@ -331,6 +332,8 @@ export function BuyerItemCard({
           )}
         </div>
       )}
+
+      <FotoCompra itemId={item.id} requestId={requestId} nombre={item.foto_compra_nombre ?? null} puedeSubir />
 
       <ItemChat itemId={item.id} requestId={requestId} me="comprador" messages={item.item_messages ?? []} waitingForSeller={!!pause} />
     </Card>

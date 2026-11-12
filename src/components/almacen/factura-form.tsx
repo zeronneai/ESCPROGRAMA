@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { clienteFacturaAction, crearSalidaAction, folioUsadoAction, ventaDesdeFacturaAction, verificarClavesAction, type ClienteFactura, type FolioUsado } from "@/actions/almacen";
 import { CustomerLookup, useRun } from "@/components/ops-ui";
 import { Alert, Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
-import { filasDeItems, leerFacturaTexto, leerFacturaXml, type FacturaLeida } from "@/lib/factura-lector";
+import { leerFacturaXml, type FacturaLeida } from "@/lib/factura-lector";
+import { leerFacturaPdf } from "@/lib/pdf-cliente";
 
 type Linea = { clave: string; descripcion: string; unidad: string; cantidad: string };
 type Cliente = { nombre: string; razon: string; rfc: string; direccion: string; telefono: string };
@@ -18,17 +19,7 @@ const SIN_FIJO: Fijo = { folio: false, fecha: false, nombre: false, razon: false
 const FIJO_CLS = "cursor-not-allowed !bg-slate-100 !text-slate-700 focus:!ring-0";
 const FALTA_CLS = "!border-amber-400 !bg-amber-50";
 
-async function leerPdf(f: File): Promise<FacturaLeida> {
-  const pdfjs = await import("pdfjs-dist");
-  pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(await f.arrayBuffer()) }).promise;
-  const filas: ReturnType<typeof filasDeItems> = [];
-  for (let i = 1; i <= doc.numPages; i++) {
-    const tc = await (await doc.getPage(i)).getTextContent();
-    filas.push(...filasDeItems(tc.items as { str: string; transform: number[] }[]));
-  }
-  return leerFacturaTexto(filas.map((r) => r.map((c) => c.s).join("  ")), filas);
-}
+const leerPdf = leerFacturaPdf;
 
 /** El XML manda (dato fiscal exacto); el PDF completa lo que el XML no trae (direccion, telefono, nombre comercial). */
 function combinar(xml: FacturaLeida | null, pdf: FacturaLeida | null): FacturaLeida | null {

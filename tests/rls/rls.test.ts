@@ -200,19 +200,19 @@ describe.skipIf(!DATABASE_URL)("RLS e integridad (requiere Postgres con migracio
       });
     });
 
-    it("no deja enviar si falta una referencia, descripcion o cantidad/talla", async () => {
+    it("no deja enviar si falta descripcion o cantidad/talla (la referencia es opcional)", async () => {
       const due = new Date(Date.now() + 5 * 86400_000).toISOString();
       const submit = () =>
         as(S1, (q) => q("update public.quote_requests set estado='enviada', due_at=$2 where id=$1", [requestId, due]));
-      expect(await failure(submit())).toMatch(/referencia/);
+      // Sin referencia ya no es error: falla por la descripcion corta.
+      await as(S1, (q) => q("update public.quote_items set descripcion='corta' where id=$1", [item2Id]));
+      expect(await failure(submit())).toMatch(/10 caracteres/);
       await as(S1, (q) =>
         q("insert into public.item_references (item_id, tipo, url) values ($1,'imagen',$2)", [
           item2Id,
           `${requestId}/${item2Id}/a.png`,
         ]),
       );
-      await as(S1, (q) => q("update public.quote_items set descripcion='corta' where id=$1", [item2Id]));
-      expect(await failure(submit())).toMatch(/10 caracteres/);
       await as(S1, (q) =>
         q("update public.quote_items set descripcion='Casco de seguridad dielectrico', talla=null where id=$1", [item2Id]),
       );
@@ -319,6 +319,17 @@ describe.skipIf(!DATABASE_URL)("RLS e integridad (requiere Postgres con migracio
       expect(Object.keys(quote.rows[0])).not.toEqual(expect.arrayContaining(["costo", "base", "proveedor"]));
       expect(quote.rows[0].price_5).toBe("121.68");
       expect((await as(B1, (q) => q("select * from public.item_costs"))).rowCount).toBe(1);
+    });
+
+    it("imagen de confirmacion: la sube el comprador y el vendedor la ve", async () => {
+      const path = `${requestId}/${itemId}/compra-1.jpg`;
+      expect(await failure(as(S1, (q) => q("select public.item_foto_compra($1, $2, 'x.jpg')", [itemId, path])))).toMatch(/comprador/);
+      expect(await failure(as(B1, (q) => q("select public.item_foto_compra($1, 'otra/ruta.jpg', 'x.jpg')", [itemId])))).toMatch(/invalido/);
+      await as(B1, (q) => q("select public.item_foto_compra($1, $2, 'guante.jpg')", [itemId, path]));
+      const r = await as(S1, (q) => q("select foto_compra_path, foto_compra_nombre from public.quote_items where id=$1", [itemId]));
+      expect(r.rows[0]).toEqual({ foto_compra_path: path, foto_compra_nombre: "guante.jpg" });
+      await as(B1, (q) => q("select public.item_foto_compra($1, null, null)", [itemId]));
+      expect((await as(S1, (q) => q("select foto_compra_path from public.quote_items where id=$1", [itemId]))).rows[0].foto_compra_path).toBeNull();
     });
 
     it("BLOQUEO: una cotizada no se puede editar ni borrar (ni siquiera por el administrador)", async () => {

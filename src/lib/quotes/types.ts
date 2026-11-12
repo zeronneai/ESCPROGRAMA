@@ -122,6 +122,9 @@ export interface ItemRow {
   item_messages?: MessageRow[];
   item_outcomes?: OutcomeRow[];
   item_price_choice?: PriceChoiceRow[];
+  /** Imagen de confirmacion que sube el comprador (el vendedor la descarga; no va en el PDF). */
+  foto_compra_path?: string | null;
+  foto_compra_nombre?: string | null;
 }
 
 /** La cotizacion vigente es la version mas reciente. */

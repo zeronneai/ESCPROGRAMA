@@ -183,6 +183,13 @@ export function operacionesSuite() {
       expect(await failure(q(w.seller1, "update public.guias set partidas='[]'::jsonb where id=$1", [gp.id]))).toMatch(/check/);
       await q(w.seller1, "update public.guias set valor_declarado=3758.3, valor_moneda='USD' where id=$1", [gp.id]);
       expect(await failure(q(w.seller1, "update public.guias set valor_moneda='EUR' where id=$1", [gp.id]))).toMatch(/check/);
+      // Palomeo de partidas: solo Marketplaces; si cambian las partidas se reinicia.
+      expect(await failure(q(w.seller1, "select public.guia_palomear($1, 0, true)", [gp.id]))).toMatch(/Marketplaces/);
+      await q(A("mkt"), "select public.guia_palomear($1, 0, true)", [gp.id]);
+      expect((await q(A("mkt"), "select public.guia_palomear($1, 2, true) as v", [gp.id])).rows[0].v).toEqual([0, 2]);
+      expect((await q(A("mkt"), "select public.guia_palomear($1, 0, false) as v", [gp.id])).rows[0].v).toEqual([2]);
+      await q(w.seller1, "update public.guias set partidas=$2::jsonb where id=$1", [gp.id, JSON.stringify([{ empaque: "bulto", cantidad: 2, peso_kg: 3 }])]);
+      expect((await q("postgres", "select partidas_listas from public.guias where id=$1", [gp.id])).rows[0].partidas_listas).toEqual([]);
     });
 
     it("gerente e ISO leen ventas y bitacora de todos, sin escribir", async () => {

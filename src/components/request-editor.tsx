@@ -346,7 +346,7 @@ function ItemCard(props: {
       </div>
 
       <div className="space-y-2">
-        <p className="text-sm font-medium text-slate-700">Referencias * (al menos una imagen o link)</p>
+        <p className="text-sm font-medium text-slate-700">Referencias (opcional: imagen o link)</p>
         <ul className="flex flex-wrap gap-2">
           {props.refs.map((r) => (
             <li key={r.id} className="flex items-center gap-1 rounded border border-slate-200 bg-slate-50 p-1 text-xs">

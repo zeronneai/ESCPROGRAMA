@@ -2,7 +2,7 @@ import { expect, it } from "vitest";
 import { guiaSchema, limpiaNumero } from "@/lib/ops/guias";
 it("formatos libres", () => {
   expect(limpiaNumero("$3,480.00")).toBe(3480); expect(limpiaNumero("120 cm")).toBe(120); expect(limpiaNumero("1,5")).toBe(1.5); expect(limpiaNumero("5 kg")).toBe(5); expect(limpiaNumero("")).toBeNull();
-  const v = { factura: "F11341", destinatario: "Jose", paqueteria: "DHL", servicio: "estandar", customer_id: "", telefono: "614 551 9914", correo: " ", calle_numero: "Mariano 9021",
+  const v = { factura: "F11341", destinatario: "Jose", contacto_nombre: "Pedro", paqueteria: "DHL", servicio: "estandar", customer_id: "", telefono: "614 551 9914", correo: " ", calle_numero: "Mariano 9021",
     cp: "C.P. 31416", ciudad: "Chihuahua", estado_geo: "Chihuahua", valor_declarado: "$3,480.00", asegurar: false, urgente: false,
     partidas: [{ empaque: "tarima", cantidad: "2", peso_kg: "150 kg", largo_cm: "120 cm", ancho_cm: "100", alto_cm: "", descripcion: "" }] };
   const r = guiaSchema.parse(v);

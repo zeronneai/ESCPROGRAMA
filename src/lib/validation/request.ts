@@ -90,10 +90,7 @@ export function submitProblems(req: {
     } else if (!hasQty && !hasSize) {
       out.push({ item: i, field: "cantidad", message: `Partida ${n}: captura cantidad o talla` });
     }
-    const refs = it.refs ?? [];
-    if (refs.length === 0) {
-      out.push({ item: i, field: "referencias", message: `Partida ${n}: agrega una imagen o un link de referencia` });
-    }
+    // La imagen o link de referencia es opcional.
   });
   return out;
 }

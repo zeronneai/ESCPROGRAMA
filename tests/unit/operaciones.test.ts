@@ -27,7 +27,7 @@ describe("guias", () => {
     expect(elapsedText(72)).toBe("3 días");
   });
   it("valida datos minimos para generar la guia", () => {
-    const base = { factura: "A-1", destinatario: "Foxconn", paqueteria: "DHL", servicio: "estandar", telefono: "6561234567", calle_numero: "Av. 1 100", cp: "32000", ciudad: "Juárez", estado_geo: "Chihuahua", partidas: [{ empaque: "bulto", cantidad: "1", peso_kg: "2.5" }] };
+    const base = { factura: "A-1", destinatario: "Foxconn", contacto_nombre: "Ana", paqueteria: "DHL", servicio: "estandar", telefono: "6561234567", calle_numero: "Av. 1 100", cp: "32000", ciudad: "Juárez", estado_geo: "Chihuahua", partidas: [{ empaque: "bulto", cantidad: "1", peso_kg: "2.5" }] };
     expect(guiaSchema.safeParse(base).success).toBe(true);
     expect(guiaSchema.safeParse({ ...base, cp: "320" }).error?.issues[0].message).toMatch(/5 dígitos/);
     expect(guiaSchema.safeParse({ ...base, paqueteria: "Otra" }).error?.issues[0].message).toMatch(/cuál/);
@@ -35,7 +35,7 @@ describe("guias", () => {
     expect(guiaSchema.safeParse({ ...base, partidas: [] }).error?.issues[0].message).toMatch(/partida/);
   });
   it("partidas: dos tarimas distintas y bultos; totales y tipo mixto", () => {
-    const base = { factura: "A-1", destinatario: "Foxconn", paqueteria: "DHL", servicio: "estandar", telefono: "6561234567", calle_numero: "Av. 1 100", cp: "32000", ciudad: "Juárez", estado_geo: "Chihuahua" };
+    const base = { factura: "A-1", destinatario: "Foxconn", contacto_nombre: "Ana", paqueteria: "DHL", servicio: "estandar", telefono: "6561234567", calle_numero: "Av. 1 100", cp: "32000", ciudad: "Juárez", estado_geo: "Chihuahua" };
     const g = guiaSchema.parse({ ...base, partidas: [
       { empaque: "tarima", cantidad: "1", peso_kg: "350", largo_cm: "120", ancho_cm: "100", alto_cm: "150" },
       { empaque: "tarima", cantidad: "1", peso_kg: "200", largo_cm: "100", ancho_cm: "100", alto_cm: "90" },

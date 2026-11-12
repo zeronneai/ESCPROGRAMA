@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { palomearPartidaAction } from "@/actions/guias";
 import { Card } from "@/components/ui";
 import { empaqueLabel, resumenPartidas, type Partida } from "@/lib/ops/guias";
 
 export type GuiaDatos = {
+  id: string;
+  /** Indices de las partidas que Marketplaces ya palomeo. */
+  listas: number[];
   factura: string;
   paqueteria: string;
   servicio: string;
@@ -77,7 +81,21 @@ function Seccion({ titulo, extra, children }: { titulo: string; extra?: React.Re
 }
 
 /** Datos del envio por secciones: envio, destinatario, direccion y paquete. */
-export function GuiaDatosView({ d }: { d: GuiaDatos }) {
+export function GuiaDatosView({ d, palomear = false }: { d: GuiaDatos; palomear?: boolean }) {
+  const [listas, setListas] = useState<number[]>(d.listas);
+  const [errorP, setErrorP] = useState<string | null>(null);
+  async function marcar(i: number, lista: boolean) {
+    const antes = listas;
+    setListas((x) => (lista ? [...new Set([...x, i])] : x.filter((k) => k !== i)));
+    setErrorP(null);
+    const r = await palomearPartidaAction(d.id, i, lista);
+    if (r.ok) setListas(r.listas);
+    else {
+      setListas(antes);
+      setErrorP(r.error);
+    }
+  }
+  const hechas = d.partidas.filter((_, i) => listas.includes(i)).length;
   const direccion = [d.calle_numero, d.colonia && `Col. ${d.colonia}`, `C.P. ${d.cp}`, `${d.ciudad}, ${d.estado_geo}`].filter(Boolean).join(", ");
   const piezas = d.conPartidas ? resumenPartidas(d.partidas) : d.resumenViejo;
   return (
@@ -100,8 +118,8 @@ export function GuiaDatosView({ d }: { d: GuiaDatos }) {
 
       <Seccion titulo="Destinatario">
         <Fila label="Persona o negocio" valor={d.destinatario} />
-        <Fila label="Recibe" valor={d.contacto_nombre} />
-        <Fila label="Teléfono" valor={d.telefono} mono />
+        <Fila label="Quién recibe" valor={d.contacto_nombre} />
+        <Fila label="Tel. de quien recibe" valor={d.telefono} mono />
         <Fila label="Correo" valor={d.correo} />
       </Seccion>
 
@@ -117,15 +135,28 @@ export function GuiaDatosView({ d }: { d: GuiaDatos }) {
       <Seccion titulo="Paquete" extra={<span className="text-sm font-semibold text-slate-900">{piezas} · {d.peso_total} kg</span>}>
         {d.conPartidas ? (
           <div className="space-y-2 pt-1">
+            {(palomear || hechas > 0) && (
+              <p className={`text-xs font-medium ${hechas === d.partidas.length ? "text-green-700" : "text-slate-600"}`}>
+                {hechas === d.partidas.length ? "Todas las partidas listas" : `${hechas} de ${d.partidas.length} partidas listas`}
+                {palomear && hechas < d.partidas.length ? ": palomea cada una conforme la armes." : ""}
+              </p>
+            )}
+            {errorP && <p className="text-xs font-medium text-red-700">{errorP}</p>}
             {d.partidas.map((p, i) => {
               const medidas = p.largo_cm && p.ancho_cm && p.alto_cm ? `${p.largo_cm} × ${p.ancho_cm} × ${p.alto_cm} cm` : null;
+              const lista = listas.includes(i);
               return (
-                <div key={i} className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                <div key={i} className={`rounded-lg border p-3 transition ${lista ? "border-green-300 bg-green-50" : "border-slate-200 bg-slate-50/70"}`}>
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-sm font-semibold text-slate-900">
-                      <span className="mr-2 text-slate-400">{i + 1}.</span>
-                      {empaqueLabel(p.empaque, p.cantidad)}
-                    </span>
+                    <label className={`flex items-center gap-2 text-sm font-semibold text-slate-900 ${palomear ? "cursor-pointer" : ""}`}>
+                      {palomear ? (
+                        <input type="checkbox" checked={lista} onChange={(e) => void marcar(i, e.target.checked)} className="h-5 w-5 accent-green-600" aria-label={`Partida ${i + 1} lista`} />
+                      ) : lista ? (
+                        <span className="text-green-700" aria-label="Lista">✓</span>
+                      ) : null}
+                      <span className="text-slate-400">{i + 1}.</span>
+                      <span className={lista ? "text-green-900" : ""}>{empaqueLabel(p.empaque, p.cantidad)}</span>
+                    </label>
                     <span className="text-sm text-slate-700">
                       {p.peso_kg} kg c/u{p.cantidad > 1 ? ` · ${Math.round(p.cantidad * p.peso_kg * 100) / 100} kg` : ""}
                     </span>

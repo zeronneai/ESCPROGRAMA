@@ -62,6 +62,34 @@ export function CustomerForm({
     setV((s) => ({ ...s, [k]: e.target.value }));
     if (errors[k]) setErrors((x) => ({ ...x, [k]: "" }));
   };
+  // Llenar con un PDF (factura de ESC o constancia de situacion fiscal): solo lo que este vacio.
+  const [pdfMsg, setPdfMsg] = useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
+  const [arrastra, setArrastra] = useState(false);
+  async function llenarConPdf(f: File | null | undefined) {
+    if (!f) return;
+    if (f.type !== "application/pdf" && !/\.pdf$/i.test(f.name)) return setPdfMsg({ tone: "error", text: "Sube un PDF (factura o constancia de situación fiscal)." });
+    setPdfMsg({ tone: "info", text: "Leyendo el PDF..." });
+    try {
+      const { datosClienteDePdf } = await import("@/lib/pdf-cliente");
+      const d = await datosClienteDePdf(f);
+      if (!d) return setPdfMsg({ tone: "error", text: "No encontré los datos del cliente en ese PDF. Captúralos a mano." });
+      setV((s) => {
+        const vacio = (k: keyof Form) => !String(s[k] ?? "").trim();
+        return {
+          ...s,
+          ...(vacio("nombre") && d.nombre ? { nombre: d.nombre } : {}),
+          ...(vacio("razon_social") && d.razon_social ? { razon_social: d.razon_social } : {}),
+          ...(vacio("rfc") && d.rfc ? { rfc: d.rfc } : {}),
+          ...(vacio("direccion") && d.direccion ? { direccion: d.direccion } : {}),
+          ...(vacio("estado_geo") && d.estado_geo ? { estado_geo: d.estado_geo } : {}),
+          ...(vacio("contacto_telefono") && d.contacto_telefono ? { contacto_telefono: d.contacto_telefono } : {}),
+        };
+      });
+      setPdfMsg({ tone: "success", text: `Llenamos los datos con la ${d.fuente === "constancia" ? "constancia de situación fiscal" : "factura"}. Revisa y completa lo que falte (giro, contacto).` });
+    } catch {
+      setPdfMsg({ tone: "error", text: "No pude leer ese PDF. Captura los datos a mano." });
+    }
+  }
   // Un cliente ya convertido no se puede regresar a prospecto desde aqui (solo comprador o jefa).
   const lockedClient = customer?.tipo === "cliente";
   function submit(e: React.FormEvent) {
@@ -83,6 +111,20 @@ export function CustomerForm({
     <div className="space-y-4">
     <form onSubmit={submit} className="space-y-3" noValidate>
       {error && <Alert tone="error">{error}</Alert>}
+      <label
+        onDragOver={(e) => { e.preventDefault(); setArrastra(true); }}
+        onDragLeave={() => setArrastra(false)}
+        onDrop={(e) => { e.preventDefault(); setArrastra(false); void llenarConPdf(e.dataTransfer.files?.[0]); }}
+        className={`flex cursor-pointer flex-wrap items-center gap-3 rounded-lg border-2 border-dashed px-3 py-3 text-sm transition ${arrastra ? "border-brand-500 bg-brand-50" : "border-slate-300 bg-slate-50 hover:bg-slate-100"}`}
+      >
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-[#0f2f7a] to-[#1d5fd6] text-[10px] font-bold text-white">PDF</span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium text-slate-800">¿Tienes una factura o la constancia de situación fiscal del cliente?</span>
+          <span className="block text-xs text-slate-500">Arrástrala aquí o tócala para elegirla: llenamos razón social, RFC, dirección y teléfono.</span>
+        </span>
+        <input type="file" accept="application/pdf" className="hidden" onChange={(e) => { void llenarConPdf(e.target.files?.[0]); e.target.value = ""; }} />
+      </label>
+      {pdfMsg && <Alert tone={pdfMsg.tone}>{pdfMsg.text}</Alert>}
       <div className="space-y-1">
         <span className="block text-sm font-medium text-slate-700">¿Ya es cliente? *</span>
         <div className="grid grid-cols-2 gap-2 sm:max-w-md">

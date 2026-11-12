@@ -49,13 +49,13 @@ export const FAQ: Faq[] = [
   {
     id: "nueva-solicitud", q: "¿Cómo hago una solicitud de cotización?", roles: V, paths: ["/vendedor"],
     keys: ["solicitud", "cotizacion", "cotizar", "nueva", "pedir", "precio", "compras"],
-    a: ["Toca \"Nueva solicitud\".", "Elige el cliente con el buscador (o dalo de alta).", "Agrega cada producto con \"Agregar partida\": nombre, descripción, cantidad y unidad. Agrega una referencia (link o imagen) para que compras encuentre lo mismo.", "Puedes \"Guardar borrador\" y seguir después.", "Cuando esté completa, toca \"Enviar solicitud\". Compras tiene 48 horas hábiles para responder."],
+    a: ["Toca \"Nueva solicitud\".", "Elige el cliente con el buscador (o dalo de alta).", "Agrega cada producto con \"Agregar partida\": nombre, descripción, cantidad y unidad. Si tienes una referencia (link o imagen) agrégala: es opcional, pero ayuda a que compras encuentre lo mismo.", "Puedes \"Guardar borrador\" y seguir después.", "Cuando esté completa, toca \"Enviar solicitud\". Compras tiene 48 horas hábiles para responder."],
     links: [{ label: "Nueva solicitud", href: "/vendedor/solicitudes/nueva" }],
   },
   {
     id: "no-envia", q: "No me deja enviar la solicitud", roles: V, paths: ["/vendedor/solicitudes"],
     keys: ["no", "deja", "enviar", "error", "falta", "rfc", "direccion", "datos", "incompleto"],
-    a: ["Revisa el aviso en rojo: casi siempre faltan datos del cliente (RFC, dirección y teléfono o correo).", "Toca \"Completar datos\" junto al cliente, guarda y vuelve a enviar.", "Cada partida necesita nombre, descripción, cantidad, unidad y al menos una referencia."],
+    a: ["Revisa el aviso en rojo: casi siempre faltan datos del cliente (RFC, dirección y teléfono o correo).", "Toca \"Completar datos\" junto al cliente, guarda y vuelve a enviar.", "Cada partida necesita nombre, descripción y cantidad con unidad (o talla). La referencia es opcional."],
   },
   {
     id: "estados", q: "¿Qué significa cada estado de mi solicitud?", roles: V, paths: ["/vendedor"],
@@ -230,6 +230,16 @@ export const FAQ: Faq[] = [
     id: "sac", q: "¿Cómo lleno una acción correctiva?", roles: ISO, paths: ["/calidad"],
     keys: ["sac", "accion", "correctiva", "6m", "causa", "raiz", "plan", "verificacion", "ishikawa"],
     a: ["Desde la queja toca \"Crear acción correctiva\" (o en Calidad > Acción correctiva).", "Llena por secciones: datos generales, reacción, 6M y causa raíz, plan de acción, verificación y cierre.", "Puedes guardar y seguir después. Sube evidencias abajo. El vendedor de la queja la ve en solo lectura."],
+  },
+  {
+    id: "cliente-pdf", q: "¿Puedo dar de alta un cliente con su factura o constancia?", roles: ["vendedor", "jefe_ventas", "comprador"],
+    keys: ["cliente", "alta", "pdf", "factura", "constancia", "situacion fiscal", "rfc", "datos", "nuevo cliente"],
+    a: ["Sí. Al dar de alta un cliente (por ejemplo desde Nueva solicitud), arrastra arriba el PDF de una factura de ESC o su Constancia de Situación Fiscal.", "Se llenan razón social, RFC, dirección, estado y teléfono. Revisa y completa el giro y el contacto."],
+  },
+  {
+    id: "foto-compra", q: "¿Qué es la \"Imagen de confirmación\" de una partida?", roles: ["vendedor", "jefe_ventas", "comprador"],
+    keys: ["imagen", "foto", "confirmacion", "descargar", "producto", "cotizacion"],
+    a: ["Compras puede subir una foto del producto en cada partida como confirmación.", "El vendedor la ve y la descarga para mandarla aparte al cliente: no va en el PDF de la cotización."],
   },
   {
     id: "link-quejas", q: "¿Cuál es el link para que los clientes manden quejas?", roles: ["vendedor", "jefe_ventas", "gerente", "ceo", "comprador", "coordinador_iso"], paths: ["/calidad"],

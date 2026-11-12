@@ -134,7 +134,7 @@ export const guiaSchema = z
     paqueteria_otra: txt(80),
     servicio: z.enum(Object.keys(SERVICIOS) as [Servicio, ...Servicio[]], { message: "Elige el servicio" }),
     customer_id: z.preprocess((v) => v || null, z.string().uuid("Cliente inválido: vuelve a elegirlo").nullable()).optional().transform((v) => v ?? null),
-    contacto_nombre: txt(150),
+    contacto_nombre: z.string({ message: "Escribe el nombre de quien recibe" }).trim().min(2, "Escribe el nombre de quien recibe").max(150),
     telefono: z.string().trim().min(7, "Escribe el teléfono de quien recibe").max(40),
     correo: z.preprocess((v) => (typeof v === "string" ? v.trim() : v) || null, z.string().email("El correo no es válido (o déjalo vacío)").max(150).nullable()).optional().transform((v) => v ?? null),
     calle_numero: z.string().trim().min(3, "Escribe calle y número").max(250),

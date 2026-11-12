@@ -16,7 +16,7 @@ const refresh = (id?: string) => {
 
 const CAMPOS_GUIA: Record<string, string> = {
   factura: "la factura", destinatario: "el destinatario", paqueteria: "la paquetería", servicio: "el servicio", customer_id: "el cliente",
-  telefono: "el teléfono", correo: "el correo", calle_numero: "la calle y número", cp: "el código postal", ciudad: "la ciudad",
+  contacto_nombre: "el nombre de quien recibe", telefono: "el teléfono de quien recibe", correo: "el correo", calle_numero: "la calle y número", cp: "el código postal", ciudad: "la ciudad",
   estado_geo: "el estado", partidas: "las partidas", valor_declarado: "el valor declarado", contenido: "el contenido",
 };
 
@@ -196,4 +196,15 @@ export async function datosFacturaGuiaAction(folio: string): Promise<DatosFactur
     valor_moneda: v.moneda === "USD" ? "USD" : "MXN",
     entrega: !!c?.parent_id,
   };
+}
+
+/** Marketplaces palomea (o despalomea) una partida de la guia conforme la va armando. */
+export async function palomearPartidaAction(id: string, idx: number, lista: boolean): Promise<{ ok: true; listas: number[] } | { ok: false; error: string }> {
+  const u = await requireUser();
+  if (u.rol !== "marketplaces") return { ok: false, error: "Solo Marketplaces palomea las partidas." };
+  if (!uuid.safeParse(id).success || !Number.isInteger(idx) || idx < 0 || idx >= 30) return { ok: false, error: "Partida inválida" };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("guia_palomear", { p_id: id, p_idx: idx, p_lista: lista });
+  if (error) return { ok: false, error: /guia_palomear/.test(error.message) ? "Primero corre la actualización 0052 en Supabase." : friendlyError(error.message) };
+  return { ok: true, listas: (data as number[]) ?? [] };
 }
