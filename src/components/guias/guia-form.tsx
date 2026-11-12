@@ -11,7 +11,7 @@ type F = Record<Exclude<keyof GuiaInput, "partidas">, string | boolean | null>;
 const EMPTY: F = {
   factura: "", destinatario: "", paqueteria: "", paqueteria_otra: "", servicio: "estandar", customer_id: null, contacto_nombre: "",
   telefono: "", correo: "", calle_numero: "", colonia: "", cp: "", ciudad: "", estado_geo: "", referencias: "",
-  contenido: "", valor_declarado: "", asegurar: false, urgente: false, notas: "",
+  contenido: "", valor_declarado: "", valor_moneda: "MXN", asegurar: false, urgente: false, notas: "",
 };
 /** Partida en el formulario (texto mientras se escribe). */
 export type PartidaForm = { key: string; empaque: "bulto" | "tarima"; cantidad: string; peso_kg: string; largo_cm: string; ancho_cm: string; alto_cm: string; descripcion: string };
@@ -38,7 +38,9 @@ export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDo
         ...(x.customer_id ? {} : { customer_id: d.customer_id }),
         ...llena("destinatario", d.destinatario), ...llena("contacto_nombre", d.contacto_nombre), ...llena("telefono", d.telefono), ...llena("correo", d.correo),
         ...llena("calle_numero", d.calle_numero), ...llena("colonia", d.colonia), ...llena("cp", d.cp), ...llena("ciudad", d.ciudad), ...llena("estado_geo", d.estado_geo),
-        ...llena("contenido", d.contenido), ...llena("valor_declarado", d.valor_declarado),
+        ...llena("contenido", d.contenido),
+        // El valor y su moneda van juntos: se toman de la factura si el valor estaba vacio.
+        ...(String(x.valor_declarado ?? "").trim() || !d.valor_declarado ? {} : { valor_declarado: d.valor_declarado, valor_moneda: d.valor_moneda }),
       };
     });
     setDeFactura(`${d.folio} · ${d.destinatario}${d.entrega ? " (domicilio de entrega)" : ""}`);
@@ -176,7 +178,15 @@ export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDo
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Contenido general"><Input value={s("contenido")} onChange={set("contenido")} placeholder="Ej. 10 cajas de guantes de nitrilo" /></Field>
-          <Field label="Valor declarado (MXN)"><Input value={s("valor_declarado")} onChange={set("valor_declarado")} inputMode="decimal" /></Field>
+          <Field label="Valor declarado">
+            <div className="flex gap-2">
+              <Input value={s("valor_declarado")} onChange={set("valor_declarado")} inputMode="decimal" className="min-w-0 flex-1" />
+              <Select value={s("valor_moneda") || "MXN"} onChange={set("valor_moneda")} className="w-24! shrink-0" aria-label="Moneda del valor declarado">
+                <option value="MXN">MXN</option>
+                <option value="USD">USD</option>
+              </Select>
+            </div>
+          </Field>
         </div>
         <div className="flex flex-wrap gap-4 text-sm">
           <label className="flex items-start gap-2"><input type="checkbox" className="mt-0.5" checked={!!v.asegurar} onChange={(e) => setV((x) => ({ ...x, asegurar: e.target.checked }))} /> <span>Asegurar el envío<span className="block text-xs text-slate-500">Si se pierde o llega dañado, la paquetería paga el valor declarado. Tiene costo extra.</span></span></label>

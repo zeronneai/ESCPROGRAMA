@@ -60,6 +60,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 43 | `0048_demo_quitar_where.sql` | Arregla **Quitar demostración** ("DELETE requires a WHERE clause"). Se puede correr en cualquier momento. |
 | 44 | `0049_guias_partidas.sql` | **Guías con partidas**: varias tarimas o bultos distintos en un mismo envío, cada uno con su peso y medidas. Se puede correr en cualquier momento. |
 | 45 | `0050_entrega_sucursal_guias.sql` | Venta con factura: el **domicilio de entrega** se registra como **sucursal** del cliente. Guías: el vendedor ve el número de guía pero **no descarga el archivo**. |
+| 46 | `0051_guias_moneda.sql` | Guías: **moneda del valor declarado** (MXN o USD); si la factura es en dólares se llena en USD. Se puede correr en cualquier momento. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

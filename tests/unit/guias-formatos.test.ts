@@ -6,7 +6,8 @@ it("formatos libres", () => {
     cp: "C.P. 31416", ciudad: "Chihuahua", estado_geo: "Chihuahua", valor_declarado: "$3,480.00", asegurar: false, urgente: false,
     partidas: [{ empaque: "tarima", cantidad: "2", peso_kg: "150 kg", largo_cm: "120 cm", ancho_cm: "100", alto_cm: "", descripcion: "" }] };
   const r = guiaSchema.parse(v);
-  expect(r).toMatchObject({ cp: "31416", correo: null, valor_declarado: 3480, peso_kg: 300, largo_cm: 120, customer_id: null });
+  expect(r).toMatchObject({ valor_moneda: "MXN", cp: "31416", correo: null, valor_declarado: 3480, peso_kg: 300, largo_cm: 120, customer_id: null });
+  expect(guiaSchema.parse({ ...v, valor_moneda: "USD" }).valor_moneda).toBe("USD");
   expect(guiaSchema.safeParse({ ...v, correo: "juan@" }).error?.issues[0].message).toMatch(/correo/);
 });
 import { partirDireccion } from "@/lib/ops/guias";

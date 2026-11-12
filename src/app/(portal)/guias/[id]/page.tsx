@@ -39,7 +39,7 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
     factura: g.factura, destinatario: g.destinatario, paqueteria: g.paqueteria, paqueteria_otra: g.paqueteria_otra ?? "", servicio: g.servicio,
     customer_id: g.customer_id, contacto_nombre: g.contacto_nombre ?? "", telefono: g.telefono, correo: g.correo ?? "", calle_numero: g.calle_numero,
     colonia: g.colonia ?? "", cp: g.cp, ciudad: g.ciudad, estado_geo: g.estado_geo, referencias: g.referencias ?? "", contenido: g.contenido ?? "",
-    valor_declarado: n(g.valor_declarado), asegurar: g.asegurar, urgente: g.urgente, notas: g.notas ?? "",
+    valor_declarado: n(g.valor_declarado), valor_moneda: g.valor_moneda === "USD" ? "USD" : "MXN", asegurar: g.asegurar, urgente: g.urgente, notas: g.notas ?? "",
   };
   const partidas = partidasDeGuia(g);
   const conPartidas = Array.isArray(g.partidas);
@@ -96,7 +96,7 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
             ["Paquete y peso", `${conPartidas ? resumenPartidas(partidas) : empaqueLabel(g.empaque, g.bultos)} · ${n(g.peso_kg)} kg en total`],
             ["Medidas", conPartidas ? "" : medidas],
             ["Contenido", g.contenido],
-            ["Valor declarado", g.valor_declarado !== null ? `$${Number(g.valor_declarado).toLocaleString("es-MX")} MXN` : ""],
+            ["Valor declarado", g.valor_declarado !== null ? `$${Number(g.valor_declarado).toLocaleString("es-MX")} ${g.valor_moneda === "USD" ? "USD" : "MXN"}` : ""],
             ["Seguro", g.asegurar ? "Sí, asegurar" : ""],
             ["Notas", g.notas],
           ]}

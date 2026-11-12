@@ -35,16 +35,16 @@ export async function saveGuiaAction(id: string | null, input: GuiaInput): Promi
   const supabase = await createClient();
   let datos: Record<string, unknown> = parsed.data;
   // Sin la actualizacion 0049 todavia: se guardan los totales y las partidas van en el contenido.
-  const sinPartidas = (msg: string) => /partidas|guias_empaque_check/.test(msg);
+  const sinPartidas = (msg: string) => /partidas|guias_empaque_check|valor_moneda/.test(msg);
   const respaldo = () => {
-    const { partidas, ...resto } = parsed.data;
+    const { partidas, valor_moneda, ...resto } = parsed.data;
     const detalle = partidas.length > 1
       ? partidas.map((p) => `${p.cantidad} ${p.empaque === "tarima" ? "tarima(s)" : "bulto(s)"} ${p.peso_kg} kg c/u${p.largo_cm && p.ancho_cm && p.alto_cm ? ` ${p.largo_cm}x${p.ancho_cm}x${p.alto_cm} cm` : ""}${p.descripcion ? ` (${p.descripcion})` : ""}`).join("; ")
       : "";
     return {
       ...resto,
       empaque: resto.empaque === "mixto" ? "tarima" : resto.empaque,
-      contenido: [detalle && `${resumenPartidas(partidas)}: ${detalle}`, resto.contenido].filter(Boolean).join(" · ").slice(0, 300) || null,
+      contenido: [detalle && `${resumenPartidas(partidas)}: ${detalle}`, resto.contenido, valor_moneda === "USD" && resto.valor_declarado != null ? `Valor declarado en USD` : ""].filter(Boolean).join(" · ").slice(0, 300) || null,
     };
   };
   if (id) {
@@ -150,6 +150,7 @@ export type DatosFacturaGuia = {
   estado_geo: string;
   contenido: string;
   valor_declarado: string;
+  valor_moneda: "MXN" | "USD";
   /** "Cliente · Sucursal" si se mando al domicilio de entrega. */
   entrega: boolean;
 };
@@ -164,14 +165,14 @@ export async function datosFacturaGuiaAction(folio: string): Promise<DatosFactur
   const supabase = await createClient();
   const { data } = await supabase
     .from("ventas")
-    .select("factura, monto, customer_id, customers(id, nombre, sucursal, parent_id, direccion, estado_geo, contacto_nombre, contacto_telefono, contacto_correo), venta_lineas(descripcion, cantidad)")
+    .select("factura, monto, moneda, customer_id, customers(id, nombre, sucursal, parent_id, direccion, estado_geo, contacto_nombre, contacto_telefono, contacto_correo), venta_lineas(descripcion, cantidad)")
     .ilike("factura", f)
     .is("cancelada_at", null)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (!data) return null;
-  const v = data as unknown as { factura: string; monto: number | null; customer_id: string | null; customers: CustGuia | null; venta_lineas: { descripcion: string; cantidad: number | null }[] };
+  const v = data as unknown as { factura: string; monto: number | null; moneda: string | null; customer_id: string | null; customers: CustGuia | null; venta_lineas: { descripcion: string; cantidad: number | null }[] };
   const c = v.customers;
   let matriz: CustGuia | null = null;
   if (c?.parent_id) {
@@ -192,6 +193,7 @@ export async function datosFacturaGuiaAction(folio: string): Promise<DatosFactur
     estado_geo: dir.estado_geo || c?.estado_geo || matriz?.estado_geo || "",
     contenido: contenido.length > 300 ? `${contenido.slice(0, 297)}...` : contenido,
     valor_declarado: v.monto != null ? String(v.monto) : "",
+    valor_moneda: v.moneda === "USD" ? "USD" : "MXN",
     entrega: !!c?.parent_id,
   };
 }

@@ -181,6 +181,8 @@ export function operacionesSuite() {
       expect(gp.empaque).toBe("mixto");
       await q(w.seller1, "update public.guias set partidas=$2::jsonb where id=$1", [gp.id, JSON.stringify([{ empaque: "bulto", cantidad: 1, peso_kg: 2 }])]);
       expect(await failure(q(w.seller1, "update public.guias set partidas='[]'::jsonb where id=$1", [gp.id]))).toMatch(/check/);
+      await q(w.seller1, "update public.guias set valor_declarado=3758.3, valor_moneda='USD' where id=$1", [gp.id]);
+      expect(await failure(q(w.seller1, "update public.guias set valor_moneda='EUR' where id=$1", [gp.id]))).toMatch(/check/);
     });
 
     it("gerente e ISO leen ventas y bitacora de todos, sin escribir", async () => {

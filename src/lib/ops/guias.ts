@@ -146,6 +146,7 @@ export const guiaSchema = z
     partidas: z.array(partidaSchema, { message: "Agrega al menos una partida" }).min(1, "Agrega al menos una partida").max(30, "Máximo 30 partidas"),
     contenido: txt(300),
     valor_declarado: z.preprocess(limpiaNumero, z.number({ message: "Valor declarado inválido: escribe solo el número" }).min(0).nullable()).optional().transform((v) => v ?? null),
+    valor_moneda: z.enum(["MXN", "USD"]).default("MXN"),
     asegurar: z.boolean().default(false),
     urgente: z.boolean().default(false),
     notas: txt(1000),
