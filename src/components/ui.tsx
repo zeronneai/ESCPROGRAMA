@@ -21,10 +21,10 @@ export function Button({
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" | "ghost"; loading?: boolean }) {
   const styles = {
-    primary: "bg-brand-600 text-white hover:bg-brand-700",
-    secondary: "border border-slate-300 bg-white text-slate-800 hover:bg-slate-100",
-    danger: "bg-red-600 text-white hover:bg-red-700",
-    ghost: "text-slate-700 hover:bg-slate-100",
+    primary: "bg-gradient-to-b from-brand-500 to-brand-700 text-white shadow-sm shadow-brand-900/20 hover:from-brand-600 hover:to-brand-800",
+    secondary: "border border-slate-300 bg-white text-slate-800 shadow-sm hover:border-brand-300 hover:bg-brand-50/60",
+    danger: "bg-gradient-to-b from-red-500 to-red-700 text-white shadow-sm hover:from-red-600 hover:to-red-800",
+    ghost: "text-slate-700 hover:bg-slate-900/5",
   }[variant];
   return (
     <button
@@ -32,12 +32,13 @@ export function Button({
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={cx(
-        "inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50",
         styles,
         className,
       )}
     >
       {loading && <Spinner />}
+      {loading && <span className="sr-only">Cargando...</span>}
       {children}
     </button>
   );
@@ -48,7 +49,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
     <input
       {...props}
       className={cx(
-        "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-600 focus:outline-none focus:ring-1 focus:ring-brand-600",
+        "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-slate-400 read-only:bg-slate-50",
         className,
       )}
     />
@@ -59,7 +60,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
   return (
     <select
       {...props}
-      className={cx("w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm", className)}
+      className={cx("w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm", className)}
     />
   );
 }
@@ -75,25 +76,36 @@ export function Field({ label, error, children }: { label: string; error?: strin
 }
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div {...props} className={cx("rounded-lg border border-slate-200 bg-white p-4 shadow-sm", className)} />;
+  return <div {...props} className={cx("rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm", className)} />;
 }
 
 export function Alert({ tone = "info", children }: { tone?: "info" | "error" | "success"; children: ReactNode }) {
   const t = {
-    info: "border-brand-100 bg-brand-50 text-brand-900",
-    error: "border-red-200 bg-red-50 text-red-800",
-    success: "border-green-200 bg-green-50 text-green-800",
+    info: "border-brand-200 bg-brand-50 text-brand-900",
+    error: "border-red-300 bg-red-50 text-red-800",
+    success: "border-green-300 bg-green-50 text-green-800",
   }[tone];
-  return <div className={cx("rounded-md border px-3 py-2 text-sm", t)}>{children}</div>;
+  const icono = { info: "i", error: "!", success: "✓" }[tone];
+  const bola = { info: "bg-brand-600", error: "bg-red-600", success: "bg-green-600" }[tone];
+  return (
+    <div
+      role={tone === "error" ? "alert" : "status"}
+      data-alerta={tone}
+      className={cx("flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm shadow-sm", t)}
+    >
+      <span className={cx("mt-px flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white", bola)} aria-hidden>{icono}</span>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
 }
 
 /** Encabezado de pagina: titulo, subtitulo opcional y acciones (se apilan en movil). */
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-      <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight text-slate-900">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+      <div className="min-w-0 border-l-4 border-brand-500 pl-3">
+        <h1 className="text-2xl font-bold tracking-tight text-brand-950">{title}</h1>
+        {subtitle && <p className="mt-0.5 text-sm text-slate-600">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
     </div>
@@ -147,14 +159,16 @@ export function EmptyState({ title, children, action }: { title: string; childre
 
 /** Bloque gris animado para estados de carga. */
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cx("animate-pulse rounded-md bg-slate-200/70", className)} aria-hidden />;
+  return <div className={cx("animate-pulse rounded-lg bg-gradient-to-r from-slate-200/80 via-slate-100 to-slate-200/80", className)} aria-hidden />;
 }
 
 /** Pagina de carga generica: encabezado, indicadores y lista. */
 export function PageSkeleton({ stats = 4, rows = 6 }: { stats?: number; rows?: number }) {
   return (
     <div className="space-y-5" role="status" aria-live="polite">
-      <span className="sr-only">Cargando...</span>
+      <div className="flex items-center gap-2 text-sm font-medium text-brand-700">
+        <Spinner className="h-5 w-5" /> Cargando...
+      </div>
       <div className="space-y-2">
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-4 w-72 max-w-full" />
@@ -166,7 +180,7 @@ export function PageSkeleton({ stats = 4, rows = 6 }: { stats?: number; rows?: n
           ))}
         </div>
       )}
-      <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+      <div className="space-y-2 rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm">
         {Array.from({ length: rows }).map((_, i) => (
           <Skeleton key={i} className="h-10" />
         ))}
@@ -182,7 +196,7 @@ export function FilterChip({ href, active, children }: { href: string; active?: 
       href={href}
       className={cx(
         "inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium transition",
-        active ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:border-brand-600 hover:text-brand-700",
+        active ? "border-brand-600 bg-brand-600 text-white shadow-sm" : "border-slate-300 bg-white text-slate-700 hover:border-brand-500 hover:bg-brand-50 hover:text-brand-700",
       )}
     >
       {children}

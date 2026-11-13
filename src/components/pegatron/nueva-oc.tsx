@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { crearPedidoPegatronAction, poPegatronUsadaAction } from "@/actions/pegatron";
+import { irACampo } from "@/components/feedback-global";
 import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
 import { leerOcPegatron, textosPdf } from "@/lib/pegatron-po";
 
@@ -56,7 +57,10 @@ export function NuevaOcPegatron() {
 
   async function guardar() {
     setAviso(null);
-    if (faltan) return setAviso({ tone: "error", text: `Falta el artículo ESC en ${faltan} renglón(es).` });
+    if (faltan) {
+      const i = rs.findIndex((r) => r.articulo_esc.trim().length < 2);
+      return irACampo(`[data-articulo-esc="${i}"]`, `Falta el artículo ESC en ${faltan} renglón(es).`);
+    }
     setBusy(true);
     const fd = new FormData();
     fd.set("datos", JSON.stringify({
@@ -121,7 +125,7 @@ export function NuevaOcPegatron() {
                 </div>
                 <div className={`rounded-lg border p-3 ${r.articulo_esc.trim().length >= 2 ? "border-green-200 bg-green-50/60" : "border-amber-300 bg-amber-50"}`}>
                   <Field label="Nombre / artículo ESC * (como lo conocemos nosotros)">
-                    <Input value={r.articulo_esc} onChange={(e) => set(i, "articulo_esc", e.target.value)} placeholder="Ej. Rollo de papel wiper para cuarto limpio 10 m" maxLength={200} />
+                    <Input data-articulo-esc={i} value={r.articulo_esc} onChange={(e) => set(i, "articulo_esc", e.target.value)} placeholder="Ej. Rollo de papel wiper para cuarto limpio 10 m" maxLength={200} />
                   </Field>
                 </div>
               </Card>

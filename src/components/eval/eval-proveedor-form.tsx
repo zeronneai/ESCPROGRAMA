@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "@/components/feedback-global";
 import { useState } from "react";
 import { guardarEvalProveedorAction } from "@/actions/evaluaciones";
 import { areaCls, useRun } from "@/components/ops-ui";
@@ -35,7 +36,7 @@ export function EvalLado({
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
       <ol className="space-y-3">
         {preguntas.map((p, i) => (
-          <li key={p.id} className="space-y-1.5">
+          <li key={p.id} data-pregunta={p.id} className="space-y-1.5 rounded-lg transition">
             <p className="text-sm font-medium text-slate-800">{i + 1}. {p.texto}</p>
             {p.ayuda && <p className="text-xs text-slate-500">{p.ayuda}</p>}
             <div className="flex flex-wrap gap-1.5">
@@ -60,7 +61,20 @@ export function EvalLado({
       </label>
       {editable && (
         <div className="flex items-center gap-3">
-          <Button loading={busy === "s"} disabled={faltan > 0} onClick={() => run("s", () => guardarEvalProveedorAction(evalId, v, c), "Evaluación guardada.")}>
+          <Button
+            loading={busy === "s"}
+            onClick={() => {
+              const sin = preguntas.find((p) => !v[p.id]);
+              if (sin) {
+                const li = document.querySelector<HTMLElement>(`[data-pregunta="${sin.id}"]`);
+                li?.scrollIntoView({ behavior: "smooth", block: "center" });
+                li?.classList.add("campo-falta");
+                setTimeout(() => li?.classList.remove("campo-falta"), 2600);
+                return toast(`Falta calificar: ${sin.texto}`, "error");
+              }
+              run("s", () => guardarEvalProveedorAction(evalId, v, c), "Evaluación guardada.");
+            }}
+          >
             {cuando ? "Actualizar evaluación" : "Guardar evaluación"}
           </Button>
           {faltan > 0 && <span className="text-xs text-slate-500">Faltan {faltan} punto(s)</span>}

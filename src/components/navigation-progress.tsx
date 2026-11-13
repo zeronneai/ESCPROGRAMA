@@ -53,10 +53,34 @@ export function NavigationProgress() {
 
   if (state === "idle") return null;
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-0 z-50 h-0.5" role="progressbar" aria-label="Cargando">
-      <div
-        className={`h-full bg-brand-600 ${state === "loading" ? "nav-progress-run" : "w-full opacity-0 transition-opacity duration-300"}`}
-      />
+    <>
+      <div className="pointer-events-none fixed inset-x-0 top-0 z-[70] h-1" role="progressbar" aria-label="Cargando">
+        <div
+          className={`h-full bg-gradient-to-r from-sky-400 via-brand-500 to-brand-700 ${state === "loading" ? "nav-progress-run" : "w-full opacity-0 transition-opacity duration-300"}`}
+        />
+      </div>
+      {state === "loading" && <PildoraLenta />}
+    </>
+  );
+}
+
+/** Si la pagina tarda, sale una pildora con el circulo girando para que se note que esta cargando. */
+function PildoraLenta() {
+  const [ver, setVer] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setVer(true), 450);
+    return () => clearTimeout(t);
+  }, []);
+  if (!ver) return null;
+  return (
+    <div className="toast-in pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 md:bottom-6" role="status" aria-live="polite">
+      <span className="flex items-center gap-2 rounded-full bg-brand-950/90 px-4 py-2 text-sm font-medium text-white shadow-lg ring-1 ring-white/10 backdrop-blur">
+        <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
+          <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+        Cargando...
+      </span>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
 } from "@/actions/requests";
 import { CustomerPicker } from "@/components/customers";
 import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
+import { irACampo } from "@/components/feedback-global";
 import { customerMissing, type CustomerRecord } from "@/lib/validation/customer";
 import {
   IMAGE_TYPES,
@@ -201,7 +202,7 @@ export function RequestEditor({ initial, customer: initialCustomer }: { initial:
         </Alert>
       )}
 
-      <Card className="space-y-3">
+      <Card className="space-y-3" data-campo="cliente">
         <div className="space-y-1.5">
           <p className="text-sm font-medium text-slate-700">Cliente *</p>
           <CustomerPicker
@@ -261,7 +262,19 @@ export function RequestEditor({ initial, customer: initialCustomer }: { initial:
           <Button type="button" variant="secondary" onClick={onSave} loading={pending}>
             Guardar borrador
           </Button>
-          <Button type="button" onClick={onSubmit} disabled={pending || problems.length > 0}>
+          <Button
+            type="button"
+            disabled={pending}
+            onClick={() => {
+              const p = problems[0];
+              if (!p) return void onSubmit();
+              const destino = p.item != null
+                ? document.querySelector<HTMLElement>(`[name="items.${p.item}.${p.field === "cantidad" && !values.items?.[p.item]?.cantidad ? "cantidad" : p.field}"]`) ?? document.querySelector<HTMLElement>(`[data-partida="${p.item}"]`)
+                : document.querySelector<HTMLElement>('[data-campo="cliente"]');
+              irACampo(destino, p.message);
+            }}
+            className={problems.length ? "opacity-80" : undefined}
+          >
             Enviar solicitud
           </Button>
         </div>
@@ -296,6 +309,7 @@ function ItemCard(props: {
 
   return (
     <Card
+      data-partida={i}
       className="space-y-3"
       // Pegar imagenes desde el portapapeles dentro de la partida.
       onPaste={(e: React.ClipboardEvent) => {

@@ -1,18 +1,106 @@
 @import "tailwindcss";
 
-/* Colores provisionales: reemplazar por los del logo de ESC. */
+/* Paleta ESC: azules del logo, con escala completa para todo el portal. */
 @theme {
   --color-brand-50: #eef4ff;
-  --color-brand-100: #dbe7ff;
-  --color-brand-600: #1e4fb3;
-  --color-brand-700: #173f91;
-  --color-brand-900: #0f2a63;
+  --color-brand-100: #dce8ff;
+  --color-brand-200: #bcd3ff;
+  --color-brand-300: #8fb4fb;
+  --color-brand-400: #5b8cf0;
+  --color-brand-500: #3468e0;
+  --color-brand-600: #1f52c7;
+  --color-brand-700: #1a43a3;
+  --color-brand-800: #183a84;
+  --color-brand-900: #142f66;
+  --color-brand-950: #0c1d42;
   --color-accent-500: #e8730c;
+
+  /* Esquinas un poco mas redondas y sombras mas suaves en todo el portal. */
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.04), 0 2px 10px -4px rgb(20 47 102 / 0.12);
+  --shadow-md: 0 2px 4px rgb(15 23 42 / 0.05), 0 8px 24px -8px rgb(20 47 102 / 0.18);
+  --shadow-lg: 0 4px 8px rgb(15 23 42 / 0.06), 0 16px 40px -12px rgb(20 47 102 / 0.25);
 }
 
+/* Fondo con color: degradado azul suave y una trama de puntos muy tenue (ya no todo blanco). */
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply text-slate-900 antialiased;
+  background-color: #eef2f9;
+  background-image:
+    radial-gradient(900px 520px at 0% -10%, rgb(52 104 224 / 0.16), transparent 60%),
+    radial-gradient(820px 480px at 100% 0%, rgb(14 165 233 / 0.12), transparent 55%),
+    radial-gradient(rgb(20 47 102 / 0.07) 1px, transparent 1px),
+    linear-gradient(180deg, #f2f5fb 0%, #e9eef7 100%);
+  background-size: auto, auto, 22px 22px, auto;
+  background-attachment: fixed;
+  min-height: 100vh;
 }
+
+@layer base {
+  /* Campos: borde mas claro, foco azul con halo y rojo cuando falta algo. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+  select,
+  textarea {
+    transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+  select:focus,
+  textarea:focus {
+    outline: none;
+    border-color: var(--color-brand-500);
+    box-shadow: 0 0 0 3px rgb(52 104 224 / 0.18);
+  }
+  input:user-invalid,
+  select:user-invalid,
+  textarea:user-invalid,
+  [aria-invalid="true"] {
+    border-color: #dc2626 !important;
+    background-color: #fef2f2;
+  }
+
+  /* Botones ocupados: se ponen grises con el circulo girando y no se pueden volver a tocar. */
+  button[aria-busy="true"] {
+    background-image: none !important;
+    background-color: #94a3b8 !important;
+    border-color: #94a3b8 !important;
+    color: #fff !important;
+    opacity: 1 !important;
+    cursor: wait !important;
+  }
+  button:disabled:not([aria-busy="true"]) {
+    filter: grayscale(0.4);
+  }
+}
+
+/* Campo que falta llenar: se sacude y queda marcado en rojo unos segundos. */
+@keyframes campo-falta {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+.campo-falta {
+  animation: campo-falta 0.45s ease-in-out;
+  border-color: #dc2626 !important;
+  background-color: #fef2f2 !important;
+  box-shadow: 0 0 0 4px rgb(220 38 38 / 0.2) !important;
+}
+/* Aviso de error que acaba de salir: un pulso para que se note. */
+@keyframes alerta-pulso {
+  0% { box-shadow: 0 0 0 0 rgb(220 38 38 / 0.45); }
+  100% { box-shadow: 0 0 0 12px rgb(220 38 38 / 0); }
+}
+.alerta-pulso { animation: alerta-pulso 0.9s ease-out 2; }
+
+/* Ventanitas de aviso (arriba al centro). */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.toast-in { animation: toast-in 0.2s ease-out; }
 
 /* Barra de progreso de navegacion */
 @keyframes nav-progress {
@@ -23,7 +111,18 @@ body {
 }
 .nav-progress-run {
   animation: nav-progress 8s cubic-bezier(0.1, 0.7, 0.3, 1) forwards;
-  box-shadow: 0 0 8px var(--color-brand-600);
+  box-shadow: 0 0 10px var(--color-brand-500);
+}
+
+/* Aparicion suave del contenido de cada pagina. */
+@keyframes pagina-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.pagina-in { animation: pagina-in 0.25s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .campo-falta, .alerta-pulso, .toast-in, .pagina-in, .nav-progress-run { animation: none; }
 }
 
 /* Espacio para la barra inferior en movil */

@@ -117,7 +117,8 @@ export function PortalNav({
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+      <header className="sticky top-0 z-30 border-b border-white/60 bg-white/85 shadow-[0_1px_0_rgb(20_47_102/0.06),0_6px_20px_-12px_rgb(20_47_102/0.25)] backdrop-blur-md supports-[backdrop-filter]:bg-white/70">
+        <div className="h-[3px] bg-gradient-to-r from-brand-800 via-brand-500 to-sky-400" aria-hidden />
         <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
           <NavLink href={items[0]?.href ?? "/"} className="shrink-0" aria-label="Inicio">
             {logo}
@@ -131,7 +132,7 @@ export function PortalNav({
                 <NavLink
                   key={i.href}
                   href={i.href}
-                  className="ml-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-brand-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-brand-700"
+                  className="ml-1 inline-flex items-center gap-1.5 whitespace-nowrap rounded-md bg-gradient-to-b from-brand-500 to-brand-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm shadow-brand-900/20 hover:brightness-110"
                 >
                   <Icon name={i.icon} className="h-4 w-4" />
                   {i.label}
@@ -142,7 +143,7 @@ export function PortalNav({
                   href={i.href}
                   aria-current={active ? "page" : undefined}
                   className={`relative inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                    active ? "bg-brand-50 text-brand-700" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    active ? "bg-brand-600 text-white shadow-sm shadow-brand-900/20" : "text-slate-600 hover:bg-brand-50 hover:text-brand-800"
                   }`}
                 >
                   <Icon name={i.icon} className="h-4 w-4" />
@@ -204,7 +205,7 @@ export function PortalNav({
 
       {/* Movil: barra inferior */}
       <nav
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200/70 bg-white/90 pb-[env(safe-area-inset-bottom)] shadow-[0_-6px_20px_-12px_rgb(20_47_102/0.3)] backdrop-blur-md md:hidden"
         aria-label="Principal"
       >
         <ul className="mx-auto flex max-w-md items-stretch justify-around">
