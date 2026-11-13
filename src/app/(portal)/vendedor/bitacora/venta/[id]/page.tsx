@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadVenta } from "@/lib/ventas-server";
 
 export default async function Venta({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ nueva?: string }> }) {
-  const u = await requireRoles(["vendedor"]);
+  const u = await requireRoles(["vendedor", "jefe_ventas"]);
   const { id } = await params;
   const { nueva } = await searchParams;
   const supabase = await createClient();

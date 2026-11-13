@@ -8,7 +8,7 @@ import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function VentaConFactura({ searchParams }: { searchParams: Promise<{ cliente?: string }> }) {
-  await requireRoles(["vendedor"]);
+  await requireRoles(["vendedor", "jefe_ventas"]);
   const { cliente } = await searchParams;
   const supabase = await createClient();
   const [cfg, almacen] = await Promise.all([getBusinessSettings(supabase), almacenVentasActivo(supabase)]);

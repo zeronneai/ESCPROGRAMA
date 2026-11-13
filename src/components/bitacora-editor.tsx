@@ -85,6 +85,7 @@ export function BitacoraEditor({
   defaultKind = "cliente",
   basePath = "/vendedor/bitacora",
   articulos: initialArticulos = [],
+  jefa = false,
 }: {
   mode: "new" | "edit" | "readonly" | "claim";
   entry: BitacoraRow | null;
@@ -96,6 +97,8 @@ export function BitacoraEditor({
   defaultKind?: CustomerKind;
   basePath?: string;
   articulos?: BitacoraArticulo[];
+  /** La jefa de ventas en su propia bitacora: sin ligas a solicitudes de vendedor. */
+  jefa?: boolean;
 }) {
   const [arts, setArts] = useState<BitacoraArticulo[]>(initialArticulos);
   const router = useRouter();
@@ -212,10 +215,10 @@ export function BitacoraEditor({
             <option value="">Sin solicitud del portal ligada</option>
             {requests.map((r) => <option key={r.id} value={r.id}>{r.folio}{r.submitted_at ? ` (${new Date(r.submitted_at).toLocaleDateString("es-MX", { day: "2-digit", month: "short" })})` : ""}</option>)}
           </Select>
-          {v.request_id && mode !== "new" && basePath.startsWith("/vendedor") && (
+          {v.request_id && mode !== "new" && basePath.startsWith("/vendedor") && !jefa && (
             <Link href={`/vendedor/solicitudes/${v.request_id}`} className="text-xs font-medium text-brand-600 hover:underline">Abrir solicitud</Link>
           )}
-          {!ro && customer && basePath.startsWith("/vendedor") && (
+          {!ro && customer && basePath.startsWith("/vendedor") && !jefa && (
             <Link href={`/vendedor/solicitudes/nueva?cliente=${customer.id}`} className="text-xs font-medium text-brand-600 hover:underline">Crear solicitud de cotización</Link>
           )}
         </div>
@@ -324,7 +327,7 @@ export function BitacoraEditor({
                     router.refresh();
                   })}>Ya es cliente</Button>
                 )}
-                <Link href={`/vendedor/clientes?editar=${customer.id}`} className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100">
+                <Link href={`${jefa ? "/ventas/clientes" : "/vendedor/clientes"}?editar=${customer.id}`} className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100">
                   {bitacoraMissing(customer).length ? "Completar datos" : "Editar datos"}
                 </Link>
               </div>

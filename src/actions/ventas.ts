@@ -17,7 +17,7 @@ const refresh = (id?: string) => {
 /** Alta o edicion de una venta diaria con sus articulos. */
 export async function saveVentaAction(id: string | null, input: VentaInput, lineas: VentaLinea[]): Promise<Result<{ id: string }>> {
   const u = await requireUser();
-  if (u.rol !== "vendedor") return { ok: false, error: "Las ventas las registran los vendedores." };
+  if (u.rol !== "vendedor" && u.rol !== "jefe_ventas") return { ok: false, error: "Las ventas las registran los vendedores." };
   const parsed = ventaSchema.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0].message };
   const ls = z.array(lineaSchema).max(50).safeParse(lineas.filter((l) => l.descripcion.trim()));

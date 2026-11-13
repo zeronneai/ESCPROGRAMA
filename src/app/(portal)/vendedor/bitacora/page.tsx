@@ -27,7 +27,7 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
 
   const [ventasQ, bitQ, { count: movHoy }, { count: convertidos }] = await Promise.all([
     supabase.from("ventas").select(`${VENTA_COLS}, customers(nombre), venta_lineas(descripcion, cantidad)`).eq("vendedor_id", user.id).order("fecha", { ascending: false }).order("created_at", { ascending: false }).limit(1000),
-    supabase.from("bitacora").select(BITACORA_SELECT).order("updated_at", { ascending: false }).limit(1500),
+    supabase.from("bitacora").select(BITACORA_SELECT).or(`vendedor_id.eq.${user.id},vendedor_id.is.null`).order("updated_at", { ascending: false }).limit(1500),
     supabase.from("bitacora_eventos").select("id", { count: "exact", head: true }).eq("created_by", user.id).gte("created_at", now.startOf("day").toUTC().toISO()!),
     supabase.from("customers").select("id", { count: "exact", head: true }).eq("convertido_por", user.id).gte("convertido_at", now.startOf("month").toUTC().toISO()!),
   ]);

@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CUSTOMER_COLS, type CustomerRecord } from "@/lib/validation/customer";
 
 export default async function NuevoRegistro({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  await requireUser();
+  const user = await requireUser();
   const sp = await searchParams;
   const tipo = sp.tipo === "cliente" ? "cliente" : "prospecto";
   const supabase = await createClient();
@@ -25,7 +25,7 @@ export default async function NuevoRegistro({ searchParams }: { searchParams: Pr
         title="Nuevo prospecto"
         subtitle="Búscalo o dalo de alta. Si ya está registrado, sus datos se llenan solos. Para registrar una venta a un cliente usa Ventas diarias."
       />
-      <BitacoraEditor mode="new" entry={null} customer={customer} requests={[]} events={[]} today={DateTime.now().setZone(cfg.timezone).toISODate()!} timezone={cfg.timezone} defaultKind={tipo} />
+      <BitacoraEditor jefa={user.rol === "jefe_ventas"} mode="new" entry={null} customer={customer} requests={[]} events={[]} today={DateTime.now().setZone(cfg.timezone).toISODate()!} timezone={cfg.timezone} defaultKind={tipo} />
     </div>
   );
 }

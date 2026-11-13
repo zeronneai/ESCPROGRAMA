@@ -24,7 +24,7 @@ export default async function VendedorVentas({ params, searchParams }: { params:
   const now = DateTime.now().setZone(cfg.timezone);
   const today = now.toISODate()!;
   const { data: seller } = await supabase.from("profiles").select("id, nombre, correo, activo, rol").eq("id", id).maybeSingle();
-  if (!seller || seller.rol !== "vendedor") notFound();
+  if (!seller || (seller.rol !== "vendedor" && seller.rol !== "jefe_ventas")) notFound();
 
   const [{ data: b }, { data: reqs }, { count: movHoy }, { data: vs }] = await Promise.all([
     supabase.from("bitacora").select(BITACORA_SELECT).eq("vendedor_id", id).is("archived_at", null).order("updated_at", { ascending: false }).limit(1000),

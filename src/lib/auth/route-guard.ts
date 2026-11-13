@@ -79,7 +79,9 @@ export function decideRoute(input: {
       ? { type: "deny", status: 403, error: "sin_permiso" }
       : { type: "redirect", to: homeFor(profile.rol) };
   }
-  if (pathname.startsWith("/vendedor") && profile.rol !== "vendedor") {
+  // La jefa de ventas tambien lleva su propia bitacora (prospeccion y ventas diarias).
+  const bitacoraJefa = profile.rol === "jefe_ventas" && (pathname === "/vendedor/bitacora" || pathname.startsWith("/vendedor/bitacora/"));
+  if (pathname.startsWith("/vendedor") && profile.rol !== "vendedor" && !bitacoraJefa) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   const under = (p: string) => pathname === p || pathname.startsWith(`${p}/`);

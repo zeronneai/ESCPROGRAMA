@@ -401,7 +401,7 @@ export const FAQ: Faq[] = [
     links: [{ label: "Entregas", href: "/entregas" }],
   },
   {
-    id: "venta-factura", q: "¿Cómo registro una venta con la factura?", roles: ["vendedor"], paths: ["/vendedor/bitacora", "/entregas"],
+    id: "venta-factura", q: "¿Cómo registro una venta con la factura?", roles: ["vendedor", "jefe_ventas"], paths: ["/vendedor/bitacora", "/entregas"],
     keys: ["venta", "registrar", "factura", "pdf", "xml", "subir", "arrastrar", "cliente", "credito", "cobrar"],
     a: ["En Bitácora toca Registrar venta con factura y arrastra el PDF de la factura al cuadro (o elígelo con el botón). El XML es opcional y más exacto.", "Se leen la fecha, el folio, el total, si es contado o crédito y los días, el cliente (RFC, razón social, dirección, teléfono) y los artículos. Revisa y guarda.", "Si el cliente no existe se da de alta solo; si ya existe se le completan los datos que falten.", "Si lleva artículos se manda a almacén para cargar. Cuando te paguen márcala como Cobrada. Para ventas sin factura usa Venta sin factura, y para cuando no se vendió, Visita sin venta."],
     links: [{ label: "Registrar venta con factura", href: "/vendedor/bitacora/venta/factura" }],

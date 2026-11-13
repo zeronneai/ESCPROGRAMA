@@ -10,7 +10,7 @@ import type { Result } from "./requests";
 
 async function requireSeller() {
   const u = await requireUser();
-  if (u.rol !== "vendedor") throw new Error("No autorizado");
+  if (u.rol !== "vendedor" && u.rol !== "jefe_ventas") throw new Error("No autorizado");
   return u;
 }
 const uuid = z.string().uuid();

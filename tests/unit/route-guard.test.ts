@@ -62,12 +62,17 @@ describe("decideRoute", () => {
     expect(d("/vendedor/leads", buyer)).toEqual({ type: "redirect", to: "/inicio" });
   });
 
-  it("jefa de ventas: entra a /ventas; no a vendedor, comprador ni administracion", () => {
+  it("jefa de ventas: entra a /ventas y a su bitacora; no a solicitudes de vendedor, comprador ni administracion", () => {
     expect(d("/", jefe)).toEqual({ type: "redirect", to: "/inicio" });
     expect(d("/login", jefe)).toEqual({ type: "redirect", to: "/inicio" });
     expect(d("/ventas", jefe)).toEqual({ type: "next" });
     expect(d("/ventas/vendedor/x", jefe)).toEqual({ type: "next" });
-    expect(d("/vendedor/bitacora", jefe)).toEqual({ type: "redirect", to: "/inicio" });
+    // Su propia bitacora si; las solicitudes y clientes de vendedor no.
+    expect(d("/vendedor/bitacora", jefe)).toEqual({ type: "next" });
+    expect(d("/vendedor/bitacora/venta/factura", jefe)).toEqual({ type: "next" });
+    expect(d("/vendedor/bitacoras", jefe)).toEqual({ type: "redirect", to: "/inicio" });
+    expect(d("/vendedor", jefe)).toEqual({ type: "redirect", to: "/inicio" });
+    expect(d("/vendedor/solicitudes/nueva", jefe)).toEqual({ type: "redirect", to: "/inicio" });
     expect(d("/comprador/clientes", jefe)).toEqual({ type: "redirect", to: "/inicio" });
     expect(d("/api/admin/usuarios", jefe)).toMatchObject({ type: "deny", status: 403 });
   });

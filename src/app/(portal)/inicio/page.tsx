@@ -36,6 +36,9 @@ const ACCESOS: Partial<Record<string, { href: string; label: string }[]>> = {
   ],
   jefe_ventas: [
     { href: "/ventas", label: "Resumen de ventas" },
+    { href: "/vendedor/bitacora/venta/factura", label: "Registrar venta con factura (PDF)" },
+    { href: "/vendedor/bitacora/venta/nueva", label: "Venta sin factura" },
+    { href: "/vendedor/bitacora/venta/nueva?tipo=visita", label: "Visita sin venta" },
     { href: "/consumo", label: "Aprobar consumo" },
   ],
   ceo: [

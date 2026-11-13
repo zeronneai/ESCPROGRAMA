@@ -209,7 +209,7 @@ export type ClienteFactura = { id: string; nombre: string; tipo: string; rfc: st
 /** A quien se le registraria la venta (por RFC o nombre de la factura). Null = cliente nuevo. */
 export async function clienteFacturaAction(rfc: string, nombre: string, razon: string): Promise<ClienteFactura | null> {
   const u = await requireUser();
-  if (u.rol !== "vendedor") return null;
+  if (u.rol !== "vendedor" && u.rol !== "jefe_ventas") return null;
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("cliente_factura_preview", { p_rfc: rfc.slice(0, 20), p_nombre: nombre.slice(0, 200), p_razon: razon.slice(0, 200) });
   if (error) return null;
@@ -242,7 +242,7 @@ const ventaFacturaSchema = z.object({
 /** Vendedor: registrar la venta con la factura (y mandarla a almacen si trae articulos del catalogo). */
 export async function ventaDesdeFacturaAction(fd: FormData): Promise<Result<{ id: string }>> {
   const u = await requireUser();
-  if (u.rol !== "vendedor") return { ok: false, error: "Las ventas las registran los vendedores." };
+  if (u.rol !== "vendedor" && u.rol !== "jefe_ventas") return { ok: false, error: "Las ventas las registran los vendedores." };
   let datos: unknown;
   try {
     datos = JSON.parse(String(fd.get("datos") ?? "{}"));

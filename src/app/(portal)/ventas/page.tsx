@@ -20,7 +20,7 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
   const toIso = to.toUTC().toISO()!;
 
   const [sellers, requests, issues, bitacora, conversions, events, arts, ventas, lineas] = await Promise.all([
-    supabase.from("profiles").select("id, nombre, activo").eq("rol", "vendedor").order("nombre"),
+    supabase.from("profiles").select("id, nombre, activo").in("rol", ["vendedor", "jefe_ventas"]).order("nombre"),
     supabase.from("quote_requests").select("vendedor_id, submitted_at").gte("submitted_at", fromIso).lte("submitted_at", toIso).limit(5000),
     supabase.from("quote_issues").select("emitida_por, request_id, emitida_at").gte("emitida_at", fromIso).lte("emitida_at", toIso).limit(5000),
     supabase

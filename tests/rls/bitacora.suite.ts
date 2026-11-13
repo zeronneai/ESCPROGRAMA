@@ -35,6 +35,24 @@ export function bitacoraSuite() {
       expect(await failure(rpc(w.seller2, "insert into public.bitacora (vendedor_id, customer_id, created_by) values ($1,$2,$1)", [w.ids.s1, c]))).toMatch(/row-level security/);
     });
 
+    it("la jefa lleva su propia bitacora y ventas, sin tocar las de los vendedores", async () => {
+      const c = await newCustomer(jefa, jefaId);
+      const id = await newEntry(jefa, jefaId, c);
+      await rpc(jefa, "update public.bitacora set fecha_catalogo=current_date where id=$1", [id]);
+      await rpc(jefa, "insert into public.bitacora_eventos (bitacora_id, tipo, nota, created_by) values ($1,'comentario','Visita',$2)", [id, jefaId]);
+      expect((await rpc(w.seller1, "select id from public.bitacora where id=$1", [id])).rowCount).toBe(0);
+      const v = (await rpc(jefa, "insert into public.ventas (customer_id, fecha, monto, pago) values ($1, current_date, 1500, 'contado') returning id, vendedor_id", [c])).rows[0];
+      expect(v.vendedor_id).toBe(jefaId);
+      await rpc(jefa, "insert into public.venta_lineas (venta_id, descripcion, cantidad) values ($1,'Guante nitrilo',10)", [v.id]);
+      expect((await rpc(w.seller1, "select id from public.ventas where id=$1", [v.id])).rowCount).toBe(0);
+      // La venta de un vendedor sigue siendo solo suya.
+      const c2 = await newCustomer(w.seller1, w.ids.s1, "cliente");
+      const v2 = (await rpc(w.seller1, "insert into public.ventas (customer_id, fecha, monto, pago) values ($1, current_date, 900, 'contado') returning id", [c2])).rows[0].id;
+      expect((await rpc(jefa, "update public.ventas set monto=1 where id=$1", [v2])).rowCount).toBe(0);
+      expect(await failure(rpc(jefa, "insert into public.venta_lineas (venta_id, descripcion, cantidad) values ($1,'x',1)", [v2]))).toMatch(/row-level security/);
+      expect(await failure(rpc(jefa, "insert into public.bitacora (vendedor_id, customer_id, created_by) values ($1,$2,$3)", [w.ids.s1, c2, jefaId]))).toMatch(/row-level security/);
+    });
+
     it("cada etapa capturada y cada comentario quedan como evento", async () => {
       const c = await newCustomer(w.seller1, w.ids.s1);
       const id = await newEntry(w.seller1, w.ids.s1, c);

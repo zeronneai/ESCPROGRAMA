@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CUST_MIN } from "@/lib/ventas-server";
 
 export default async function NuevaVenta({ searchParams }: { searchParams: Promise<{ cliente?: string; tipo?: string }> }) {
-  await requireRoles(["vendedor"]);
+  await requireRoles(["vendedor", "jefe_ventas"]);
   const { cliente, tipo } = await searchParams;
   const visita = tipo === "visita";
   const supabase = await createClient();

@@ -23,6 +23,7 @@ export default async function RegistroBitacora({ params }: { params: Promise<{ i
         subtitle={`Prospección · creado ${DateTime.fromISO(d.entry.created_at, { zone: cfg.timezone }).setLocale("es-MX").toFormat("d LLL yyyy")}${d.entry.archived_at ? " · archivado" : ""}`}
       />
       <BitacoraEditor
+        jefa={user.rol === "jefe_ventas"}
         key={d.entry.updated_at}
         mode={mode}
         entry={d.entry}
