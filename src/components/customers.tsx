@@ -10,6 +10,8 @@ import {
   ESTADOS_MX,
   KIND_LABEL,
   matchCustomer,
+  normalizeRfc,
+  RFC_ESC,
   RFC_EXTRANJERO,
   type CustomerKind,
   type CustomerRecord,
@@ -79,7 +81,8 @@ export function CustomerForm({
           ...s,
           ...(vacio("nombre") && d.nombre ? { nombre: d.nombre } : {}),
           ...(vacio("razon_social") && d.razon_social ? { razon_social: d.razon_social } : {}),
-          ...(vacio("rfc") && d.rfc ? { rfc: d.rfc } : {}),
+          // El RFC de la constancia o factura reemplaza uno vacio o el de ESC (que ponian para avanzar).
+          ...((vacio("rfc") || normalizeRfc(s.rfc) === RFC_ESC) && d.rfc && d.rfc !== RFC_ESC ? { rfc: d.rfc } : {}),
           ...(vacio("direccion") && d.direccion ? { direccion: d.direccion } : {}),
           ...(vacio("estado_geo") && d.estado_geo ? { estado_geo: d.estado_geo } : {}),
           ...(vacio("contacto_telefono") && d.contacto_telefono ? { contacto_telefono: d.contacto_telefono } : {}),
@@ -159,7 +162,7 @@ export function CustomerForm({
             {ESTADOS_MX.map((e) => <option key={e} value={e}>{e}</option>)}
           </Select>
         </Field>
-        <Field label={v.tipo === "cliente" ? "RFC *" : "RFC (si lo tienes)"} error={errors.rfc}>
+        <Field label={v.tipo === "cliente" ? "RFC *" : "RFC (si lo tienes; si no, déjalo vacío)"} error={errors.rfc}>
           <Input value={v.rfc} onChange={set("rfc")} className="font-mono uppercase" maxLength={16} placeholder="ABC010101AB1" />
           <span className="block text-[11px] text-slate-500">
             Extranjero:{" "}
@@ -181,7 +184,7 @@ export function CustomerForm({
           <Input value={v.contacto_correo} onChange={set("contacto_correo")} type="email" inputMode="email" placeholder="compras@cliente.com" />
         </Field>
       </div>
-      <p className="text-xs text-slate-500">* Obligatorios, además de teléfono o correo. Para cotizarle a un prospecto también se necesita su RFC.</p>
+      <p className="text-xs text-slate-500">* Obligatorios, además de teléfono o correo. A un prospecto se le puede cotizar sin RFC: cuando compre, su RFC se llena al subir su factura o constancia.</p>
       <div className="flex gap-2">
         <Button type="submit" loading={pending}>{customer ? "Guardar" : "Dar de alta"}</Button>
         {onCancel && <Button type="button" variant="ghost" onClick={onCancel} disabled={pending}>Cancelar</Button>}

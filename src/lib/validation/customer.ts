@@ -4,6 +4,8 @@ import { z } from "zod";
 export const RFC_RE = /^[A-ZÑ&]{3,4}\d{6}[A-Z\d]{3}$/;
 export const RFC_EXTRANJERO = "XEXX010101000";
 export const normalizeRfc = (v: string) => v.toUpperCase().replace(/[\s.-]/g, "");
+/** RFC de ESC: no es el de un cliente (lo ponian para poder avanzar). */
+export const RFC_ESC = "ERE060228NLA";
 
 const opt = (max: number) =>
   z
@@ -35,6 +37,7 @@ export const customerSchema = z
       .string()
       .transform(normalizeRfc)
       .refine((v) => v === "" || RFC_RE.test(v), `RFC inválido (12 o 13 caracteres; extranjero: ${RFC_EXTRANJERO})`)
+      .refine((v) => v !== RFC_ESC, "Ese es el RFC de ESC, no el del cliente. Si no lo tienes, déjalo vacío.")
       .transform((v) => (v ? v : null)),
     direccion: z.string().trim().min(5, "Escribe la dirección (calle, número, colonia, ciudad)").max(400),
     contacto_nombre: opt(150),
@@ -85,10 +88,10 @@ export const sucursalSchema = z
   });
 export type SucursalInput = z.input<typeof sucursalSchema>;
 
-/** Lo que le falta al cliente para poder enviarle una solicitud (vacio = completo). */
-export function customerMissing(c: Pick<CustomerRecord, "nombre" | "rfc" | "direccion" | "contacto_telefono" | "contacto_correo">): string[] {
+/** Lo que le falta al cliente para poder enviarle una solicitud (vacio = completo). Al prospecto no se le pide RFC. */
+export function customerMissing(c: Pick<CustomerRecord, "nombre" | "rfc" | "direccion" | "contacto_telefono" | "contacto_correo"> & { tipo?: CustomerKind }): string[] {
   const out: string[] = [];
-  if (!c.rfc || !RFC_RE.test(c.rfc)) out.push("RFC");
+  if (c.tipo !== "prospecto" && (!c.rfc || !RFC_RE.test(c.rfc) || c.rfc === RFC_ESC)) out.push("RFC");
   if (!c.direccion || c.direccion.trim().length < 5) out.push("dirección");
   if (!c.contacto_telefono && !c.contacto_correo) out.push("teléfono o correo");
   return out;

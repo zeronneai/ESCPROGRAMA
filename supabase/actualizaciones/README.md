@@ -67,6 +67,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 50 | `0055_jefa_bitacora.sql` | La **jefa de ventas** lleva su propia **bitácora** (prospección, ventas diarias, visitas y ventas con factura) como los vendedores. |
 | 51 | `0056_comprador_pide_guias.sql` | El **comprador** también puede **pedir guías** a Marketplaces y descargarlas. |
 | 52 | `0057_guias_recoleccion.sql` | Guías de **recolección con proveedor**: se sube la **OC** y la guía va del proveedor (origen) a ESC (destino). |
+| 53 | `0058_rfc_prospectos.sql` | A los **prospectos** ya se les cotiza **sin RFC**; el **RFC de ESC** ya no se acepta en clientes y se borra donde lo pusieron (se llena solo al subir su factura o constancia). |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

@@ -158,10 +158,17 @@ describe("clientes", () => {
     expect(customerSchema.safeParse({ ...ok, tipo: "prospecto", rfc: "" }).success).toBe(true);
     expect(customerSchema.safeParse({ ...ok, tipo: "cliente", rfc: "" }).success).toBe(false);
     expect(customerSchema.safeParse({ ...ok, giro: "" }).success).toBe(false);
+    // El RFC de ESC no se acepta como RFC de un cliente o prospecto.
+    const esc = customerSchema.safeParse({ ...ok, tipo: "prospecto", rfc: "ERE-060228-NLA" });
+    expect(esc.success).toBe(false);
+    expect(esc.error?.issues[0].message).toMatch(/RFC de ESC/);
   });
   it("faltantes y busqueda sin acentos", () => {
     const c = { id: "1", tipo: "prospecto" as const, giro: "Óptica", estado_geo: "Chihuahua", nombre: "Óptica Juárez", razon_social: null, rfc: null, direccion: null, contacto_nombre: "Ana", contacto_telefono: null, contacto_correo: null, activo: true };
-    expect(customerMissing(c)).toEqual(["RFC", "dirección", "teléfono o correo"]);
+    // Al prospecto no se le pide RFC para cotizarle; al cliente si (y el RFC de ESC no cuenta).
+    expect(customerMissing(c)).toEqual(["dirección", "teléfono o correo"]);
+    expect(customerMissing({ ...c, tipo: "cliente" })).toEqual(["RFC", "dirección", "teléfono o correo"]);
+    expect(customerMissing({ ...c, tipo: "cliente", rfc: "ERE060228NLA", direccion: "Calle 1 #2", contacto_telefono: "6141234567" })).toEqual(["RFC"]);
     expect(matchCustomer(c, "optica juarez")).toBe(true);
     expect(matchCustomer(c, "ana")).toBe(true);
     expect(matchCustomer(c, "bosch")).toBe(false);

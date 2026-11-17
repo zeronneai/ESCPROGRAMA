@@ -163,5 +163,21 @@ export function emisionesSuite() {
       await rpc(w.seller1, "update public.customers set rfc='INC010101AB1', direccion='Calle 9, Juarez', contacto_correo='a@b.mx' where id=$1", [cust]);
       await send();
     });
+
+    it("a un prospecto se le cotiza sin RFC; el RFC de ESC no se guarda en clientes", async () => {
+      const tag = randomUUID().slice(0, 6);
+      const p = (await rpc(w.seller1, "insert into public.customers (nombre, tipo, rfc, direccion, contacto_correo, created_by) values ($2,'prospecto','ERE-060228-NLA','Calle 1, Chihuahua','p@x.mx',$1) returning id", [w.ids.s1, `Prospecto ${tag}`])).rows[0].id;
+      expect((await rpc("postgres", "select rfc from public.customers where id=$1", [p])).rows[0].rfc).toBeNull();
+      expect((await rpc("postgres", "select public.customer_is_complete($1) as ok", [p])).rows[0].ok).toBe(true);
+      const req = (await rpc(w.seller1, "insert into public.quote_requests (id, vendedor_id, customer_id) values (gen_random_uuid(),$1,$2) returning id", [w.ids.s1, p])).rows[0].id;
+      await rpc(w.seller1, "insert into public.quote_items (request_id, producto, descripcion, cantidad, unidad) values ($1,'Guante','Descripcion suficiente',4,'pieza')", [req]);
+      await rpc("postgres", "insert into public.item_references (item_id, tipo, url) select id, 'link', 'https://x.example' from public.quote_items where request_id=$1", [req]);
+      await rpc(w.seller1, "update public.quote_requests set estado='enviada', due_at=now() + interval '2 days' where id=$1", [req]);
+      // Ya como cliente sin RFC no es completo; con su RFC si.
+      await rpc(w.seller1, "update public.customers set tipo='cliente' where id=$1", [p]);
+      expect((await rpc("postgres", "select public.customer_is_complete($1) as ok", [p])).rows[0].ok).toBe(false);
+      await rpc(w.seller1, "update public.customers set rfc='PRO010101AB1' where id=$1", [p]);
+      expect((await rpc("postgres", "select public.customer_is_complete($1) as ok", [p])).rows[0].ok).toBe(true);
+    });
   });
 }
