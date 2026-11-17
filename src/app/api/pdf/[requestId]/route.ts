@@ -61,7 +61,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ requ
         model = live.model;
       }
     }
-    const buffer = await renderQuotePdf(model);
+    // Imagenes de producto que subio compras (PNG o JPG). Si alguna no baja, el PDF sale sin ella.
+    const imagenes: Record<string, Buffer> = {};
+    await Promise.all(
+      [...new Set(model.rows.map((r) => r.imagen).filter((x): x is string => !!x))].map(async (p) => {
+        const { data } = await supabase.storage.from("aclaraciones").download(p);
+        if (!data) return;
+        const b = Buffer.from(await data.arrayBuffer());
+        const esPng = b[0] === 0x89 && b[1] === 0x50;
+        const esJpg = b[0] === 0xff && b[1] === 0xd8;
+        if (esPng || esJpg) imagenes[p] = b;
+      }),
+    );
+    const buffer = await renderQuotePdf(model, imagenes);
     // Bitacora: solo metadatos, nunca el contenido del PDF.
     await supabase.rpc("log_event", {
       p_action: "download_pdf",

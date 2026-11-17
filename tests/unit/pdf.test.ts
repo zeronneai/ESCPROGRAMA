@@ -53,6 +53,16 @@ describe("modelo del PDF", () => {
     expect(m.company.rfc).toBe("RFC ERE 060228 NLA");
   });
 
+  it("imagen del producto que subio compras: va en el renglon y se dibuja debajo del nombre", async () => {
+    const m = buildPdfModel(base({ items: [item({ imagen: "req/item/foto.png" }), item({ folio: "COT-2026-0001-02", id: "i2" })] }));
+    expect(m.rows[0].imagen).toBe("req/item/foto.png");
+    expect(m.rows[1].imagen).toBeUndefined();
+    const logo = readFileSync(path.resolve(import.meta.dirname, "../../public/logo-esc.png"));
+    const sin = await renderToBuffer(createElement(QuoteDocument, { model: m, logoSrc: logo }) as never);
+    const con = await renderToBuffer(createElement(QuoteDocument, { model: m, logoSrc: logo, imagenes: { "req/item/foto.png": logo } }) as never);
+    expect(con.length).toBeGreaterThan(sin.length);
+  });
+
   it("U. Price es SOLO el precio elegido y Price es U. Price por CANT", () => {
     const m = buildPdfModel(base());
     expect(m.rows).toHaveLength(1);

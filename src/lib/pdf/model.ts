@@ -36,6 +36,8 @@ export interface PdfItemInput {
   cantidad: number | string | null;
   unidad: string | null;
   talla: string | null;
+  /** Imagen del producto que subio compras (ruta en storage); sale en el PDF debajo del nombre. */
+  imagen?: string | null;
   /** Version vigente de la cotizacion. */
   quote: {
     version: number;
@@ -103,6 +105,8 @@ export interface PdfRow {
   currency: PdfCurrency;
   uPrice: string;
   price: string;
+  /** Ruta de la imagen del producto (se descarga al generar el PDF). */
+  imagen?: string;
 }
 
 export interface PdfModel {
@@ -267,6 +271,7 @@ export function buildPdfModel(input: PdfInput): PdfModel {
       // El envio ya va dentro del precio unitario: el PDF solo muestra el costo final.
       uPrice: l.precioUnitario,
       price: l.importe,
+      ...(i.imagen ? { imagen: i.imagen } : {}),
     };
   });
   // Envio como cargo aparte: un renglon mas, ya sumado en el total de su moneda.

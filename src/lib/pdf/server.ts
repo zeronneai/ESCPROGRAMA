@@ -80,6 +80,9 @@ export async function buildLiveQuoteModel(supabase: SupabaseClient, requestId: s
     getCompanyProfile(supabase),
   ]);
   const rows = (items ?? []) as unknown as Array<ItemRow & { item_price_choice: { quote_version: number; precio: number }[] }>;
+  // Imagen que subio compras por partida (aparte: si falta la columna, el PDF sale sin imagenes).
+  const { data: fotos } = await supabase.from("quote_items").select("id, foto_compra_path").eq("request_id", requestId).not("foto_compra_path", "is", null);
+  const fotoDe = new Map(((fotos ?? []) as { id: string; foto_compra_path: string | null }[]).map((f) => [f.id, f.foto_compra_path]));
   const revision = requestRevision(rows);
   const [{ data: pdfData }, { data: shipItems }, { data: minChoices }, { data: nameRows }] = await Promise.all([
     supabase
@@ -112,6 +115,7 @@ export async function buildLiveQuoteModel(supabase: SupabaseClient, requestId: s
         cantidad: i.cantidad,
         unidad: i.unidad,
         talla: i.talla,
+        imagen: fotoDe.get(i.id) ?? null,
         quote: toPdfQuote(q!),
         precioElegido: i.item_price_choice?.find((c) => c.quote_version === q!.version)?.precio ?? null,
       })),

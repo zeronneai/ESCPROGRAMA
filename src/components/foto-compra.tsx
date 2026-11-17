@@ -26,8 +26,26 @@ export function FotoCompra({ itemId, requestId, nombre, puedeSubir }: { itemId: 
     if (descargar) window.location.href = r.url;
     else setVista(r.url);
   }
-  async function subir(f: File | null) {
-    if (!f) return;
+  async function subir(original: File | null) {
+    if (!original) return;
+    // El PDF solo acepta PNG o JPG: una imagen WEBP se convierte a JPG antes de subirla.
+    let f: File = original;
+    if (original.type === "image/webp") {
+      try {
+        const bmp = await createImageBitmap(original);
+        const c = document.createElement("canvas");
+        c.width = bmp.width;
+        c.height = bmp.height;
+        const ctx = c.getContext("2d");
+        ctx!.fillStyle = "#fff";
+        ctx!.fillRect(0, 0, c.width, c.height);
+        ctx!.drawImage(bmp, 0, 0);
+        const blob = await new Promise<Blob | null>((ok) => c.toBlob(ok, "image/jpeg", 0.9));
+        if (blob) f = new File([blob], original.name.replace(/\.webp$/i, "") + ".jpg", { type: "image/jpeg" });
+      } catch {
+        /* se sube como venga */
+      }
+    }
     setError(null);
     setBusy("subir");
     const fd = new FormData();
@@ -47,11 +65,11 @@ export function FotoCompra({ itemId, requestId, nombre, puedeSubir }: { itemId: 
     <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0 text-sm">
-          <p className="font-semibold text-sky-900">Imagen de confirmación</p>
+          <p className="font-semibold text-sky-900">Imagen del producto (sale en el PDF)</p>
           <p className="text-xs text-sky-900/80">
             {nombre
-              ? puedeSubir ? `Subida: ${nombre}. El vendedor la puede descargar.` : "Compras subió una imagen del producto. Descárgala para mandarla aparte al cliente (no va en el PDF)."
-              : "Opcional: sube una foto del producto como confirmación. El vendedor la descarga aparte; no va en el PDF."}
+              ? puedeSubir ? `Subida: ${nombre}. Sale en el PDF de la cotización (debajo del producto) y el vendedor la puede descargar.` : "Compras subió una imagen del producto: sale en el PDF de la cotización y también la puedes descargar."
+              : "Opcional: sube una foto del producto (PNG o JPG). Sale en el PDF de la cotización debajo del producto y el vendedor la puede descargar."}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

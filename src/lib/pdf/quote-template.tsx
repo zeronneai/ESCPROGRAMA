@@ -39,7 +39,7 @@ function Cell({ w, children, right }: { w: string; children?: React.ReactNode; r
   return <View style={[s.cell, { width: w }]}>{typeof children === "string" ? <Text style={right ? s.right : undefined}>{children}</Text> : children}</View>;
 }
 
-export function QuoteDocument({ model, logoSrc }: { model: PdfModel; logoSrc?: string | Buffer }) {
+export function QuoteDocument({ model, logoSrc, imagenes = {} }: { model: PdfModel; logoSrc?: string | Buffer; imagenes?: Record<string, Buffer> }) {
   const c = model.company;
   return (
     <Document title={`${model.folio} - ${model.empresa}`} author={c.razon_social}>
@@ -89,6 +89,7 @@ export function QuoteDocument({ model, logoSrc }: { model: PdfModel; logoSrc?: s
             <Cell w={W.te}>{r.te}</Cell>
             <Cell w={W.name}>
               <Text style={{ fontFamily: PDF_FONT.bold }}>{r.nombre}</Text>
+              {r.imagen && imagenes[r.imagen] ? <Image src={imagenes[r.imagen]} style={{ width: 80, height: 80, objectFit: "contain", marginTop: 4 }} /> : null}
             </Cell>
             <Cell w={W.cant}>{r.cant}</Cell>
             <Cell w={W.cur}>{r.currency}</Cell>
