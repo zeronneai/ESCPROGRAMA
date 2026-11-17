@@ -98,6 +98,7 @@ const NAV: Record<Rol, NavItem[]> = {
   coordinador_iso: [
     { href: "/calidad", label: "Quejas y acciones correctivas", short: "Calidad", icon: "alert" },
     { href: "/documentos", label: "Documentos", short: "Docs", icon: "list" },
+    { href: "/norma-iso", label: "Norma ISO 9001", short: "ISO", icon: "shield" },
     { href: "/calidad/cambios", label: "Control de cambios", short: "Cambios", icon: "history", secondary: true },
     { href: "/ventas", label: "Ventas", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard", secondary: true },
@@ -170,7 +171,9 @@ const NAV: Record<Rol, NavItem[]> = {
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
   const almacenOn = await almacenVentasActivo(await createClient());
-  const nav = NAV[user.rol].filter((i) => almacenOn || !RUTAS_ALMACEN_VENTAS.includes(i.href));
+  // La guia de la norma ISO 9001 la puede consultar todo el personal (en "Mas").
+  const base = NAV[user.rol].some((i) => i.href === "/norma-iso") ? NAV[user.rol] : [...NAV[user.rol], { href: "/norma-iso", label: "Norma ISO 9001", icon: "shield" as const, secondary: true }];
+  const nav = base.filter((i) => almacenOn || !RUTAS_ALMACEN_VENTAS.includes(i.href));
   return (
     <div className="min-h-screen">
       <Suspense fallback={null}>
