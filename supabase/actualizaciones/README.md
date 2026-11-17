@@ -65,6 +65,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 48 | `0053_catalogo_aviso_pegatron.sql` | **Catálogo 2026**: aviso a todos y comentarios para el comprador. **Pedidos Pegatron**: la jefa de ventas sube la OC y pone el artículo ESC; el comprador marca lo pedido. |
 | 49 | `0054_guias_varios_archivos.sql` | Guías: Marketplaces sube **varios archivos** (uno por bulto o tarima), cada uno con su **número de guía**. |
 | 50 | `0055_jefa_bitacora.sql` | La **jefa de ventas** lleva su propia **bitácora** (prospección, ventas diarias, visitas y ventas con factura) como los vendedores. |
+| 51 | `0056_comprador_pide_guias.sql` | El **comprador** también puede **pedir guías** a Marketplaces y descargarlas. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

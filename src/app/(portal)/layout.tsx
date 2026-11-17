@@ -27,6 +27,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/comprador/catalogo", label: "Comentarios del catálogo", icon: "chat", secondary: true },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/pagos", label: "Pagos", icon: "dollar" },
+    { href: "/guias", label: "Guías", icon: "package", secondary: true },
     { href: "/comprador/estadisticas", label: "Estadísticas", short: "Stats", icon: "chart", secondary: true },
     { href: "/ventas", label: "Ventas", icon: "target", secondary: true },
     { href: "/calidad", label: "Quejas y acciones correctivas", icon: "alert", secondary: true },

@@ -5,13 +5,14 @@ import { requireRoles } from "@/lib/auth/sales";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function NuevaGuia() {
-  const u = await requireRoles(["vendedor"]);
-  // Sus facturas recientes (ya subidas como venta) para elegirlas y que se llenen los datos.
+  const u = await requireRoles(["vendedor", "comprador"]);
+  const compras = u.rol === "comprador";
+  // Facturas recientes (ya subidas como venta) para elegirlas y que se llenen los datos.
+  // El vendedor ve las suyas; compras puede usar cualquiera.
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("ventas")
-    .select("factura, customers(nombre)")
-    .eq("vendedor_id", u.id)
+  let consulta = supabase.from("ventas").select("factura, customers(nombre)");
+  if (!compras) consulta = consulta.eq("vendedor_id", u.id);
+  const { data } = await consulta
     .not("factura", "is", null)
     .is("cancelada_at", null)
     .order("created_at", { ascending: false })
@@ -23,8 +24,13 @@ export default async function NuevaGuia() {
   return (
     <div className="space-y-4">
       <Link href="/guias" className="text-sm text-slate-500 hover:text-slate-800">← Guías</Link>
-      <PageHeader title="Pedir guía" subtitle="Escribe o elige la factura: si ya la subiste como venta, se llenan solos el cliente y su domicilio. Marketplaces genera la guía y te pone el número." />
-      <Card className="p-4 sm:p-6"><GuiaForm id={null} facturas={facturas} /></Card>
+      <PageHeader
+        title="Pedir guía"
+        subtitle={compras
+          ? "Escribe la factura o una referencia (OC, muestra, devolución a proveedor). Si es una factura ya registrada como venta, se llenan solos el cliente y su domicilio. Marketplaces genera la guía y la descargas aquí."
+          : "Escribe o elige la factura: si ya la subiste como venta, se llenan solos el cliente y su domicilio. Marketplaces genera la guía y te pone el número."}
+      />
+      <Card className="p-4 sm:p-6"><GuiaForm id={null} facturas={facturas} referencia={compras} /></Card>
     </div>
   );
 }

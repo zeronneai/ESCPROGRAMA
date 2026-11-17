@@ -13,7 +13,7 @@ type Row = {
   solicitada_at: string; lista_at: string | null; vendedor_nombre: string | null; atendida_nombre: string | null; urgente: boolean;
   recordatorios: number; numero_rastreo: string | null; created_at: string; vendedor_id: string;
 };
-const VIEWS = { pendientes: "Pendientes", listas: "Listas", todas: "Todas" } as const;
+const VIEWS = { pendientes: "Pendientes", listas: "Listas", todas: "Todas", mias: "Mis guías" } as const;
 
 export default async function Guias({ searchParams }: { searchParams: Promise<{ ver?: string; q?: string }> }) {
   const u = await requireUser();
@@ -30,9 +30,10 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
   const all = (data ?? []) as Row[];
   const now = new Date();
   const isSeller = u.rol === "vendedor";
+  const puedePedir = isSeller || u.rol === "comprador";
   const isMkt = u.rol === "marketplaces";
   const pendientes = all.filter((g) => ["solicitada", "en_proceso", "requiere_datos"].includes(g.estado));
-  const rows = (ver === "pendientes" ? pendientes : ver === "listas" ? all.filter((g) => g.estado === "lista") : all)
+  const rows = (ver === "pendientes" ? pendientes : ver === "listas" ? all.filter((g) => g.estado === "lista") : ver === "mias" ? all.filter((g) => g.vendedor_id === u.id) : all)
     .filter((g) => !qq || [g.factura, g.destinatario, g.paqueteria, g.numero, g.vendedor_nombre, g.numero_rastreo].some((f) => f?.toLowerCase().includes(qq)))
     .sort((a, b) =>
       ver !== "pendientes"
@@ -57,8 +58,8 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
     <div className="space-y-5">
       <PageHeader
         title="Guías de paquetería"
-        subtitle={isMkt ? "Solicitudes de los vendedores. Toma la guía, genérala y súbela aquí." : isSeller ? "Pide la guía a Marketplaces y descárgala aquí cuando esté lista." : "Seguimiento de las guías de todos los vendedores (solo lectura)."}
-        actions={isSeller && (
+        subtitle={isMkt ? "Solicitudes de los vendedores y compras. Toma la guía, genérala y súbela aquí." : isSeller ? "Pide la guía a Marketplaces y descárgala aquí cuando esté lista." : u.rol === "comprador" ? "Pide tus guías a Marketplaces y descárgalas aquí. También ves las de los vendedores." : "Seguimiento de las guías de todos los vendedores (solo lectura)."}
+        actions={puedePedir && (
           <Link href="/guias/nueva" className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
             <Icon name="plus" className="h-4 w-4" /> Pedir guía
           </Link>
@@ -86,7 +87,7 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
       </div>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-          {Object.entries(VIEWS).map(([k, l]) => (
+          {Object.entries(VIEWS).filter(([k]) => k !== "mias" || u.rol === "comprador").map(([k, l]) => (
             <FilterChip key={k} href={href({ ver: k === "pendientes" ? undefined : k })} active={ver === k}>{l}{k === "pendientes" ? ` ${pendientes.length}` : ""}</FilterChip>
           ))}
         </div>

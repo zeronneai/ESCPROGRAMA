@@ -22,7 +22,7 @@ const CAMPOS_GUIA: Record<string, string> = {
 
 export async function saveGuiaAction(id: string | null, input: GuiaInput): Promise<Result<{ id: string }>> {
   const u = await requireUser();
-  if (u.rol !== "vendedor") return { ok: false, error: "Las guías las piden los vendedores." };
+  if (u.rol !== "vendedor" && u.rol !== "comprador") return { ok: false, error: "Las guías las piden los vendedores y compras." };
   const parsed = guiaSchema.safeParse(input);
   if (!parsed.success) {
     const i = parsed.error.issues[0];

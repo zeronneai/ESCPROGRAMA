@@ -20,7 +20,7 @@ const nuevaPartida = (empaque: "bulto" | "tarima" = "bulto"): PartidaForm => ({
 });
 const numero = (x: string) => Number(x.replace(",", "."));
 
-export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDone }: { id: string | null; initial?: Partial<F>; partidas?: PartidaForm[]; facturas?: { folio: string; cliente: string }[]; onDone?: () => void }) {
+export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDone, referencia = false }: { id: string | null; initial?: Partial<F>; partidas?: PartidaForm[]; facturas?: { folio: string; cliente: string }[]; onDone?: () => void; /** Compras: acepta factura u otra referencia (OC, muestra). */ referencia?: boolean }) {
   const [v, setV] = useState<F>({ ...EMPTY, ...initial });
   const [deFactura, setDeFactura] = useState<string | null>(null);
   const buscada = useRef("");
@@ -73,9 +73,9 @@ export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDo
       {title && <p className="rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-800">Título: {title}</p>}
 
       <fieldset className="grid gap-3 sm:grid-cols-3">
-        <Field label="Factura *">
+        <Field label={referencia ? "Factura o referencia *" : "Factura *"}>
           <Input value={s("factura")} onChange={(e) => { set("factura")(e); if (facturas.some((x) => x.folio.toUpperCase() === e.target.value.trim().toUpperCase())) void llenarDeFactura(e.target.value); }}
-            onBlur={(e) => void llenarDeFactura(e.target.value)} placeholder="Ej. F11341" list="facturas-guia" autoComplete="off" />
+            onBlur={(e) => void llenarDeFactura(e.target.value)} placeholder={referencia ? "Ej. F11341, OC-0123 o Muestra proveedor" : "Ej. F11341"} list="facturas-guia" autoComplete="off" />
           <datalist id="facturas-guia">{facturas.map((x) => <option key={x.folio} value={x.folio}>{x.cliente}</option>)}</datalist>
         </Field>
         <Field label="Paquetería *">

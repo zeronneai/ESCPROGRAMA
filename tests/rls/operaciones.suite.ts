@@ -179,6 +179,20 @@ export function operacionesSuite() {
       expect(await failure(q(w.buyer1, "insert into public.consumo_solicitudes (tipo, categoria, descripcion, cantidad, motivo) values ('producto','limpieza','Cloro',3,'Limpieza')"))).toMatch(/row-level security/);
     });
 
+    it("guias: compras tambien pide su guia, la corrige y la recibe; otros puestos no piden", async () => {
+      const g = (await q(w.buyer1, GUIA, ["Muestra proveedor"])).rows[0];
+      expect(g.vendedor_id).toBe(w.ids.b1);
+      expect((await q(w.seller1, "select id from public.guias where id=$1", [g.id])).rowCount).toBe(0);
+      expect(await notif(people.mkt.id, "guia_nueva", g.id)).toBe(1);
+      await q(A("mkt"), "select public.guia_mover($1,'requiere_datos','Falta el telefono de quien recibe')", [g.id]);
+      expect(await notif(w.ids.b1, "guia_requiere_datos", g.id)).toBe(1);
+      await q(w.buyer1, "update public.guias set telefono='6561112233' where id=$1", [g.id]);
+      expect((await q(w.buyer1, "select estado from public.guias where id=$1", [g.id])).rows[0].estado).toBe("solicitada");
+      await q(A("mkt"), "select public.guia_archivo_agregar($1,$2,'guia.pdf','999888',null)", [g.id, `${g.id}/guia.pdf`]);
+      expect(await notif(w.ids.b1, "guia_lista", g.id)).toBe(1);
+      expect(await failure(q(A("iso"), GUIA, ["F-X"]))).toMatch(/row-level security/);
+    });
+
     it("guias: el vendedor pide, Marketplaces toma, pide datos y sube la guia; recordatorio a partir de 1 hora", async () => {
       const g = (await q(w.seller1, GUIA, ["F-1234"])).rows[0];
       expect(g).toMatchObject({ vendedor_id: w.ids.s1, estado: "solicitada" });
