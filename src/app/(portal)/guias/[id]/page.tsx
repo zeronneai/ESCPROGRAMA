@@ -48,7 +48,15 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
     customer_id: g.customer_id, contacto_nombre: g.contacto_nombre ?? "", telefono: g.telefono, correo: g.correo ?? "", calle_numero: g.calle_numero,
     colonia: g.colonia ?? "", cp: g.cp, ciudad: g.ciudad, estado_geo: g.estado_geo, referencias: g.referencias ?? "", contenido: g.contenido ?? "",
     valor_declarado: n(g.valor_declarado), valor_moneda: g.valor_moneda === "USD" ? "USD" : "MXN", asegurar: g.asegurar, urgente: g.urgente, notas: g.notas ?? "",
+    sentido: g.sentido === "recoleccion" ? "recoleccion" : "envio", recoleccion_modo: g.recoleccion_modo ?? "recoleccion", recoleccion_fecha: g.recoleccion_fecha ?? "", origen_nombre: g.origen_nombre ?? "", origen_contacto: g.origen_contacto ?? "",
+    origen_telefono: g.origen_telefono ?? "", origen_calle_numero: g.origen_calle_numero ?? "", origen_colonia: g.origen_colonia ?? "", origen_cp: g.origen_cp ?? "",
+    origen_ciudad: g.origen_ciudad ?? "", origen_estado_geo: g.origen_estado_geo ?? "",
   };
+  // La OC de la recoleccion (la ven compras, Marketplaces y los jefes).
+  const ocUrl = g.oc_path && u.rol !== "vendedor" ? await signedUrl(supabase, "guias", g.oc_path, g.oc_nombre) : null;
+  const origen = g.sentido === "recoleccion"
+    ? { modo: g.recoleccion_modo, fecha: g.recoleccion_fecha, nombre: g.origen_nombre, contacto: g.origen_contacto, telefono: g.origen_telefono, calle_numero: g.origen_calle_numero, colonia: g.origen_colonia, cp: g.origen_cp, ciudad: g.origen_ciudad, estado_geo: g.origen_estado_geo, oc_url: ocUrl, oc_nombre: g.oc_nombre }
+    : null;
   const partidas = partidasDeGuia(g);
   const conPartidas = Array.isArray(g.partidas);
   const s0 = (x: number | null) => (x == null ? "" : String(x));
@@ -67,7 +75,7 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
         urgente: g.urgente, asegurar: g.asegurar, destinatario: g.destinatario, contacto_nombre: g.contacto_nombre, telefono: g.telefono, correo: g.correo,
         calle_numero: g.calle_numero, colonia: g.colonia, cp: g.cp, ciudad: g.ciudad, estado_geo: g.estado_geo, referencias: g.referencias,
         partidas, conPartidas, resumenViejo: empaqueLabel(g.empaque, g.bultos), medidasViejas: medidas, peso_total: n(g.peso_kg),
-        contenido: g.contenido, notas: g.notas,
+        contenido: g.contenido, notas: g.notas, origen,
         valor: g.valor_declarado !== null ? `$${Number(g.valor_declarado).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${g.valor_moneda === "USD" ? "USD" : "MXN"}` : null,
       }}
     />

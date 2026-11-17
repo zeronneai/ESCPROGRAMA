@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 type Row = {
   id: string; numero: string; factura: string; destinatario: string; paqueteria: string; paqueteria_otra: string | null; estado: GuiaEstado;
   solicitada_at: string; lista_at: string | null; vendedor_nombre: string | null; atendida_nombre: string | null; urgente: boolean;
-  recordatorios: number; numero_rastreo: string | null; created_at: string; vendedor_id: string;
+  recordatorios: number; numero_rastreo: string | null; created_at: string; vendedor_id: string; sentido?: string | null; origen_nombre?: string | null;
 };
 const VIEWS = { pendientes: "Pendientes", listas: "Listas", todas: "Todas", mias: "Mis guías" } as const;
 
@@ -22,12 +22,12 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
   const qq = (sp.q ?? "").trim().toLowerCase();
   const supabase = await createClient();
   const cfg = await getBusinessSettings(supabase);
-  const { data, error } = await supabase
-    .from("guias")
-    .select("id, numero, factura, destinatario, paqueteria, paqueteria_otra, estado, solicitada_at, lista_at, vendedor_nombre, atendida_nombre, urgente, recordatorios, numero_rastreo, created_at, vendedor_id")
-    .order("created_at", { ascending: false })
-    .limit(500);
-  const all = (data ?? []) as Row[];
+  const BASE = "id, numero, factura, destinatario, paqueteria, paqueteria_otra, estado, solicitada_at, lista_at, vendedor_nombre, atendida_nombre, urgente, recordatorios, numero_rastreo, created_at, vendedor_id";
+  const consulta = (cols: string) => supabase.from("guias").select(cols).order("created_at", { ascending: false }).limit(500);
+  // Con la 0057 tambien sale de donde se recoge (recolecciones); sin ella, la lista de siempre.
+  let { data, error } = await consulta(`${BASE}, sentido, origen_nombre`);
+  if (error && /sentido|origen_nombre/.test(error.message)) ({ data, error } = await consulta(BASE));
+  const all = (data ?? []) as unknown as Row[];
   const now = new Date();
   const isSeller = u.rol === "vendedor";
   const puedePedir = isSeller || u.rol === "comprador";

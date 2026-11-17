@@ -14,10 +14,27 @@ export const GUIA_ESTADOS = {
 } as const;
 export type GuiaEstado = keyof typeof GUIA_ESTADOS;
 
-/** Titulo de la guia: factura, persona o negocio y paqueteria. */
-export function guiaTitle(g: { factura: string; destinatario: string; paqueteria: string; paqueteria_otra?: string | null }) {
-  return `${g.factura} · ${g.destinatario} · ${g.paqueteria === "Otra" ? g.paqueteria_otra || "Otra" : g.paqueteria}`;
+/** Titulo de la guia: factura, persona o negocio y paqueteria. En recolecciones: OC, proveedor y "a ESC". */
+export function guiaTitle(g: { factura: string; destinatario: string; paqueteria: string; paqueteria_otra?: string | null; sentido?: string | null; origen_nombre?: string | null }) {
+  const paq = g.paqueteria === "Otra" ? g.paqueteria_otra || "Otra" : g.paqueteria;
+  if (g.sentido === "recoleccion") return `OC ${g.factura} · ${g.origen_nombre || "Proveedor"} → ESC · ${paq}`;
+  return `${g.factura} · ${g.destinatario} · ${paq}`;
 }
+
+export const RECOLECCION_MODOS = {
+  recoleccion: "La paquetería lo recoge en el proveedor",
+  proveedor_lleva: "El proveedor lo lleva a la paquetería",
+} as const;
+
+/** Destino de las recolecciones: el almacen de ESC (se puede cambiar en el formulario). */
+export const DESTINO_ESC = {
+  destinatario: "ESC REPRESENTACIONES S. DE R.L.",
+  calle_numero: "Heroico Colegio Militar 5910-C",
+  colonia: "Nombre de Dios",
+  cp: "31105",
+  ciudad: "Chihuahua",
+  estado_geo: "Chihuahua",
+};
 
 /** Las guias se atienden rapido: alarma a la hora y alerta roja fuerte a las 2 horas. */
 export const AMBAR_AFTER_HOURS = 1;
@@ -128,6 +145,17 @@ export function partidasDeGuia(g: { partidas?: unknown; empaque?: string | null;
 
 export const guiaSchema = z
   .object({
+    sentido: z.enum(["envio", "recoleccion"]).default("envio"),
+    recoleccion_modo: z.preprocess((v) => v || null, z.enum(["recoleccion", "proveedor_lleva"]).nullable()).optional().transform((v) => v ?? null),
+    recoleccion_fecha: z.preprocess((v) => v || null, z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida").nullable()).optional().transform((v) => v ?? null),
+    origen_nombre: txt(200),
+    origen_contacto: txt(150),
+    origen_telefono: txt(40),
+    origen_calle_numero: txt(250),
+    origen_colonia: txt(150),
+    origen_cp: z.preprocess((v) => (typeof v === "string" ? v.replace(/\D/g, "") || null : v ?? null), z.string().regex(/^\d{5}$/, "El código postal del proveedor es de 5 dígitos").nullable()).optional().transform((v) => v ?? null),
+    origen_ciudad: txt(120),
+    origen_estado_geo: txt(60),
     factura: z.string().trim().min(1, "Escribe la factura").max(60),
     destinatario: z.string().trim().min(2, "Escribe la persona o negocio").max(200),
     paqueteria: z.enum(PAQUETERIAS, { message: "Elige la paquetería" }),
@@ -152,6 +180,17 @@ export const guiaSchema = z
     notas: txt(1000),
   })
   .refine((v) => v.paqueteria !== "Otra" || !!v.paqueteria_otra, { message: "Escribe cuál paquetería", path: ["paqueteria_otra"] })
+  .superRefine((v, ctx) => {
+    if (v.sentido !== "recoleccion") return;
+    const falta: [keyof typeof v, string][] = [
+      ["recoleccion_modo", "Elige si la paquetería recoge o el proveedor lo lleva"], ["recoleccion_fecha", "Escribe la fecha de recolección o de entrega"],
+      ["origen_nombre", "Escribe el proveedor donde se recoge"], ["origen_telefono", "Escribe el teléfono del proveedor (para la recolección)"],
+      ["origen_calle_numero", "Escribe la calle y número del proveedor"], ["origen_cp", "Escribe el código postal del proveedor"],
+      ["origen_ciudad", "Escribe la ciudad del proveedor"], ["origen_estado_geo", "Elige el estado del proveedor"],
+    ];
+    for (const [k, msg] of falta) if (!v[k]) ctx.addIssue({ code: "custom", message: msg, path: [k] });
+    if (v.origen_telefono && v.origen_telefono.replace(/\D/g, "").length < 7) ctx.addIssue({ code: "custom", message: "El teléfono del proveedor está incompleto", path: ["origen_telefono"] });
+  })
   .transform((v) => ({ ...v, ...totalesPartidas(v.partidas) }));
 export type GuiaInput = z.input<typeof guiaSchema>;
 

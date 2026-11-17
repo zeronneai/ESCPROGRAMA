@@ -193,6 +193,21 @@ export function operacionesSuite() {
       expect(await failure(q(A("iso"), GUIA, ["F-X"]))).toMatch(/row-level security/);
     });
 
+    it("guias de recoleccion: compras sube la OC; la guia va del proveedor a ESC", async () => {
+      const RECO = "insert into public.guias (sentido, recoleccion_modo, recoleccion_fecha, factura, destinatario, paqueteria, paqueteria_otra, telefono, calle_numero, cp, ciudad, estado_geo, peso_kg, origen_nombre, origen_telefono, origen_calle_numero, origen_cp, origen_ciudad, origen_estado_geo) values ('recoleccion','proveedor_lleva','2026-11-20','700','ESC REPRESENTACIONES','Otra','Aeroflash','6144100000','Heroico Colegio Militar 5910-C','31105','Chihuahua','Chihuahua',20,$1,'5555555555','Miguel Allende 37-A','53228','Naucalpan','Estado de Mexico') returning id";
+      expect(await failure(q(w.buyer1, RECO, [null]))).toMatch(/guias_recoleccion_origen/);
+      const g = (await q(w.buyer1, RECO, ["CARNIPROTEK S.A DE C.V"])).rows[0];
+      expect((await q("postgres", "select titulo from public.notifications where user_id=$1 and tipo='guia_nueva' and ref_id=$2", [people.mkt.id, g.id])).rows[0].titulo).toMatch(/Proveedor lo lleva 20\/11 OC 700 · CARNIPROTEK/);
+      // La OC: solo quien pidio la guia, en la carpeta de la guia.
+      expect(await failure(q(w.buyer2, "insert into storage.objects (bucket_id, name) values ('guias', $1)", [`${g.id}/oc-1-oc.pdf`]))).toMatch(/row-level security/);
+      await q(w.buyer1, "insert into storage.objects (bucket_id, name) values ('guias', $1)", [`${g.id}/oc-1-oc.pdf`]);
+      expect(await failure(q(w.buyer1, "select public.guia_oc($1, $2, 'oc.pdf')", [g.id, `${g.id}/guia.pdf`]))).toMatch(/invalido/);
+      expect(await failure(q(w.buyer2, "select public.guia_oc($1, $2, 'oc.pdf')", [g.id, `${g.id}/oc-1-oc.pdf`]))).toMatch(/No autorizado/);
+      await q(w.buyer1, "select public.guia_oc($1, $2, 'OC 700.pdf')", [g.id, `${g.id}/oc-1-oc.pdf`]);
+      expect((await q(A("mkt"), "select oc_nombre, origen_nombre from public.guias where id=$1", [g.id])).rows[0]).toMatchObject({ oc_nombre: "OC 700.pdf", origen_nombre: "CARNIPROTEK S.A DE C.V" });
+      expect((await q(A("mkt"), "select name from storage.objects where bucket_id='guias' and name=$1", [`${g.id}/oc-1-oc.pdf`])).rowCount).toBe(1);
+    });
+
     it("guias: el vendedor pide, Marketplaces toma, pide datos y sube la guia; recordatorio a partir de 1 hora", async () => {
       const g = (await q(w.seller1, GUIA, ["F-1234"])).rows[0];
       expect(g).toMatchObject({ vendedor_id: w.ids.s1, estado: "solicitada" });

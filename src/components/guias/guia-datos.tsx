@@ -32,6 +32,11 @@ export type GuiaDatos = {
   contenido: string | null;
   valor: string | null;
   notas: string | null;
+  /** Recoleccion con proveedor: donde se recoge y la OC. */
+  origen?: {
+    modo: string | null; fecha: string | null; nombre: string | null; contacto: string | null; telefono: string | null; calle_numero: string | null; colonia: string | null;
+    cp: string | null; ciudad: string | null; estado_geo: string | null; oc_url: string | null; oc_nombre: string | null;
+  } | null;
 };
 
 /** Boton chico para copiar un dato (para pegarlo en la pagina de la paqueteria). */
@@ -97,9 +102,37 @@ export function GuiaDatosView({ d, palomear = false }: { d: GuiaDatos; palomear?
   }
   const hechas = d.partidas.filter((_, i) => listas.includes(i)).length;
   const direccion = [d.calle_numero, d.colonia && `Col. ${d.colonia}`, `C.P. ${d.cp}`, `${d.ciudad}, ${d.estado_geo}`].filter(Boolean).join(", ");
+  const o = d.origen;
+  const dirOrigen = o ? [o.calle_numero, o.colonia && `Col. ${o.colonia}`, o.cp && `C.P. ${o.cp}`, [o.ciudad, o.estado_geo].filter(Boolean).join(", ")].filter(Boolean).join(", ") : "";
   const piezas = d.conPartidas ? resumenPartidas(d.partidas) : d.resumenViejo;
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      {o && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-sky-300 bg-gradient-to-r from-sky-50 to-green-50 px-4 py-3 lg:col-span-2">
+          <p className="text-sm font-semibold text-slate-900">
+            {o.modo === "proveedor_lleva" ? "EL PROVEEDOR LO LLEVA A LA PAQUETERÍA" : "RECOLECCIÓN EN EL PROVEEDOR"}
+            {o.fecha && <> el <span className="rounded bg-white px-1.5 py-0.5 text-sky-900 ring-1 ring-sky-300">{fechaCorta(o.fecha)}</span></>}
+            : sale de <span className="text-sky-800">{o.nombre}</span> y se entrega en <span className="text-green-800">{d.destinatario}</span>
+          </p>
+          {o.oc_url && (
+            <a href={o.oc_url} target="_blank" rel="noreferrer" className="rounded-md bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-800">Ver OC{o.oc_nombre ? ` (${o.oc_nombre})` : ""}</a>
+          )}
+        </div>
+      )}
+      {o && (
+        <Seccion titulo="Sale de (origen)" extra={dirOrigen ? <Copiar texto={dirOrigen} /> : undefined}>
+          <Fila label="Cómo sale" valor={o.modo === "proveedor_lleva" ? "El proveedor lo lleva a la paquetería" : o.modo ? "La paquetería lo recoge" : null} copiar={false} />
+          <Fila label={o.modo === "proveedor_lleva" ? "Día que lo lleva" : "Fecha de recolección"} valor={o.fecha ? fechaCorta(o.fecha) : null} copiar={false} />
+          <Fila label="Proveedor" valor={o.nombre} />
+          <Fila label="Contacto" valor={o.contacto} />
+          <Fila label="Teléfono" valor={o.telefono} mono />
+          <Fila label="Calle y número" valor={o.calle_numero} />
+          <Fila label="Colonia" valor={o.colonia} />
+          <Fila label="Código postal" valor={o.cp} mono />
+          <Fila label="Ciudad" valor={o.ciudad} />
+          <Fila label="Estado" valor={o.estado_geo} />
+        </Seccion>
+      )}
       <Seccion
         titulo="Envío"
         extra={
@@ -109,21 +142,21 @@ export function GuiaDatosView({ d, palomear = false }: { d: GuiaDatos; palomear?
           </div>
         }
       >
-        <Fila label="Factura" valor={d.factura} mono />
+        <Fila label={o ? "Orden de compra" : "Factura"} valor={d.factura} mono />
         <Fila label="Paquetería" valor={d.paqueteria} copiar={false} />
         <Fila label="Servicio" valor={d.servicio} copiar={false} />
         <Fila label="Valor declarado" valor={d.valor} />
         <Fila label="Contenido" valor={d.contenido} />
       </Seccion>
 
-      <Seccion titulo="Destinatario">
+      <Seccion titulo={o ? "Se entrega en (destino)" : "Destinatario"}>
         <Fila label="Persona o negocio" valor={d.destinatario} />
         <Fila label="Quién recibe" valor={d.contacto_nombre} />
         <Fila label="Tel. de quien recibe" valor={d.telefono} mono />
         <Fila label="Correo" valor={d.correo} />
       </Seccion>
 
-      <Seccion titulo="Dirección" extra={<Copiar texto={direccion} />}>
+      <Seccion titulo={o ? "Dirección de entrega" : "Dirección"} extra={<Copiar texto={direccion} />}>
         <Fila label="Calle y número" valor={d.calle_numero} />
         <Fila label="Colonia" valor={d.colonia} />
         <Fila label="Código postal" valor={d.cp} mono />
@@ -185,4 +218,10 @@ export function GuiaDatosView({ d, palomear = false }: { d: GuiaDatos; palomear?
       )}
     </div>
   );
+}
+
+/** "2026-11-20" -> "vie 20 nov 2026" */
+function fechaCorta(f: string) {
+  const d = new Date(`${f}T12:00:00`);
+  return Number.isNaN(d.getTime()) ? f : d.toLocaleDateString("es-MX", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 }

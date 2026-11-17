@@ -33,11 +33,18 @@ export async function saveGuiaAction(id: string | null, input: GuiaInput): Promi
     return { ok: false, error: generico ? `Revisa ${campo || "los datos"}${partida}.` : `${i.message}${partida}` };
   }
   const supabase = await createClient();
+  if (parsed.data.sentido === "recoleccion" && u.rol !== "comprador") return { ok: false, error: "Las recolecciones con proveedor las pide compras." };
   let datos: Record<string, unknown> = parsed.data;
+  // Envio normal: no se mandan los datos de origen (asi funciona aunque falte la 0057).
+  if (parsed.data.sentido === "envio") {
+    const { sentido: _s, recoleccion_modo: _m, recoleccion_fecha: _fe, origen_nombre: _a, origen_contacto: _b, origen_telefono: _c, origen_calle_numero: _d, origen_colonia: _e, origen_cp: _f, origen_ciudad: _g, origen_estado_geo: _h, ...resto } = parsed.data;
+    datos = resto;
+  }
   // Sin la actualizacion 0049 todavia: se guardan los totales y las partidas van en el contenido.
   const sinPartidas = (msg: string) => /partidas|guias_empaque_check|valor_moneda/.test(msg);
+  const sinRecoleccion = (msg: string) => /sentido|origen_|recoleccion/.test(msg);
   const respaldo = () => {
-    const { partidas, valor_moneda, ...resto } = parsed.data;
+    const { partidas, valor_moneda, ...resto } = datos as typeof parsed.data;
     const detalle = partidas.length > 1
       ? partidas.map((p) => `${p.cantidad} ${p.empaque === "tarima" ? "tarima(s)" : "bulto(s)"} ${p.peso_kg} kg c/u${p.largo_cm && p.ancho_cm && p.alto_cm ? ` ${p.largo_cm}x${p.ancho_cm}x${p.alto_cm} cm` : ""}${p.descripcion ? ` (${p.descripcion})` : ""}`).join("; ")
       : "";
@@ -51,16 +58,37 @@ export async function saveGuiaAction(id: string | null, input: GuiaInput): Promi
     if (!uuid.safeParse(id).success) return { ok: false, error: "Guía inválida" };
     let { data, error } = await supabase.from("guias").update(datos).eq("id", id).select("id");
     if (error && sinPartidas(error.message)) ({ data, error } = await supabase.from("guias").update((datos = respaldo())).eq("id", id).select("id"));
-    if (error) return { ok: false, error: friendlyError(error.message) };
+    if (error) return { ok: false, error: sinRecoleccion(error.message) ? "Primero corre la actualización 0057 en Supabase." : friendlyError(error.message) };
     if (!data?.length) return { ok: false, error: "Ya no puedes editar esta guía." };
     refresh(id);
     return { ok: true, id };
   }
   let { data, error } = await supabase.from("guias").insert(datos).select("id").single();
   if (error && sinPartidas(error.message)) ({ data, error } = await supabase.from("guias").insert(respaldo()).select("id").single());
-  if (error || !data) return { ok: false, error: friendlyError(error?.message ?? "No se pudo guardar") };
+  if (error || !data) return { ok: false, error: error && sinRecoleccion(error.message) ? "Primero corre la actualización 0057 en Supabase." : friendlyError(error?.message ?? "No se pudo guardar") };
   refresh();
   return { ok: true, id: data.id };
+}
+
+/** Compras adjunta la orden de compra (PDF) a su guia de recoleccion. */
+export async function subirOcGuiaAction(formData: FormData): Promise<Result> {
+  const u = await requireUser();
+  if (u.rol !== "comprador") return { ok: false, error: "La OC la adjunta compras." };
+  const id = String(formData.get("id") ?? "");
+  const file = formData.get("file");
+  if (!uuid.safeParse(id).success) return { ok: false, error: "Guía inválida" };
+  if (!(file instanceof File) || file.size === 0) return { ok: false, error: "Elige la orden de compra" };
+  if (!GUIA_FILE_TYPES.includes(file.type)) return { ok: false, error: "La OC debe ser PDF, PNG o JPG" };
+  if (file.size > 10 * 1024 * 1024) return { ok: false, error: "La OC pesa más de 10 MB" };
+  const safe = file.name.replace(/[^\w.\-]+/g, "_").slice(-80) || "oc.pdf";
+  const path = `${id}/oc-${Date.now()}-${safe}`;
+  const supabase = await createClient();
+  const { error: up } = await supabase.storage.from("guias").upload(path, file, { contentType: file.type });
+  if (up) return { ok: false, error: /row-level|policy/i.test(up.message) ? "Primero corre la actualización 0057 en Supabase." : friendlyError(up.message) };
+  const { error } = await supabase.rpc("guia_oc", { p_id: id, p_path: path, p_nombre: file.name.slice(0, 200) });
+  if (error) return { ok: false, error: /guia_oc|does not exist|schema cache/i.test(error.message) ? "Primero corre la actualización 0057 en Supabase." : friendlyError(error.message) };
+  refresh(id);
+  return { ok: true };
 }
 
 async function mover(id: string, estado: "en_proceso" | "requiere_datos", nota?: string): Promise<Result> {
@@ -224,4 +252,18 @@ export async function palomearPartidaAction(id: string, idx: number, lista: bool
   const { data, error } = await supabase.rpc("guia_palomear", { p_id: id, p_idx: idx, p_lista: lista });
   if (error) return { ok: false, error: /guia_palomear/.test(error.message) ? "Primero corre la actualización 0052 en Supabase." : friendlyError(error.message) };
   return { ok: true, listas: (data as number[]) ?? [] };
+}
+
+/** Datos del proveedor del catalogo (contacto y telefono) para la guia de recoleccion. */
+export async function proveedorGuiaAction(nombre: string): Promise<{ nombre: string; contacto: string | null; telefono: string | null; direccion: string | null } | null> {
+  const u = await requireUser();
+  if (u.rol !== "comprador") return null;
+  // "CARNIPROTEK S.A DE C.V" -> "CARNIPROTEK"
+  const clave = nombre.toUpperCase().replace(/\b(S\.?\s?A\.?|DE|C\.?\s?V\.?|S\.?\s?DE\s?R\.?\s?L\.?|SAPI)\b\.?/g, " ").replace(/[^\wÁÉÍÓÚÑ ]/g, " ").trim().split(/\s+/).filter((w) => w.length >= 3).slice(0, 2).join(" ");
+  if (clave.length < 3) return null;
+  const supabase = await createClient();
+  const { data } = await supabase.from("suppliers").select("nombre, razon_social, contacto_nombre, telefono, direccion")
+    .or(`nombre.ilike.%${clave.replace(/[%,()]/g, "")}%,razon_social.ilike.%${clave.replace(/[%,()]/g, "")}%`).limit(1).maybeSingle();
+  if (!data) return null;
+  return { nombre: data.nombre, contacto: data.contacto_nombre ?? null, telefono: data.telefono ?? null, direccion: data.direccion ?? null };
 }
