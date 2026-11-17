@@ -1,9 +1,10 @@
+import { FechasOc, entregaMasProxima } from "@/components/pegatron/fechas-oc";
 import Link from "next/link";
 import { Alert, Card, EmptyState, FilterChip, PageHeader } from "@/components/ui";
 import { requireRoles } from "@/lib/auth/sales";
 import { createClient } from "@/lib/supabase/server";
 
-type Linea = { id: string; articulo_esc: string; descripcion: string; cantidad: number | string; unidad: string | null; pedido_at: string | null };
+type Linea = { id: string; articulo_esc: string; descripcion: string; cantidad: number | string; unidad: string | null; entrega?: string | null; pedido_at: string | null };
 type Oc = { id: string; folio: string; po_numero: string; fecha: string | null; autor_nombre: string | null; created_at: string; pegatron_oc_lineas: Linea[] };
 
 const fmt = (n: number | string) => Number(n).toLocaleString("es-MX", { maximumFractionDigits: 3 });
@@ -14,7 +15,7 @@ export default async function PedidosPegatron({ searchParams }: { searchParams: 
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("pegatron_oc")
-    .select("id, folio, po_numero, fecha, autor_nombre, created_at, pegatron_oc_lineas(id, articulo_esc, descripcion, cantidad, unidad, pedido_at)")
+    .select("id, folio, po_numero, fecha, autor_nombre, created_at, pegatron_oc_lineas(id, articulo_esc, descripcion, cantidad, unidad, entrega, pedido_at)")
     .order("created_at", { ascending: false })
     .limit(200);
   const ocs = ((data ?? []) as Oc[]).map((o) => ({ ...o, pend: o.pegatron_oc_lineas.filter((l) => !l.pedido_at).length }));
@@ -47,7 +48,8 @@ export default async function PedidosPegatron({ searchParams }: { searchParams: 
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="font-semibold text-slate-900">P/O {o.po_numero} <span className="ml-1 text-xs font-normal text-slate-500">{o.folio}</span></p>
-                      <p className="text-xs text-slate-500">Pegatron{o.fecha ? ` · ${o.fecha.split("-").reverse().join("/")}` : ""}{o.autor_nombre ? ` · subió ${o.autor_nombre}` : ""}</p>
+                      <p className="text-xs text-slate-500">Pegatron{o.autor_nombre ? ` · subió ${o.autor_nombre}` : ""}</p>
+                      <div className="mt-1.5"><FechasOc subida={o.created_at} fechaOc={o.fecha} entrega={entregaMasProxima(o.pegatron_oc_lineas)} /></div>
                     </div>
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${o.pend === 0 ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-900"}`}>
                       {o.pend === 0 ? "Todo pedido" : `${total - o.pend} de ${total} pedidos`}
