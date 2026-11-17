@@ -60,12 +60,15 @@ export async function saveGuiaAction(id: string | null, input: GuiaInput): Promi
     if (error && sinPartidas(error.message)) ({ data, error } = await supabase.from("guias").update((datos = respaldo())).eq("id", id).select("id"));
     if (error) return { ok: false, error: sinRecoleccion(error.message) ? "Primero corre la actualización 0057 en Supabase." : friendlyError(error.message) };
     if (!data?.length) return { ok: false, error: "Ya no puedes editar esta guía." };
+    if (parsed.data.sentido === "recoleccion") await guardarProveedorDeGuia(supabase, parsed.data).catch(() => null);
     refresh(id);
     return { ok: true, id };
   }
   let { data, error } = await supabase.from("guias").insert(datos).select("id").single();
   if (error && sinPartidas(error.message)) ({ data, error } = await supabase.from("guias").insert(respaldo()).select("id").single());
   if (error || !data) return { ok: false, error: error && sinRecoleccion(error.message) ? "Primero corre la actualización 0057 en Supabase." : friendlyError(error?.message ?? "No se pudo guardar") };
+  // Recoleccion: el proveedor queda en el catalogo de proveedores (o se completan sus datos).
+  if (parsed.data.sentido === "recoleccion") await guardarProveedorDeGuia(supabase, parsed.data).catch(() => null);
   refresh();
   return { ok: true, id: data.id };
 }
@@ -258,12 +261,51 @@ export async function palomearPartidaAction(id: string, idx: number, lista: bool
 export async function proveedorGuiaAction(nombre: string): Promise<{ nombre: string; contacto: string | null; telefono: string | null; direccion: string | null } | null> {
   const u = await requireUser();
   if (u.rol !== "comprador") return null;
-  // "CARNIPROTEK S.A DE C.V" -> "CARNIPROTEK"
-  const clave = nombre.toUpperCase().replace(/\b(S\.?\s?A\.?|DE|C\.?\s?V\.?|S\.?\s?DE\s?R\.?\s?L\.?|SAPI)\b\.?/g, " ").replace(/[^\wÁÉÍÓÚÑ ]/g, " ").trim().split(/\s+/).filter((w) => w.length >= 3).slice(0, 2).join(" ");
-  if (clave.length < 3) return null;
   const supabase = await createClient();
-  const { data } = await supabase.from("suppliers").select("nombre, razon_social, contacto_nombre, telefono, direccion")
-    .or(`nombre.ilike.%${clave.replace(/[%,()]/g, "")}%,razon_social.ilike.%${clave.replace(/[%,()]/g, "")}%`).limit(1).maybeSingle();
+  const data = await buscarProveedor(supabase, nombre);
   if (!data) return null;
   return { nombre: data.nombre, contacto: data.contacto_nombre ?? null, telefono: data.telefono ?? null, direccion: data.direccion ?? null };
+}
+
+/** "CARNIPROTEK S.A DE C.V" -> "CARNIPROTEK" (para encontrarlo aunque el nombre no sea identico). */
+function claveProveedor(nombre: string) {
+  return nombre.toUpperCase().replace(/\b(S\.?\s?A\.?|DE|C\.?\s?V\.?|S\.?\s?DE\s?R\.?\s?L\.?|SAPI)\b\.?/g, " ").replace(/[^\wÁÉÍÓÚÑ ]/g, " ").trim().split(/\s+/).filter((w) => w.length >= 3).slice(0, 2).join(" ").replace(/[%,()]/g, "");
+}
+type ProvCat = { id: string; nombre: string; razon_social: string | null; contacto_nombre: string | null; telefono: string | null; direccion: string | null };
+async function buscarProveedor(supabase: Awaited<ReturnType<typeof createClient>>, nombre: string): Promise<ProvCat | null> {
+  const clave = claveProveedor(nombre);
+  if (clave.length < 3) return null;
+  const { data } = await supabase.from("suppliers").select("id, nombre, razon_social, contacto_nombre, telefono, direccion")
+    .or(`nombre.ilike.%${clave}%,razon_social.ilike.%${clave}%`).limit(1).maybeSingle();
+  return (data as ProvCat | null) ?? null;
+}
+
+/**
+ * La guia de recoleccion alimenta el catalogo de proveedores: si el proveedor no existe se da de alta
+ * con sus datos; si ya existe, solo se llenan los datos que le faltaban (nunca se sobreescribe nada).
+ */
+async function guardarProveedorDeGuia(supabase: Awaited<ReturnType<typeof createClient>>, g: {
+  origen_nombre: string | null; origen_contacto: string | null; origen_telefono: string | null; origen_calle_numero: string | null;
+  origen_colonia: string | null; origen_cp: string | null; origen_ciudad: string | null; origen_estado_geo: string | null;
+}): Promise<"alta" | "actualizado" | null> {
+  if (!g.origen_nombre) return null;
+  const direccion = [g.origen_calle_numero, g.origen_colonia && `Col. ${g.origen_colonia}`, g.origen_cp && `C.P. ${g.origen_cp}`, [g.origen_ciudad, g.origen_estado_geo].filter(Boolean).join(", ")].filter(Boolean).join(", ") || null;
+  const existe = await buscarProveedor(supabase, g.origen_nombre);
+  if (!existe) {
+    const { error } = await supabase.from("suppliers").insert({
+      nombre: g.origen_nombre.slice(0, 200), razon_social: g.origen_nombre.slice(0, 200), contacto_nombre: g.origen_contacto, telefono: g.origen_telefono,
+      direccion, tipo: "nacional", pais: "México",
+    });
+    if (!error) revalidatePath("/comprador/proveedores");
+    return error ? null : "alta";
+  }
+  const faltan: Record<string, string> = {};
+  if (!existe.razon_social) faltan.razon_social = g.origen_nombre.slice(0, 200);
+  if (!existe.contacto_nombre && g.origen_contacto) faltan.contacto_nombre = g.origen_contacto;
+  if (!existe.telefono && g.origen_telefono) faltan.telefono = g.origen_telefono;
+  if (!existe.direccion && direccion) faltan.direccion = direccion;
+  if (!Object.keys(faltan).length) return null;
+  const { error } = await supabase.from("suppliers").update(faltan).eq("id", existe.id);
+  if (!error) revalidatePath("/comprador/proveedores");
+  return error ? null : "actualizado";
 }

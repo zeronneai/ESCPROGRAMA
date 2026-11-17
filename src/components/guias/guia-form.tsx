@@ -155,7 +155,7 @@ export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDo
               className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-brand-300 bg-brand-50/50 px-4 py-6 text-center hover:bg-brand-50"
             >
               <span className="font-medium text-slate-800">{leyendoOc ? "Leyendo la OC..." : oc ? `OC: ${oc.name}` : "Arrastra aquí la orden de compra (PDF de Microsip)"}</span>
-              <span className="text-xs text-slate-500">Se llenan el folio, el proveedor y su domicilio, la vía de embarque y el contenido. La OC le llega a Marketplaces.</span>
+              <span className="text-xs text-slate-500">Se llenan el folio, el proveedor y su domicilio, la vía de embarque y el contenido. La OC le llega a Marketplaces. Si el proveedor no está en tu catálogo, se da de alta solo.</span>
               <input type="file" accept="application/pdf,image/png,image/jpeg" className="hidden" onChange={(e) => { void leerOc(e.target.files?.[0]); e.target.value = ""; }} />
             </label>
           )}
