@@ -193,6 +193,16 @@ export function operacionesSuite() {
       expect(await failure(q(A("iso"), GUIA, ["F-X"]))).toMatch(/row-level security/);
     });
 
+    it("el vendedor marca si es recoleccion u ocurre y Marketplaces lo ve en el aviso", async () => {
+      const OC = "insert into public.guias (entrega_modo, factura, destinatario, paqueteria, telefono, calle_numero, cp, ciudad, estado_geo, peso_kg) values ($1,'F-OC','Foxconn','DHL','6561234567','Av. Uno 100','32000','Juarez','Chihuahua',2) returning id";
+      expect(await failure(q(w.seller1, OC, ["domicilio"]))).toMatch(/guias_entrega_modo_check/);
+      const g = (await q(w.seller1, OC, ["ocurre"])).rows[0];
+      expect((await q("postgres", "select titulo from public.notifications where user_id=$1 and tipo='guia_nueva' and ref_id=$2", [people.mkt.id, g.id])).rows[0].titulo).toMatch(/^Guia OCURRE · F-OC/);
+      expect((await q(A("mkt"), "select entrega_modo from public.guias where id=$1", [g.id])).rows[0].entrega_modo).toBe("ocurre");
+      await q(w.seller1, "update public.guias set entrega_modo='recoleccion' where id=$1", [g.id]);
+      expect((await q(w.seller1, "select entrega_modo from public.guias where id=$1", [g.id])).rows[0].entrega_modo).toBe("recoleccion");
+    });
+
     it("guias de recoleccion: compras sube la OC; la guia va del proveedor a ESC", async () => {
       const RECO = "insert into public.guias (sentido, recoleccion_modo, recoleccion_fecha, factura, destinatario, paqueteria, paqueteria_otra, telefono, calle_numero, cp, ciudad, estado_geo, peso_kg, origen_nombre, origen_telefono, origen_calle_numero, origen_cp, origen_ciudad, origen_estado_geo) values ('recoleccion','proveedor_lleva','2026-11-20','700','ESC REPRESENTACIONES','Otra','Aeroflash','6144100000','Heroico Colegio Militar 5910-C','31105','Chihuahua','Chihuahua',20,$1,'5555555555','Miguel Allende 37-A','53228','Naucalpan','Estado de Mexico') returning id";
       expect(await failure(q(w.buyer1, RECO, [null]))).toMatch(/guias_recoleccion_origen/);

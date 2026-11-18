@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 type Row = {
   id: string; numero: string; factura: string; destinatario: string; paqueteria: string; paqueteria_otra: string | null; estado: GuiaEstado;
   solicitada_at: string; lista_at: string | null; vendedor_nombre: string | null; atendida_nombre: string | null; urgente: boolean;
-  recordatorios: number; numero_rastreo: string | null; created_at: string; vendedor_id: string; sentido?: string | null; origen_nombre?: string | null;
+  recordatorios: number; numero_rastreo: string | null; created_at: string; vendedor_id: string; sentido?: string | null; origen_nombre?: string | null; entrega_modo?: string | null;
 };
 const VIEWS = { pendientes: "Pendientes", listas: "Listas", todas: "Todas", mias: "Mis guías" } as const;
 
@@ -25,7 +25,8 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
   const BASE = "id, numero, factura, destinatario, paqueteria, paqueteria_otra, estado, solicitada_at, lista_at, vendedor_nombre, atendida_nombre, urgente, recordatorios, numero_rastreo, created_at, vendedor_id";
   const consulta = (cols: string) => supabase.from("guias").select(cols).order("created_at", { ascending: false }).limit(500);
   // Con la 0057 tambien sale de donde se recoge (recolecciones); sin ella, la lista de siempre.
-  let { data, error } = await consulta(`${BASE}, sentido, origen_nombre`);
+  let { data, error } = await consulta(`${BASE}, sentido, origen_nombre, entrega_modo`);
+  if (error && /entrega_modo/.test(error.message)) ({ data, error } = await consulta(`${BASE}, sentido, origen_nombre`));
   if (error && /sentido|origen_nombre/.test(error.message)) ({ data, error } = await consulta(BASE));
   const all = (data ?? []) as unknown as Row[];
   const now = new Date();
@@ -110,6 +111,9 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
                   <Link href={`/guias/${g.id}`} className={`flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${alert === "roja" ? "border-l-8 border-red-600 bg-red-100 hover:bg-red-200" : alert === "ambar" ? "border-l-4 border-amber-500 bg-amber-50 hover:bg-amber-100" : "hover:bg-slate-50"}`}>
                     <div className="min-w-0">
                       <p className="flex flex-wrap items-center gap-2 font-medium text-slate-900">
+                        {g.sentido !== "recoleccion" && g.entrega_modo && (
+                          <span className={`rounded-md px-2 py-0.5 text-xs font-extrabold tracking-wider text-white ${g.entrega_modo === "ocurre" ? "bg-violet-600" : "bg-sky-600"}`}>{g.entrega_modo === "ocurre" ? "OCURRE" : "RECOLECCIÓN"}</span>
+                        )}
                         <span className="truncate">{guiaTitle(g)}</span>
                         {g.urgente && <Chip cls="bg-red-600 text-white">URGENTE</Chip>}
                         {alert === "roja" && <Chip cls="animate-pulse bg-red-700 text-white">ATRASADA +2 h</Chip>}

@@ -32,6 +32,8 @@ export type GuiaDatos = {
   contenido: string | null;
   valor: string | null;
   notas: string | null;
+  /** Envio de vendedor: recoleccion u ocurre (se muestra en grande para Marketplaces). */
+  entrega_modo?: string | null;
   /** Recoleccion con proveedor: donde se recoge y la OC. */
   origen?: {
     modo: string | null; fecha: string | null; nombre: string | null; contacto: string | null; telefono: string | null; calle_numero: string | null; colonia: string | null;
@@ -107,6 +109,12 @@ export function GuiaDatosView({ d, palomear = false }: { d: GuiaDatos; palomear?
   const piezas = d.conPartidas ? resumenPartidas(d.partidas) : d.resumenViejo;
   return (
     <div className="grid gap-4 lg:grid-cols-2">
+      {d.entrega_modo && (
+        <div className={`rounded-2xl px-5 py-4 text-center text-white shadow-md lg:col-span-2 ${d.entrega_modo === "ocurre" ? "bg-violet-600" : "bg-sky-600"}`}>
+          <p className="text-3xl font-extrabold tracking-widest sm:text-4xl">{d.entrega_modo === "ocurre" ? "OCURRE" : "RECOLECCIÓN"}</p>
+          <p className="mt-1 text-sm font-medium text-white/90">{d.entrega_modo === "ocurre" ? "Se entrega en la sucursal de la paquetería" : "La paquetería pasa a recoger el paquete"}</p>
+        </div>
+      )}
       {o && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border-2 border-sky-300 bg-gradient-to-r from-sky-50 to-green-50 px-4 py-3 lg:col-span-2">
           <p className="text-sm font-semibold text-slate-900">

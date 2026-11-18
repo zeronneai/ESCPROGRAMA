@@ -2,9 +2,10 @@
 
 import { useRef, useState } from "react";
 import { datosFacturaGuiaAction, proveedorGuiaAction, saveGuiaAction, subirOcGuiaAction } from "@/actions/guias";
+import { irACampo } from "@/components/feedback-global";
 import { areaCls, CustomerLookup, useRun } from "@/components/ops-ui";
 import { Alert, Button, Field, Input, Select } from "@/components/ui";
-import { DESTINO_ESC, PAQUETERIAS, RECOLECCION_MODOS, SERVICIOS, guiaTitle, partirDireccion, resumenPartidas, type GuiaInput } from "@/lib/ops/guias";
+import { DESTINO_ESC, ENTREGA_MODOS, PAQUETERIAS, RECOLECCION_MODOS, SERVICIOS, guiaTitle, partirDireccion, resumenPartidas, type GuiaInput } from "@/lib/ops/guias";
 import { contenidoOc, domicilioOc, leerOcMicrosip } from "@/lib/oc-microsip";
 import { textosPdf } from "@/lib/pegatron-po";
 import { ESTADOS_MX } from "@/lib/validation/customer";
@@ -14,7 +15,7 @@ const EMPTY: F = {
   factura: "", destinatario: "", paqueteria: "", paqueteria_otra: "", servicio: "estandar", customer_id: null, contacto_nombre: "",
   telefono: "", correo: "", calle_numero: "", colonia: "", cp: "", ciudad: "", estado_geo: "", referencias: "",
   contenido: "", valor_declarado: "", valor_moneda: "MXN", asegurar: false, urgente: false, notas: "",
-  sentido: "envio", recoleccion_modo: "recoleccion", recoleccion_fecha: "", origen_nombre: "", origen_contacto: "", origen_telefono: "", origen_calle_numero: "", origen_colonia: "", origen_cp: "",
+  sentido: "envio", entrega_modo: "", recoleccion_modo: "recoleccion", recoleccion_fecha: "", origen_nombre: "", origen_contacto: "", origen_telefono: "", origen_calle_numero: "", origen_colonia: "", origen_cp: "",
   origen_ciudad: "", origen_estado_geo: "",
 };
 /** Partida en el formulario (texto mientras se escribe). */
@@ -116,6 +117,7 @@ export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDo
       className="space-y-5"
       onSubmit={(e) => {
         e.preventDefault();
+        if (!reco && !v.entrega_modo) return irACampo('[data-campo="entrega_modo"]', "Elige si es Recolección u Ocurre");
         const datos = { ...v, partidas: ps.map(({ key: _k, ...p }) => p) } as unknown as GuiaInput;
         run("save", async () => {
           const r = await saveGuiaAction(id, datos);
@@ -221,6 +223,24 @@ export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDo
                 {ESTADOS_MX.map((e) => <option key={e} value={e}>{e}</option>)}
               </Select>
             </Field>
+          </div>
+        </div>
+      )}
+
+      {!reco && (
+        <div className="space-y-2" data-campo="entrega_modo">
+          <h3 className="text-sm font-semibold text-slate-800">¿Es recolección u ocurre? *</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(Object.keys(ENTREGA_MODOS) as (keyof typeof ENTREGA_MODOS)[]).map((k) => {
+              const act = v.entrega_modo === k;
+              return (
+                <button key={k} type="button" aria-pressed={act} onClick={() => setV((x) => ({ ...x, entrega_modo: k }))}
+                  className={`rounded-xl border-2 px-4 py-3 text-left transition ${act ? (k === "ocurre" ? "border-violet-600 bg-violet-600 text-white shadow" : "border-sky-600 bg-sky-600 text-white shadow") : "border-slate-300 bg-white text-slate-800 hover:border-brand-300"}`}>
+                  <span className="block text-lg font-extrabold tracking-wide">{ENTREGA_MODOS[k].label}</span>
+                  <span className={`block text-xs ${act ? "text-white/85" : "text-slate-500"}`}>{ENTREGA_MODOS[k].ayuda}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

@@ -146,6 +146,7 @@ export function partidasDeGuia(g: { partidas?: unknown; empaque?: string | null;
 export const guiaSchema = z
   .object({
     sentido: z.enum(["envio", "recoleccion"]).default("envio"),
+    entrega_modo: z.preprocess((v) => v || null, z.enum(["recoleccion", "ocurre"]).nullable()).optional().transform((v) => v ?? null),
     recoleccion_modo: z.preprocess((v) => v || null, z.enum(["recoleccion", "proveedor_lleva"]).nullable()).optional().transform((v) => v ?? null),
     recoleccion_fecha: z.preprocess((v) => v || null, z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida").nullable()).optional().transform((v) => v ?? null),
     origen_nombre: txt(200),
@@ -181,6 +182,7 @@ export const guiaSchema = z
   })
   .refine((v) => v.paqueteria !== "Otra" || !!v.paqueteria_otra, { message: "Escribe cuál paquetería", path: ["paqueteria_otra"] })
   .superRefine((v, ctx) => {
+    if (v.sentido === "envio" && !v.entrega_modo) ctx.addIssue({ code: "custom", message: "Elige si es Recolección u Ocurre", path: ["entrega_modo"] });
     if (v.sentido !== "recoleccion") return;
     const falta: [keyof typeof v, string][] = [
       ["recoleccion_modo", "Elige si la paquetería recoge o el proveedor lo lleva"], ["recoleccion_fecha", "Escribe la fecha de recolección o de entrega"],
@@ -193,6 +195,13 @@ export const guiaSchema = z
   })
   .transform((v) => ({ ...v, ...totalesPartidas(v.partidas) }));
 export type GuiaInput = z.input<typeof guiaSchema>;
+
+/** Envio de vendedor: la paqueteria recoge, o va a sucursal (ocurre). */
+export const ENTREGA_MODOS = {
+  recoleccion: { label: "RECOLECCIÓN", ayuda: "La paquetería pasa a recoger el paquete" },
+  ocurre: { label: "OCURRE", ayuda: "Se entrega en la sucursal de la paquetería" },
+} as const;
+export type EntregaModo = keyof typeof ENTREGA_MODOS;
 
 export const GUIA_FILE_TYPES = ["application/pdf", "image/png", "image/jpeg"];
 

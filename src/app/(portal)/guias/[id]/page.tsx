@@ -48,7 +48,7 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
     customer_id: g.customer_id, contacto_nombre: g.contacto_nombre ?? "", telefono: g.telefono, correo: g.correo ?? "", calle_numero: g.calle_numero,
     colonia: g.colonia ?? "", cp: g.cp, ciudad: g.ciudad, estado_geo: g.estado_geo, referencias: g.referencias ?? "", contenido: g.contenido ?? "",
     valor_declarado: n(g.valor_declarado), valor_moneda: g.valor_moneda === "USD" ? "USD" : "MXN", asegurar: g.asegurar, urgente: g.urgente, notas: g.notas ?? "",
-    sentido: g.sentido === "recoleccion" ? "recoleccion" : "envio", recoleccion_modo: g.recoleccion_modo ?? "recoleccion", recoleccion_fecha: g.recoleccion_fecha ?? "", origen_nombre: g.origen_nombre ?? "", origen_contacto: g.origen_contacto ?? "",
+    sentido: g.sentido === "recoleccion" ? "recoleccion" : "envio", entrega_modo: g.entrega_modo ?? "", recoleccion_modo: g.recoleccion_modo ?? "recoleccion", recoleccion_fecha: g.recoleccion_fecha ?? "", origen_nombre: g.origen_nombre ?? "", origen_contacto: g.origen_contacto ?? "",
     origen_telefono: g.origen_telefono ?? "", origen_calle_numero: g.origen_calle_numero ?? "", origen_colonia: g.origen_colonia ?? "", origen_cp: g.origen_cp ?? "",
     origen_ciudad: g.origen_ciudad ?? "", origen_estado_geo: g.origen_estado_geo ?? "",
   };
@@ -75,7 +75,7 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
         urgente: g.urgente, asegurar: g.asegurar, destinatario: g.destinatario, contacto_nombre: g.contacto_nombre, telefono: g.telefono, correo: g.correo,
         calle_numero: g.calle_numero, colonia: g.colonia, cp: g.cp, ciudad: g.ciudad, estado_geo: g.estado_geo, referencias: g.referencias,
         partidas, conPartidas, resumenViejo: empaqueLabel(g.empaque, g.bultos), medidasViejas: medidas, peso_total: n(g.peso_kg),
-        contenido: g.contenido, notas: g.notas, origen,
+        contenido: g.contenido, notas: g.notas, origen, entrega_modo: g.sentido === "recoleccion" ? null : (g.entrega_modo ?? null),
         valor: g.valor_declarado !== null ? `$${Number(g.valor_declarado).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${g.valor_moneda === "USD" ? "USD" : "MXN"}` : null,
       }}
     />

@@ -39,10 +39,21 @@ export async function saveGuiaAction(id: string | null, input: GuiaInput): Promi
   if (parsed.data.sentido === "envio") {
     const { sentido: _s, recoleccion_modo: _m, recoleccion_fecha: _fe, origen_nombre: _a, origen_contacto: _b, origen_telefono: _c, origen_calle_numero: _d, origen_colonia: _e, origen_cp: _f, origen_ciudad: _g, origen_estado_geo: _h, ...resto } = parsed.data;
     datos = resto;
+  } else {
+    const { entrega_modo: _em, ...resto } = datos as typeof parsed.data;
+    void _em;
+    datos = resto;
   }
   // Sin la actualizacion 0049 todavia: se guardan los totales y las partidas van en el contenido.
   const sinPartidas = (msg: string) => /partidas|guias_empaque_check|valor_moneda/.test(msg);
   const sinRecoleccion = (msg: string) => /sentido|origen_|recoleccion/.test(msg);
+  // Sin la 0062 todavia no existe entrega_modo: se guarda en las notas.
+  const sinModo = (msg: string) => /entrega_modo/.test(msg);
+  const conModoEnNotas = () => {
+    const { entrega_modo, ...resto } = datos as typeof parsed.data;
+    const t = entrega_modo === "ocurre" ? "OCURRE" : entrega_modo === "recoleccion" ? "RECOLECCIÓN" : "";
+    return { ...resto, notas: [t, resto.notas].filter(Boolean).join(" · ").slice(0, 1000) || null };
+  };
   const respaldo = () => {
     const { partidas, valor_moneda, ...resto } = datos as typeof parsed.data;
     const detalle = partidas.length > 1
@@ -57,6 +68,7 @@ export async function saveGuiaAction(id: string | null, input: GuiaInput): Promi
   if (id) {
     if (!uuid.safeParse(id).success) return { ok: false, error: "Guía inválida" };
     let { data, error } = await supabase.from("guias").update(datos).eq("id", id).select("id");
+    if (error && sinModo(error.message)) ({ data, error } = await supabase.from("guias").update((datos = conModoEnNotas())).eq("id", id).select("id"));
     if (error && sinPartidas(error.message)) ({ data, error } = await supabase.from("guias").update((datos = respaldo())).eq("id", id).select("id"));
     if (error) return { ok: false, error: sinRecoleccion(error.message) ? "Primero corre la actualización 0057 en Supabase." : friendlyError(error.message) };
     if (!data?.length) return { ok: false, error: "Ya no puedes editar esta guía." };
@@ -65,6 +77,7 @@ export async function saveGuiaAction(id: string | null, input: GuiaInput): Promi
     return { ok: true, id };
   }
   let { data, error } = await supabase.from("guias").insert(datos).select("id").single();
+  if (error && sinModo(error.message)) ({ data, error } = await supabase.from("guias").insert((datos = conModoEnNotas())).select("id").single());
   if (error && sinPartidas(error.message)) ({ data, error } = await supabase.from("guias").insert(respaldo()).select("id").single());
   if (error || !data) return { ok: false, error: error && sinRecoleccion(error.message) ? "Primero corre la actualización 0057 en Supabase." : friendlyError(error?.message ?? "No se pudo guardar") };
   // Recoleccion: el proveedor queda en el catalogo de proveedores (o se completan sus datos).
