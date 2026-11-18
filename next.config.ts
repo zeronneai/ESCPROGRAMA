@@ -11,6 +11,13 @@ import type { NextConfig } from "next";
  * `pnpm build` ejecuta scripts/verify-pdf-trace.mjs para comprobar que los archivos quedaron incluidos.
  */
 const PDF_ROUTE = "/api/pdf/[requestId]";
+const PDF_FILES = [
+  // pnpm (node_modules/.pnpm) y, por si se instala con npm/yarn, node_modules plano.
+  "./node_modules/.pnpm/pdfkit@*/node_modules/pdfkit/js/**/*",
+  "./node_modules/pdfkit/js/**/*",
+  // Logo del encabezado del PDF (se lee con fs desde la funcion).
+  "./public/logo-esc.png",
+];
 
 const config: NextConfig = {
   reactStrictMode: true,
@@ -18,13 +25,9 @@ const config: NextConfig = {
   // No empaquetar estas librerias: se cargan desde node_modules en tiempo de ejecucion.
   serverExternalPackages: ["@react-pdf/renderer", "pdfkit"],
   outputFileTracingIncludes: {
-    [PDF_ROUTE]: [
-      // pnpm (node_modules/.pnpm) y, por si se instala con npm/yarn, node_modules plano.
-      "./node_modules/.pnpm/pdfkit@*/node_modules/pdfkit/js/**/*",
-      "./node_modules/pdfkit/js/**/*",
-      // Logo del encabezado del PDF (se lee con fs desde la funcion).
-      "./public/logo-esc.png",
-    ],
+    [PDF_ROUTE]: PDF_FILES,
+    // Purchase Order de planeacion de compras.
+    "/api/planeacion/oc/[id]": PDF_FILES,
   },
 };
 
