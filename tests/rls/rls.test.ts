@@ -12,6 +12,7 @@ import { documentosSuite } from "./documentos.suite";
 import { almacenSuite } from "./almacen.suite";
 import { riesgosSuite } from "./riesgos.suite";
 import { pagosSuite } from "./pagos.suite";
+import { planeacionSuite } from "./planeacion.suite";
 import { calcTabulador } from "@/lib/pricing/tabulador";
 import { DATABASE_URL, as, failure, pool, type Actor } from "./helpers";
 
@@ -565,6 +566,7 @@ documentosSuite();
 almacenSuite();
   riesgosSuite();
 pagosSuite();
+planeacionSuite();
 
 afterAll(async () => {
   await pool?.end();
