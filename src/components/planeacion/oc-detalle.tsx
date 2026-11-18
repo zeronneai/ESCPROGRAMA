@@ -99,7 +99,10 @@ export function OcDetalle({ oc, prov, lineas, catalogo, proformaUrl, hoy }: { oc
               {oc.origen === "excel" && " · Tomada de tu Excel"}
             </p>
           </div>
-          <Button type="button" variant="secondary" onClick={copiar}>Copiar OC</Button>
+          <div className="flex flex-wrap gap-2">
+            <a href={`/api/planeacion/oc/${oc.id}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-lg bg-gradient-to-b from-brand-500 to-brand-700 px-3.5 py-2 text-sm font-medium text-white shadow-sm">Purchase Order (PDF)</a>
+            <Button type="button" variant="secondary" onClick={copiar}>Copiar OC</Button>
+          </div>
         </div>
         {oc.estado === "cancelada" ? (
           <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-800">Cancelada: ya no cuenta como en camino.</p>

@@ -89,6 +89,10 @@ describe("decideRoute", () => {
     expect(d("/", p("coordinador_iso"))).toEqual({ type: "redirect", to: "/inicio" });
     expect(d("/", p("marketplaces"))).toEqual({ type: "redirect", to: "/inicio" });
     expect(d("/ventas", p("gerente"))).toEqual({ type: "next" });
+    expect(d("/cotizaciones", p("gerente"))).toEqual({ type: "next" });
+    expect(d("/cotizaciones/abc", p("gerente"))).toEqual({ type: "next" });
+    expect(d("/cotizaciones", p("vendedor")).type).toBe("redirect");
+    expect(d("/cotizaciones", p("jefe_ventas")).type).toBe("redirect");
     expect(d("/ventas", p("coordinador_iso"))).toEqual({ type: "next" });
     expect(d("/ventas", p("marketplaces"))).toEqual({ type: "redirect", to: "/inicio" });
     expect(d("/calidad", p("marketplaces"))).toEqual({ type: "redirect", to: "/inicio" });

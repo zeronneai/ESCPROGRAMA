@@ -81,6 +81,7 @@ const NAV: Record<Rol, NavItem[]> = {
   ],
   gerente: [
     { href: "/ventas", label: "Ventas", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
+    { href: "/cotizaciones", label: "Cotizaciones", short: "Cotiz.", icon: "inbox" },
     { href: "/calidad", label: "Calidad", icon: "alert" },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/guias", label: "Guías", icon: "package" },

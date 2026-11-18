@@ -38,6 +38,9 @@ export interface PlanProveedor {
   objetivo_meses: number;
   punto_meses: number;
   cobertura_meses: number;
+  razon_social?: string | null;
+  contacto?: string | null;
+  enviar_a?: string | null;
 }
 
 /** Un mes de historial: [mes "YYYY-MM", venta, traspasos, dias con existencia, dias del mes contados, existencia al cierre]. */

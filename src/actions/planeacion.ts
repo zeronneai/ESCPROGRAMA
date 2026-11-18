@@ -212,6 +212,9 @@ const ajustes = z.object({
   objetivo_meses: z.number().min(0).max(36),
   punto_meses: z.number().min(0).max(36),
   cobertura_meses: z.number().min(0).max(36),
+  razon_social: z.string().trim().max(200).nullable().optional(),
+  contacto: z.string().trim().max(120).nullable().optional(),
+  enviar_a: z.string().trim().max(300).nullable().optional(),
 });
 
 /** Ajustes del proveedor: siglas, dias de entrega y reglas para pedir. */
@@ -221,7 +224,14 @@ export async function ajustesProveedorAction(id: string, input: z.input<typeof a
   const p = ajustes.safeParse(input);
   if (!p.success) return { ok: false, error: p.error.issues[0].message };
   const supabase = await createClient();
-  const { error } = await supabase.from("plan_proveedores").update(p.data).eq("id", id);
+  const datos = { ...p.data, razon_social: p.data.razon_social || null, contacto: p.data.contacto || null, enviar_a: p.data.enviar_a || null };
+  let { error } = await supabase.from("plan_proveedores").update(datos).eq("id", id);
+  // Sin la actualizacion 0060 todavia no existen razon social, contacto y envio.
+  if (error && /razon_social|contacto|enviar_a/.test(error.message)) {
+    const { razon_social: _r, contacto: _c, enviar_a: _e, ...resto } = datos;
+    void _r; void _c; void _e;
+    ({ error } = await supabase.from("plan_proveedores").update(resto).eq("id", id));
+  }
   if (error) return { ok: false, error: friendlyError(error.message) };
   refrescar();
   return { ok: true };

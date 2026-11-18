@@ -271,6 +271,9 @@ function AjustesProveedor({ prov }: { prov: PlanProveedor }) {
     objetivo_meses: String(prov.objetivo_meses),
     punto_meses: String(prov.punto_meses),
     cobertura_meses: String(prov.cobertura_meses),
+    razon_social: prov.razon_social ?? "",
+    contacto: prov.contacto ?? "",
+    enviar_a: prov.enviar_a ?? "",
   });
   const china = prov.origen === "china";
   const campo = (k: keyof typeof v, label: string, extra?: string) => (
@@ -292,6 +295,9 @@ function AjustesProveedor({ prov }: { prov: PlanProveedor }) {
         objetivo_meses: Number(v.objetivo_meses),
         punto_meses: Number(v.punto_meses),
         cobertura_meses: Number(v.cobertura_meses),
+        razon_social: v.razon_social,
+        contacto: v.contacto,
+        enviar_a: v.enviar_a,
       });
       if (!r.ok) return toast(r.error, "error");
       toast("Ajustes guardados", "success");
@@ -321,8 +327,23 @@ function AjustesProveedor({ prov }: { prov: PlanProveedor }) {
           <input type="checkbox" checked={v.recibe_parcial} onChange={(e) => setV({ ...v, recibe_parcial: e.target.checked })} />
           Puede llegar por partes
         </label>
-        <Button type="button" variant="secondary" onClick={guardar} loading={pend}>Guardar ajustes</Button>
       </div>
+      <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">Para la Purchase Order</p>
+      <div className="mt-2 grid gap-3 sm:grid-cols-3">
+        <label className="flex flex-col gap-1 text-xs text-slate-600">
+          Razón social del proveedor
+          <input className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" value={v.razon_social} onChange={(e) => setV({ ...v, razon_social: e.target.value })} placeholder="Ej. RIZHAO ESHINE TRADING CO.,LTD" />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-slate-600">
+          AT&apos;N (contacto)
+          <input className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" value={v.contacto} onChange={(e) => setV({ ...v, contacto: e.target.value })} placeholder="Ej. Terry" />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-slate-600">
+          Ship to
+          <input className="rounded-md border border-slate-300 px-2 py-1.5 text-sm" value={v.enviar_a} onChange={(e) => setV({ ...v, enviar_a: e.target.value })} placeholder="Ej. Port of Export in China" />
+        </label>
+      </div>
+      <div className="mt-3"><Button type="button" variant="secondary" onClick={guardar} loading={pend}>Guardar ajustes</Button></div>
     </details>
   );
 }

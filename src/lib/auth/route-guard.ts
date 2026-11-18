@@ -99,6 +99,10 @@ export function decideRoute(input: {
   if (under("/pedidos-pegatron") && !["jefe_ventas", "comprador", "gerente", "ceo"].includes(profile.rol)) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
+  // Cotizaciones (solo lectura, sin datos del comprador): la gerente.
+  if (under("/cotizaciones") && profile.rol !== "gerente") {
+    return { type: "redirect", to: homeFor(profile.rol) };
+  }
   // Pagos a proveedores extranjeros: comprador y CEO.
   if (under("/pagos") && profile.rol !== "comprador" && profile.rol !== "ceo") {
     return { type: "redirect", to: homeFor(profile.rol) };
