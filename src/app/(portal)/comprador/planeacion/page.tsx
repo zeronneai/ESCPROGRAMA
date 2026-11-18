@@ -71,23 +71,27 @@ export default async function PlaneacionPage({ searchParams }: { searchParams: P
         }
       />
 
-      <nav className="flex flex-wrap gap-2" aria-label="Proveedor">
-        {proveedores.map((p) => {
-          const r = resumen.get(p.id)!;
-          const act = p.id === prov.id;
-          return (
-            <Link
-              key={p.id}
-              href={`/comprador/planeacion?p=${p.id}`}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition ${act ? "border-brand-600 bg-brand-600 text-white shadow-sm" : "border-slate-200 bg-white text-slate-700 hover:border-brand-300"}`}
-            >
-              {p.nombre}
-              <span className={`text-[11px] ${act ? "text-white/80" : "text-slate-400"}`}>{p.origen === "china" ? "CN" : "US"}</span>
-              {r.rojo > 0 && <span className={`rounded-full px-1.5 text-[11px] font-semibold ${act ? "bg-white/25 text-white" : "bg-red-100 text-red-700"}`}>{r.rojo}</span>}
-            </Link>
-          );
-        })}
-      </nav>
+      <div className="space-y-2">
+        {(["usa", "china"] as const).map((origen) => (
+          <nav key={origen} className="flex flex-wrap items-center gap-2" aria-label={origen === "usa" ? "Proveedores americanos" : "Proveedores asiáticos"}>
+            <span className={`w-24 shrink-0 text-xs font-bold uppercase tracking-wide ${origen === "usa" ? "text-amber-700" : "text-red-700"}`}>{origen === "usa" ? "Americanos" : "Asiáticos"}</span>
+            {proveedores.filter((p) => p.origen === origen).map((p) => {
+              const r = resumen.get(p.id)!;
+              const act = p.id === prov.id;
+              const tono = origen === "usa"
+                ? act ? "border-amber-500 bg-amber-400 text-amber-950 shadow-sm" : "border-amber-200 bg-amber-50 text-amber-900 hover:border-amber-400"
+                : act ? "border-red-600 bg-red-600 text-white shadow-sm" : "border-red-200 bg-red-50 text-red-900 hover:border-red-400";
+              return (
+                <Link key={p.id} href={`/comprador/planeacion?p=${p.id}`} className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ${tono}`}>
+                  {p.nombre.toUpperCase()}
+                  <span className="text-[11px] opacity-70">{r.n}</span>
+                  {r.rojo > 0 && <span className={`rounded-full px-1.5 text-[11px] font-semibold ${act ? "bg-white/30" : "bg-red-600 text-white"}`} title="Se acaban antes de que llegue un pedido">{r.rojo}</span>}
+                </Link>
+              );
+            })}
+          </nav>
+        ))}
+      </div>
 
       <Planeador key={prov.id} prov={prov} articulos={mios} hoy={hoy} />
 

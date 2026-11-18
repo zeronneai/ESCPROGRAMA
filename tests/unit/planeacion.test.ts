@@ -43,6 +43,22 @@ describe("planeacion de compras", () => {
     expect(v.sinStock).toBeCloseTo(5 / 6, 5);
   });
 
+  it("tambien cuenta como desabasto los dias con menos de un pedido normal", () => {
+    // Nunca llego a cero, pero 20 de 30 dias tuvo menos de un pedido normal: en los 10 dias buenos vendio 300.
+    const h: MesHist[] = [{ mes: "2026-10", venta: 330, traspasos: 0, dias_stock: 30, dias: 30, existencia_fin: 10, dias_suf: 10, venta_suf: 300, tras_suf: 0 }];
+    const v = ventaReal(h, P);
+    expect(v.simple).toBeCloseTo((330 / 30) * 30.4, 5);
+    expect(v.real).toBeCloseTo(v.simple, 5); // con menos de 20 dias buenos no se usa
+    const h2 = [h[0], { ...h[0], mes: "2026-09" }];
+    const v2 = ventaReal(h2, P);
+    expect(v2.real).toBeCloseTo((600 / 20) * 30.4, 5);
+    expect(v2.sinStock).toBe(0);
+    expect(v2.bajoStock).toBeCloseTo(40 / 60, 5);
+    // Nunca baja del calculo por dias en cero
+    const h3 = [{ ...h[0], dias_suf: 25, venta_suf: 10 }, { ...h[0], mes: "2026-09", dias_suf: 25, venta_suf: 10 }];
+    expect(ventaReal(h3, P).real).toBeCloseTo((660 / 60) * 30.4, 5);
+  });
+
   it("redondea a cajas completas", () => {
     expect(redondeaEmpaque(55, 54)).toBe(108);
     expect(redondeaEmpaque(54, 54)).toBe(54);

@@ -70,12 +70,15 @@ export async function cargarPlaneacion(supabase: SupabaseClient, soloProveedor?:
   }));
   const corte = (corteRow?.fecha as string | undefined) ?? null;
 
-  type ArtRow = { clave: string; proveedor_id: string; nombre: string; um: string | null; empaque: string | null; cbm_empaque: string | null; precio: string | null };
-  const arts = await todas<ArtRow>((a, b) => {
-    let q = supabase.from("plan_articulos").select("clave, proveedor_id, nombre, um, empaque, cbm_empaque, precio").eq("activo", true).order("clave").range(a, b);
-    if (soloProveedor) q = q.eq("proveedor_id", soloProveedor);
-    return q;
-  });
+  type ArtRow = { clave: string; proveedor_id: string; nombre: string; um: string | null; empaque: string | null; cbm_empaque: string | null; precio: string | null; pedido_tipico?: string | null };
+  const traerArts = (cols: string) =>
+    todas<ArtRow>((a, b) => {
+      let q = supabase.from("plan_articulos").select(cols).eq("activo", true).order("clave").range(a, b);
+      if (soloProveedor) q = q.eq("proveedor_id", soloProveedor);
+      return q as unknown as PromiseLike<{ data: ArtRow[] | null; error: { message: string } | null }>;
+    });
+  // Sin la actualizacion 0061 todavia no existe el pedido tipico.
+  const arts = await traerArts("clave, proveedor_id, nombre, um, empaque, cbm_empaque, precio, pedido_tipico").catch(() => traerArts("clave, proveedor_id, nombre, um, empaque, cbm_empaque, precio"));
   const claves = new Set(arts.map((a) => a.clave));
 
   const exist = new Map<string, number>();
@@ -83,14 +86,21 @@ export async function cargarPlaneacion(supabase: SupabaseClient, soloProveedor?:
     const ex = await todas<{ clave: string; existencia: string }>((a, b) => supabase.from("plan_existencias").select("clave, existencia").eq("corte_id", corteRow.id).range(a, b));
     for (const e of ex) exist.set(e.clave, Number(e.existencia));
   }
-  const hist = await todas<{ clave: string; mes: string; venta: string; traspasos: string; dias_stock: number; dias: number; existencia_fin: string | null }>((a, b) =>
-    supabase.from("plan_historial").select("clave, mes, venta, traspasos, dias_stock, dias, existencia_fin").order("clave").order("mes").range(a, b),
+  type HistRow = { clave: string; mes: string; venta: string; traspasos: string; dias_stock: number; dias: number; existencia_fin: string | null; dias_suficiente?: number; venta_suficiente?: string; traspasos_suficiente?: string };
+  const traerHist = (cols: string) =>
+    todas<HistRow>((a, b) => supabase.from("plan_historial").select(cols).order("clave").order("mes").range(a, b) as unknown as PromiseLike<{ data: HistRow[] | null; error: { message: string } | null }>);
+  const hist = await traerHist("clave, mes, venta, traspasos, dias_stock, dias, existencia_fin, dias_suficiente, venta_suficiente, traspasos_suficiente").catch(() =>
+    traerHist("clave, mes, venta, traspasos, dias_stock, dias, existencia_fin"),
   );
   const histPor = new Map<string, MesHist[]>();
   for (const h of hist) {
     if (!claves.has(h.clave)) continue;
     const l = histPor.get(h.clave) ?? [];
-    l.push({ mes: h.mes.slice(0, 7), venta: Number(h.venta), traspasos: Number(h.traspasos), dias_stock: h.dias_stock, dias: h.dias, existencia_fin: num(h.existencia_fin) });
+    const conSuf = h.dias_suficiente != null && (h.dias_suficiente > 0 || Number(h.venta_suficiente ?? 0) > 0 || h.dias_stock === 0);
+    l.push({
+      mes: h.mes.slice(0, 7), venta: Number(h.venta), traspasos: Number(h.traspasos), dias_stock: h.dias_stock, dias: h.dias, existencia_fin: num(h.existencia_fin),
+      ...(conSuf ? { dias_suf: h.dias_suficiente, venta_suf: Number(h.venta_suficiente ?? 0), tras_suf: Number(h.traspasos_suficiente ?? 0) } : {}),
+    });
     histPor.set(h.clave, l);
   }
 
@@ -171,6 +181,7 @@ export async function cargarPlaneacion(supabase: SupabaseClient, soloProveedor?:
       empaque: num(a.empaque),
       cbm_empaque: num(a.cbm_empaque),
       precio: num(a.precio),
+      pedido_tipico: num(a.pedido_tipico),
       existencia_corte,
       ventas_portal: vend,
       recibido_post,

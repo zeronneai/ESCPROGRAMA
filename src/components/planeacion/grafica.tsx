@@ -38,10 +38,10 @@ export function GraficaArticulo({ a, c, prov, p, hoy, pedir }: { a: ArticuloPlan
             </g>
           ))}
           {ms.map((m, i) => {
-            const sin = m.dias ? 1 - m.dias_stock / m.dias : 0;
+            const sin = m.dias ? 1 - (m.dias_suf ?? m.dias_stock) / m.dias : 0;
             return (
               <g key={m.mes}>
-                {sin > 0.02 && <rect x={x(i)} y={T} width={bw} height={H - T - B} fill="#dc2626" opacity={Math.min(0.35, 0.08 + sin * 0.3)}><title>{`${m.mes}: ${fmtNum(sin * 100)}% de días sin existencia`}</title></rect>}
+                {sin > 0.02 && <rect x={x(i)} y={T} width={bw} height={H - T - B} fill="#dc2626" opacity={Math.min(0.35, 0.08 + sin * 0.3)}><title>{`${m.mes}: ${fmtNum(sin * 100)}% de días sin stock suficiente (${m.dias - m.dias_stock} en cero)`}</title></rect>}
                 <rect x={x(i) + bw * 0.15} y={y(vals[i])} width={bw * 0.7} height={Math.max(0, y(0) - y(vals[i]))} rx="2" fill="#3468e0"><title>{`${m.mes}: vendió ${fmtNum(vals[i])}`}</title></rect>
                 {(i % 2 === 0 || ms.length < 14) && (
                   <text x={x(i) + bw / 2} y={H - B + 14} textAnchor="middle" fontSize="10" fill="#64748b">{mesCorto(m.mes)}{m.mes.endsWith("-01") || i === 0 ? ` ${m.mes.slice(2, 4)}` : ""}</text>
@@ -67,7 +67,7 @@ export function GraficaArticulo({ a, c, prov, p, hoy, pedir }: { a: ArticuloPlan
       </div>
       <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">
         <span><i className="mr-1 inline-block h-3 w-3 rounded-sm bg-brand-500 align-[-2px]" />Venta del mes</span>
-        <span><i className="mr-1 inline-block h-3 w-3 rounded-sm bg-red-200 align-[-2px]" />Días sin existencia</span>
+        <span><i className="mr-1 inline-block h-3 w-3 rounded-sm bg-red-200 align-[-2px]" />Días sin stock suficiente</span>
         <span><i className="mr-1 inline-block h-3 w-3 rounded-sm bg-[#e8730c] align-[-2px]" />Existencia (punteada: proyección con lo que viene{pedir ? " y lo que vas a pedir" : ""})</span>
       </div>
     </div>

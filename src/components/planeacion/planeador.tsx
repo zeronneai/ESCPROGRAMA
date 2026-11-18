@@ -151,7 +151,7 @@ export function Planeador({ prov, articulos, hoy }: { prov: PlanProveedor; artic
               <th className="px-3 py-2 text-right">En camino</th>
               <th className="px-3 py-2 text-right">Prom. simple</th>
               <th className="px-3 py-2 text-right">Venta real</th>
-              <th className="px-3 py-2 text-right">Sin stock</th>
+              <th className="px-3 py-2 text-right" title="Días en cero o con menos de un pedido normal">Sin stock suf.</th>
               <th className="px-3 py-2 text-right">Meses inv.</th>
               <th className="px-3 py-2 text-right">Pedir</th>
               <th className="px-3 py-2 text-right">{china ? "CBM" : "Importe"}</th>
@@ -179,7 +179,7 @@ export function Planeador({ prov, articulos, hoy }: { prov: PlanProveedor; artic
                       {fmtNum(c.real, 1)}
                       {dif > 0.05 && <span className={`block text-[11px] font-normal ${dif > 0.15 ? "text-red-700" : "text-slate-500"}`}>+{fmtNum(dif * 100)}%</span>}
                     </td>
-                    <td className="px-3 py-2 text-right">{fmtNum(c.sinStock * 100)}%</td>
+                    <td className={`px-3 py-2 text-right ${c.bajoStock > 0.25 ? "font-semibold text-red-700" : ""}`}>{fmtNum(c.bajoStock * 100)}%</td>
                     <td className="px-3 py-2 text-right">{isFinite(c.mesesInv) ? fmtNum(c.mesesInv, 1) : ""}</td>
                     <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                       <input
@@ -243,8 +243,11 @@ function Detalle({ a, c, prov, p, hoy, pedir }: { a: ArticuloPlan; c: Calculo; p
             <span>{fmtNum(l.cantidad)} · llega {fechaCortaMx(l.fecha)}{l.fecha < hoy ? " (ya debió llegar)" : ""}</span>
           </div>
         ))}
+        {a.pedido_tipico ? fila("Pedido normal (3 de cada 4 son de esto o menos)", fmtNum(a.pedido_tipico) + um) : null}
+        {fila("Días en cero", `${fmtNum(c.sinStock * 100)}%`)}
+        {fila("Días sin stock suficiente para un pedido normal", `${fmtNum(c.bajoStock * 100)}%`)}
         {fila(`Promedio simple (${p.ventana} m)`, `${fmtNum(c.simple, 1)}/mes`)}
-        {fila("Venta real (solo días con stock)", `${fmtNum(c.real, 1)}/mes`)}
+        {fila("Venta real (solo días con stock suficiente)", `${fmtNum(c.real, 1)}/mes`)}
         {fila(`Demanda para planear (+${fmtNum(p.crecimiento * 100)}%)`, `${fmtNum(c.plan, 1)}/mes`)}
         {fila("Punto de pedido", fmtNum(c.reorden))}
         {fila("Objetivo", fmtNum(c.objetivo))}

@@ -44,7 +44,18 @@ export interface PlanProveedor {
 }
 
 /** Un mes de historial: [mes "YYYY-MM", venta, traspasos, dias con existencia, dias del mes contados, existencia al cierre]. */
-export type MesHist = { mes: string; venta: number; traspasos: number; dias_stock: number; dias: number; existencia_fin: number | null };
+export type MesHist = {
+  mes: string;
+  venta: number;
+  traspasos: number;
+  dias_stock: number;
+  dias: number;
+  existencia_fin: number | null;
+  /** Dias en que la existencia alcanzaba para un pedido normal, y lo vendido en esos dias. */
+  dias_suf?: number;
+  venta_suf?: number;
+  tras_suf?: number;
+};
 
 export interface Llegada {
   folio: string;
@@ -65,6 +76,7 @@ export interface ArticuloPlan {
   ventas_portal: number; // vendido en el portal despues del corte
   recibido_post: number; // recibido de OCs despues del corte
   existencia: number; // corte - ventas del portal + recibido
+  pedido_tipico?: number | null; // 3 de cada 4 pedidos son de esta cantidad o menos
   historial: MesHist[];
   llegadas: Llegada[];
 }
@@ -87,7 +99,8 @@ export const SEMAFORO: Record<Semaforo, string> = {
 export interface Calculo {
   simple: number;
   real: number;
-  sinStock: number; // 0..1
+  sinStock: number; // 0..1, dias en cero
+  bajoStock: number; // 0..1, dias sin stock suficiente para un pedido normal (incluye los de cero)
   pocosDatos: boolean;
   plan: number;
   transito: number;
@@ -116,20 +129,33 @@ export function llegadaEfectiva(fecha: string, hoy: string): string {
   return fecha < hoy ? addDias(hoy, 15) : fecha;
 }
 
+/**
+ * Venta real: se toma la mayor de dos medidas.
+ *  1) Lo vendido / dias con existencia (los dias en cero no cuentan).
+ *  2) Lo vendido en los dias con stock SUFICIENTE / esos dias: con menos de un pedido normal en el almacen
+ *     tampoco se puede surtir, aunque no este en cero. Se usa si hay al menos 20 dias asi en la ventana.
+ */
 export function ventaReal(historial: MesHist[], p: Parametros) {
   const ms = historial.slice(-p.ventana);
-  let v = 0;
-  let dcs = 0;
-  let d = 0;
+  let v = 0, dcs = 0, d = 0, vs = 0, ds = 0;
+  let conSuf = false;
   for (const m of ms) {
     v += m.venta + (p.traspasos ? m.traspasos : 0);
     dcs += m.dias_stock;
     d += m.dias;
+    if (m.dias_suf != null) {
+      conSuf = true;
+      ds += m.dias_suf;
+      vs += (m.venta_suf ?? 0) + (p.traspasos ? (m.tras_suf ?? 0) : 0);
+    }
   }
   const simple = d ? (v / d) * DIAS_MES : 0;
   const pocosDatos = dcs < 15 && v > 0;
-  const real = dcs >= 15 ? (v / dcs) * DIAS_MES : simple;
-  return { simple, real, sinStock: d ? 1 - dcs / d : 0, pocosDatos };
+  const real1 = dcs >= 15 ? (v / dcs) * DIAS_MES : simple;
+  const real2 = conSuf && ds >= 20 ? (vs / ds) * DIAS_MES : 0;
+  const real = Math.max(real1, real2);
+  const diasBuenos = conSuf ? ds : dcs;
+  return { simple, real, sinStock: d ? 1 - dcs / d : 0, bajoStock: d ? 1 - diasBuenos / d : 0, pocosDatos };
 }
 
 export function redondeaEmpaque(cantidad: number, empaque: number | null): number {
@@ -238,9 +264,12 @@ export function historialConPortal(historial: MesHist[], corte: string, hoy: str
   let d = addDias(corte, 1);
   while (d <= hoy) {
     const mes = d.slice(0, 7);
-    const m = mapa.get(mes) ?? { mes, venta: 0, traspasos: 0, dias_stock: 0, dias: 0, existencia_fin: null };
+    const m = mapa.get(mes) ?? { mes, venta: 0, traspasos: 0, dias_stock: 0, dias: 0, existencia_fin: null, dias_suf: 0, venta_suf: 0, tras_suf: 0 };
     m.dias += 1;
-    if (hayStock) m.dias_stock += 1;
+    if (hayStock) {
+      m.dias_stock += 1;
+      if (m.dias_suf != null) m.dias_suf += 1;
+    }
     mapa.set(mes, m);
     d = addDias(d, 1);
   }
@@ -248,7 +277,10 @@ export function historialConPortal(historial: MesHist[], corte: string, hoy: str
     if (v.fecha <= corte) continue;
     const mes = v.fecha.slice(0, 7);
     const m = mapa.get(mes);
-    if (m) m.venta += v.cantidad;
+    if (m) {
+      m.venta += v.cantidad;
+      if (m.venta_suf != null && hayStock) m.venta_suf += v.cantidad;
+    }
   }
   return [...mapa.values()].sort((a, b) => a.mes.localeCompare(b.mes));
 }
