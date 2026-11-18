@@ -9,6 +9,12 @@ export interface LineaFactura {
   descripcion: string;
   unidad: string | null;
   cantidad: number | null;
+  /** Precio unitario antes del descuento (si se pudo leer). */
+  precio?: number | null;
+  /** Descuento del renglon en porcentaje (15 = 15%). */
+  descuentoPct?: number | null;
+  /** Importe del renglon ya con el descuento. */
+  importe?: number | null;
 }
 export interface FacturaLeida {
   folio: string | null;
@@ -64,15 +70,28 @@ const NUM_RE = /^-?[\d,]+(?:\.\d+)?$/;
 const num = (s: string) => Number(s.replace(/,/g, ""));
 const limpiar = (s: string) => s.replace(/\s+/g, " ").trim();
 
-/** De los numeros al final del renglon: ...unidades, precio, [descuento], importe. */
-function cantidadDeNumeros(nums: number[]): number | null {
+type Montos = { cantidad: number; precio: number; importe: number; descuentoPct: number | null };
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * De los numeros al final del renglon: ...unidades, precio, [descuento], importe.
+ * El descuento puede venir como porcentaje ("15.00 %", aparte) o como monto en su columna.
+ */
+function montosDeNumeros(nums: number[], pct: number | null): Montos | null {
   if (nums.length < 3) return null;
   const importe = nums[nums.length - 1];
+  const cerca = (a: number, b: number) => Math.abs(a - b) <= Math.max(0.05, Math.abs(b) * 0.001);
   for (let k = nums.length - 3; k >= 0; k--) {
     const u = nums[k];
     const p = nums[k + 1];
+    if (!(u > 0) || !Number.isFinite(u)) continue;
+    // Descuento en porcentaje: unidades x precio x (1 - %) = importe.
+    if (pct !== null && k + 2 === nums.length - 1 && cerca(u * p * (1 - pct / 100), importe)) return { cantidad: u, precio: p, importe, descuentoPct: pct };
     const descuentos = nums.slice(k + 2, nums.length - 1).reduce((a, x) => a + x, 0);
-    if (u > 0 && Number.isFinite(u) && Math.abs(u * p - descuentos - importe) <= Math.max(0.05, importe * 0.001)) return u;
+    if (cerca(u * p - descuentos, importe)) {
+      const bruto = u * p;
+      return { cantidad: u, precio: p, importe, descuentoPct: descuentos > 0 && bruto > 0 ? r2((descuentos / bruto) * 100) : null };
+    }
   }
   return null;
 }
@@ -117,8 +136,15 @@ export function leerFacturaTexto(renglones: string[], filas?: Celda[][]): Factur
     if (!/^\d{8}$/.test(tokens[0] ?? "")) continue; // la partida empieza con la clave SAT (8 digitos)
     let fin = tokens.length;
     const nums: number[] = [];
-    while (fin > 1 && NUM_RE.test(tokens[fin - 1])) {
-      nums.unshift(num(tokens[fin - 1]));
+    let pct: number | null = null;
+    while (fin > 1) {
+      const t = tokens[fin - 1];
+      // Descuento en porcentaje: "15.00 %" o "15.00" y "%" en columnas separadas.
+      const mp = t.match(/^([\d,]+(?:\.\d+)?)\s*%$/);
+      if (mp) { pct = num(mp[1]); fin--; continue; }
+      if (t === "%" && fin > 2 && NUM_RE.test(tokens[fin - 2])) { pct = num(tokens[fin - 2]); fin -= 2; continue; }
+      if (!NUM_RE.test(t)) break;
+      nums.unshift(num(t));
       fin--;
     }
     const medio = tokens.slice(1, fin).filter((t) => !/^\d{3}-(IVA|IEPS|ISR)$/i.test(t));
@@ -135,9 +161,13 @@ export function leerFacturaTexto(renglones: string[], filas?: Celda[][]): Factur
       if (resto && !NUM_RE.test(resto)) descripcion = `${descripcion}${/[a-z]$/i.test(descripcion) && /^[a-z]/.test(resto) ? "" : " "}${resto}`;
       if (m) break;
     }
-    const cantidad = cantidadDeNumeros(nums);
+    const m = montosDeNumeros(nums, pct);
+    const cantidad = m?.cantidad ?? null;
     if (cantidad === null) avisos.push(`No pude leer la cantidad de ${clave ?? descripcion.slice(0, 40)}`);
-    lineas.push({ clave: clave ? clave.toUpperCase() : null, descripcion: limpiar(descripcion), unidad: unidad ? limpiar(unidad) : null, cantidad });
+    lineas.push({
+      clave: clave ? clave.toUpperCase() : null, descripcion: limpiar(descripcion), unidad: unidad ? limpiar(unidad) : null, cantidad,
+      ...(m ? { precio: m.precio, importe: m.importe, descuentoPct: m.descuentoPct } : {}),
+    });
   }
 
   if (!lineas.length) {
@@ -224,11 +254,18 @@ export function leerFacturaXml(xml: string): FacturaLeida {
     const desc = dec(attr(c, "Descripcion"));
     const clave = (ident.match(ESC_RE) ?? desc.match(ESC_RE))?.[0] ?? null;
     const cant = Number(attr(c, "Cantidad"));
+    const pu = Number(attr(c, "ValorUnitario"));
+    const imp = Number(attr(c, "Importe"));
+    const desc$ = Number(attr(c, "Descuento") ?? 0);
+    const okN = (v: number) => Number.isFinite(v) && v > 0;
     lineas.push({
       clave: clave ? clave.toUpperCase() : null,
       descripcion: limpiar(desc),
       unidad: attr(c, "Unidad") ?? attr(c, "ClaveUnidad"),
       cantidad: Number.isFinite(cant) && cant > 0 ? cant : null,
+      ...(okN(pu) ? { precio: pu } : {}),
+      // En el XML el Importe va sin descuento; el Descuento es un monto.
+      ...(okN(imp) ? { importe: r2(imp - (okN(desc$) ? desc$ : 0)), descuentoPct: okN(desc$) ? r2((desc$ / imp) * 100) : null } : {}),
     });
   }
   const avisos: string[] = [];

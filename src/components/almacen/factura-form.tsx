@@ -7,7 +7,8 @@ import { Alert, Button, Card, Field, Input, Select, Spinner } from "@/components
 import { leerFacturaXml, type FacturaLeida } from "@/lib/factura-lector";
 import { leerFacturaPdf } from "@/lib/pdf-cliente";
 
-type Linea = { clave: string; descripcion: string; unidad: string; cantidad: string };
+type Linea = { clave: string; descripcion: string; unidad: string; cantidad: string; precio?: number | null; descuentoPct?: number | null; importe?: number | null };
+const mx = (n: number) => n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 type Cliente = { nombre: string; razon: string; rfc: string; direccion: string; telefono: string };
 type Cobro = { total: string; moneda: "MXN" | "USD"; pago: "contado" | "credito"; dias: string };
 /** Lo que se leyo del archivo queda fijo; solo se escribe lo que no se pudo leer. */
@@ -108,7 +109,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
 
   async function aplicar(f: FacturaLeida, fuente: string) {
     setV((s) => ({ ...s, folio: f.folio ?? s.folio, fecha: f.fecha ?? s.fecha, cliente: f.cliente ?? s.cliente, vendedor: f.vendedor ?? s.vendedor, uuid: f.uuid ?? s.uuid }));
-    const ls = f.lineas.map((l) => ({ clave: l.clave ?? "", descripcion: l.descripcion, unidad: l.unidad ?? "", cantidad: l.cantidad != null ? String(l.cantidad) : "" }));
+    const ls = f.lineas.map((l) => ({ clave: l.clave ?? "", descripcion: l.descripcion, unidad: l.unidad ?? "", cantidad: l.cantidad != null ? String(l.cantidad) : "", precio: l.precio ?? null, descuentoPct: l.descuentoPct ?? null, importe: l.importe ?? null }));
     setLineas(ls);
     setAvisos(f.avisos.map((a) => `${fuente}: ${a}`));
     const c: Cliente = {
@@ -199,7 +200,9 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
       }
       fd.set("datos", JSON.stringify({
         folio: v.folio, fecha: v.fecha || null, uuid: v.uuid || null, vendedor_factura: v.vendedor || null, notas_almacen: almacen ? v.notas || null : null,
-        comentarios: v.comentarios || null, pedido: v.pedido || null,
+        // Los descuentos de la factura quedan anotados en la venta.
+        comentarios: [v.comentarios, lineas.filter((l) => l.descuentoPct).map((l) => `Descuento ${l.descuentoPct}% en ${l.clave || l.descripcion.slice(0, 40)}`).join("; ")].filter(Boolean).join(" · ").slice(0, 2000) || null,
+        pedido: v.pedido || null,
         customer_id: elegido?.id ?? null, nombre: cli.nombre, razon_social: cli.razon, rfc: cli.rfc, direccion: cli.direccion, telefono: cli.telefono,
         entrega_nombre: entrega?.usar ? entrega.nombre || null : null, entrega_direccion: entrega?.usar ? entrega.direccion || null : null,
         total: Number(cobro.total), moneda: cobro.moneda, pago: cobro.pago, dias_credito: cobro.pago === "credito" ? Number(cobro.dias) || 30 : null,
@@ -275,6 +278,13 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
                           <input value={l.descripcion} onChange={(e) => setL(i, "descripcion", e.target.value)} placeholder="Descripción" className="w-full rounded border border-slate-300 px-2 py-1.5 text-sm" />
                         ) : (
                           <p className="text-slate-800">{enCat || l.descripcion || "Sin descripción"}</p>
+                        )}
+                        {(l.precio != null || l.importe != null) && (
+                          <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                            {l.precio != null && <span>Precio ${mx(l.precio)}</span>}
+                            {!!l.descuentoPct && <span className="rounded bg-rose-100 px-1.5 py-0.5 font-semibold text-rose-800">Descuento {l.descuentoPct}%</span>}
+                            {l.importe != null && <span className="font-medium text-slate-800">Importe ${mx(l.importe)}</span>}
+                          </p>
                         )}
                         {almacen && <p className={`text-xs ${enCat ? "text-green-700" : "text-amber-700"}`}>{enCat ? "En el catálogo: se escanea al cargar" : l.clave ? "Esa clave no está en el catálogo: no se escanea" : "Sin clave ESC (servicio o flete): no se escanea"}</p>}
                       </div>

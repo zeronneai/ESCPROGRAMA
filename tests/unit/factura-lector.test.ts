@@ -28,7 +28,7 @@ describe("lector de facturas", () => {
     expect(f.fecha).toBe("2026-11-05");
     expect(f.cliente).toBe("CLIENTE DE PRUEBA SA · NOMBRE COMERCIAL");
     expect(f.vendedor).toBe("DIANA PEREZ");
-    expect(f.lineas).toEqual([
+    expect(f.lineas.map(({ clave, descripcion, unidad, cantidad }) => ({ clave, descripcion, unidad, cantidad }))).toEqual([
       { clave: "ESC-GLPFGG-L", descripcion: "Guante de Latex Libre de Polvo GG, talla L, caja con 10 cajitas de 100 piezas c/u", unidad: "H87 - MASTER", cantidad: 10 },
       { clave: "ESC-GLPFGG-M", descripcion: "Guante de Latex Libre de Polvo GG, talla M, caja con 10 cajitas de 100 piezas c/u", unidad: "H87 - MASTER", cantidad: 2 },
       { clave: null, descripcion: "Flete", unidad: "E48 - SERVICIO", cantidad: 1 },
@@ -42,6 +42,32 @@ describe("lector de facturas", () => {
     const g = leerFacturaTexto(["46181504  H87 - CAJA  Guante  002-IVA  144  5  200.00  100.00  900.00", "ESC-X-2"]);
     expect(g.lineas[0].cantidad).toBe(5);
     expect(g.avisos).toContain("No encontré el folio: escríbelo.");
+  });
+
+  it("PDF con descuento en porcentaje (factura F11286): lee cantidad, precio, descuento e importe", () => {
+    const filas = [
+      "Serie y folio: F11286",
+      "Clave SAT  U.med.  Nombre  Impuesto Tasa Importe  Unidades  Precio  Descto.  Importe",
+      "46182001  H87 - MASTER  Cubrebocas Plisado, Brondo, color Blanco, Master con 20 cajitas de 50  002-IVA  179.2  2  560.00  1,120.00",
+      "ESC-DCBP3WH-20  pz",
+      "Pedimento: 261633416002510/15-may.-2026/MANZANILLO",
+      "46181708  H87 - MASTER  Red de Nylon para Cabello, Brondo, 21\", Negra, caja con 10 paquetes d  002-IVA  137.088  1  1,008.00  15.00 %  856.80",
+      "ESC-DRNBK-2  e 100 piezas c/u",
+      "Pedimento: 261633416003695/14-ago.-2026/MANZANILLO",
+      "Subtotal  1,976.80",
+      "Total  2,293.09",
+    ];
+    const f = leerFacturaTexto(filas);
+    expect(f.avisos).toEqual([]);
+    expect(f.lineas[0]).toMatchObject({ clave: "ESC-DCBP3WH-20", cantidad: 2, precio: 560, importe: 1120, descuentoPct: null });
+    expect(f.lineas[1]).toMatchObject({ clave: "ESC-DRNBK-2", cantidad: 1, precio: 1008, importe: 856.8, descuentoPct: 15 });
+    expect(f.total).toBe(2293.09);
+    // El "%" puede venir en su propia columna.
+    const g = leerFacturaTexto(["46181708  H87 - MASTER  Red  002-IVA  137.088  1  1,008.00  15.00  %  856.80", "ESC-DRNBK-2"]);
+    expect(g.lineas[0]).toMatchObject({ cantidad: 1, descuentoPct: 15, importe: 856.8 });
+    // Descuento como monto: se calcula el porcentaje.
+    const h = leerFacturaTexto(["46181504  H87 - CAJA  Guante  002-IVA  144  5  200.00  100.00  900.00", "ESC-X-2"]);
+    expect(h.lineas[0]).toMatchObject({ cantidad: 5, precio: 200, importe: 900, descuentoPct: 10 });
   });
 
   it("XML del CFDI", () => {
