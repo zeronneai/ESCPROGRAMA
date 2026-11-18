@@ -36,6 +36,20 @@ describe("lector de facturas", () => {
     expect(f.avisos).toEqual([]);
   });
 
+  it("membranas MSR-65 y MSR-65P (sin ESC- al principio); otras claves sin ESC- no", () => {
+    const f = leerFacturaTexto([
+      "Serie y folio: F11400",
+      "30151505  H87 - PIEZA  Membrana de Super Refuerzo para Impermeabilizacion, blanca, 1.1 X 100,  002-IVA  2400  2  1,200.00  2,400.00",
+      "MSR-65P  pieza",
+      "30151505  H87 - PIEZA  Membrana de Super Refuerzo p/Impermeabilizacion, blanca, 100mts, con  002-IVA  1600  1  1,000.00  1,000.00",
+      "MSR-65  Detalles",
+      "30151505  H87 - PIEZA  Otra membrana  002-IVA  160  1  100.00  100.00",
+      "MSR-650  extra",
+    ]);
+    expect(f.lineas.map((l) => [l.clave, l.cantidad])).toEqual([["MSR-65P", 2], ["MSR-65", 1], [null, 1]]);
+    expect(f.lineas[0].descripcion).toMatch(/pieza$/);
+  });
+
   it("PDF con descuento en la partida", () => {
     const f = leerFacturaTexto(["Serie y folio: A55", "46181504  H87 - CAJA  Guante  002-IVA  160  5  200.00  0.00  1,000.00", "ESC-X-1"]);
     expect(f.lineas[0]).toMatchObject({ clave: "ESC-X-1", cantidad: 5 });

@@ -1,5 +1,5 @@
 /**
- * Lector de facturas (CFDI) de ESC: saca el folio, el cliente y los articulos con clave ESC-... y su cantidad.
+ * Lector de facturas (CFDI) de ESC: saca el folio, el cliente y los articulos con clave ESC-... (o MSR-65 / MSR-65P) y su cantidad.
  * Funciona con el texto del PDF (renglones reconstruidos por posicion) o con el XML del CFDI.
  * Es "mejor esfuerzo": el usuario revisa y corrige antes de guardar.
  */
@@ -65,7 +65,11 @@ function diasEntre(a: string | null, b: string | null): number | null {
   return d >= 1 && d <= 365 ? d : null;
 }
 
-const ESC_RE = /\bESC-[A-Z0-9][A-Z0-9.\-/]*/i;
+/**
+ * Claves de articulo: todas empiezan con ESC-, salvo dos membranas que en Microsip no lo llevan
+ * (MSR-65 y MSR-65P). Solo esas dos son excepcion.
+ */
+const ESC_RE = /\b(?:ESC-[A-Z0-9][A-Z0-9.\-/]*|MSR-65P?(?![A-Z0-9]))/i;
 const NUM_RE = /^-?[\d,]+(?:\.\d+)?$/;
 const num = (s: string) => Number(s.replace(/,/g, ""));
 const limpiar = (s: string) => s.replace(/\s+/g, " ").trim();
