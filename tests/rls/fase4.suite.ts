@@ -255,6 +255,26 @@ export function fase4Suite() {
       expect(n.rows[0].n).toBeGreaterThanOrEqual(1);
     });
 
+    it("compras puede seguir y cotizar sin esperar la aclaracion; el vendedor puede contestar despues", async () => {
+      const { item } = await newPendingItem(w, "Producto sin esperar");
+      await rpc(w.buyer1, "select public.request_clarification($1,'Que color?')", [item]);
+      expect(await failure(rpc(w.seller1, "select public.continuar_sin_aclaracion($1)", [item]))).toMatch(/No autorizado/);
+      const r = (await rpc(w.buyer1, "select public.continuar_sin_aclaracion($1) as e", [item])).rows[0];
+      expect(r.e).toBe("pendiente");
+      expect((await itemRow(item)).estado).toBe("pendiente");
+      const cerrada = (await rpc(w.buyer1, "select resumed_at is not null as c from public.item_clarification_pauses where item_id=$1", [item])).rows[0];
+      expect(cerrada.c).toBe(true);
+      await respond(w.buyer1, item, "quote", quotePayload("10", null, await currentFactors()));
+      expect((await itemRow(item)).estado).toBe("cotizada");
+      // El vendedor contesta despues: queda como mensaje y no cambia la partida
+      await rpc(w.seller1, "select public.post_item_message($1,'Azul')", [item]);
+      expect((await itemRow(item)).estado).toBe("cotizada");
+      const kinds = (await rpc(w.seller1, "select kind, author_rol from public.item_messages where item_id=$1 order by created_at", [item])).rows.map((m) => `${m.author_rol}:${m.kind}`);
+      expect(kinds).toEqual(["comprador:pedir_aclaracion", "comprador:mensaje", "vendedor:mensaje"]);
+      // Llamarla otra vez no hace nada
+      expect((await rpc(w.buyer1, "select public.continuar_sin_aclaracion($1) as e", [item])).rows[0].e).toBe("cotizada");
+    });
+
     it("el chat libre no cambia el estado; mensajes y pausas son inmutables; el vendedor no pide aclaraciones", async () => {
       const { item } = await newPendingItem(w, "Producto chat");
       await rpc(w.seller1, "select public.post_item_message($1,'Hola')", [item]);

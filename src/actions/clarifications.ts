@@ -24,6 +24,23 @@ export async function requestClarificationAction(itemId: string, body: string): 
   return { ok: true };
 }
 
+/**
+ * Comprador: seguir con la partida aunque el vendedor no haya contestado la aclaracion.
+ * Cierra la pausa (el reloj vuelve a correr) y la partida regresa a su estado anterior.
+ */
+export async function continuarSinAclaracionAction(itemId: string): Promise<Result> {
+  await requireBuyer();
+  if (!id.safeParse(itemId).success) return { ok: false, error: "Partida invalida" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("continuar_sin_aclaracion", { p_item: itemId });
+  if (error) {
+    if (/continuar_sin_aclaracion/.test(error.message)) return { ok: false, error: "Falta correr la actualización 0063 en la base para cotizar sin esperar la aclaración." };
+    return { ok: false, error: friendlyError(error.message) };
+  }
+  revalidatePath("/comprador");
+  return { ok: true };
+}
+
 /** Mensaje del chat de la partida (vendedor o comprador), con imagen opcional. */
 export async function postMessageAction(formData: FormData): Promise<Result> {
   const u = await requireUser();

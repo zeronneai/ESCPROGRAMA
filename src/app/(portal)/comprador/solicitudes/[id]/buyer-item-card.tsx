@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { requestClarificationAction } from "@/actions/clarifications";
+import { continuarSinAclaracionAction, requestClarificationAction } from "@/actions/clarifications";
 import { respondNotFoundAction, respondQuoteAction } from "@/actions/responses";
 import { respondRevisionAction } from "@/actions/revisions";
 import { getSourcingBaseAction, saveSourcingAction, type SimilarQuote } from "@/actions/sourcing";
@@ -80,11 +80,13 @@ export function BuyerItemCard({
   const open = openUpdateRequest(item);
   const pause = openPause(item);
   const locked = item.estado === "cotizada" || item.estado === "enviada_cliente";
-  const respondable = item.estado === "pendiente" || item.estado === "no_encontrada";
+  // Esperando aclaracion: compras puede cotizar sin esperar la respuesta (al guardar se cierra la pausa).
+  const esperaSobrePendiente = item.estado === "esperando_aclaracion" && !!pause && (pause.estado_previo === "pendiente" || pause.estado_previo === "no_encontrada");
+  const respondable = item.estado === "pendiente" || item.estado === "no_encontrada" || esperaSobrePendiente;
   const vencida = isVigenciaVencida(q, now);
 
   const [mode, setMode] = useState<"quote" | "not_found">(item.estado === "no_encontrada" ? "not_found" : "quote");
-  const [editing, setEditing] = useState(item.estado === "pendiente");
+  const [editing, setEditing] = useState(item.estado === "pendiente" || esperaSobrePendiente);
   const [form, setForm] = useState<QuoteFormValues>(() => ({ ...emptyQuoteForm, minUnidad: defaultMinUnit(item.unidad) }));
   const [nota, setNota] = useState(item.not_found_note ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -169,7 +171,20 @@ export function BuyerItemCard({
       <ReferenceList refs={item.item_references} />
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
 
-      {pause && <Alert tone="info">Esperando aclaración del vendedor desde {fmtDate(pause.clarification_requested_at)}. El reloj de 48 horas hábiles está en pausa.</Alert>}
+      {pause && (
+        <Alert tone="info">
+          Esperando aclaración del vendedor desde {fmtDate(pause.clarification_requested_at)}. El reloj de 48 horas hábiles está en pausa.
+          {esperaSobrePendiente ? (
+            <span className="mt-1 block font-medium">Si ya tienes lo necesario, puedes cotizar abajo sin esperar: al guardar se reanuda el reloj y el vendedor todavía puede contestar.</span>
+          ) : (
+            <span className="mt-2 block">
+              <Button variant="secondary" disabled={pending} onClick={() => run(() => continuarSinAclaracionAction(item.id), "Listo: sigues sin esperar la aclaración. El reloj se reanudó.")}>
+                Seguir sin esperar la aclaración
+              </Button>
+            </span>
+          )}
+        </Alert>
+      )}
 
       {/* Cotizacion registrada (bloqueada) */}
       {q && (locked || item.estado === "actualizacion_solicitada") && (

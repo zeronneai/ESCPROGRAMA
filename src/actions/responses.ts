@@ -1,5 +1,6 @@
 "use server";
 
+import { continuarSinAclaracionAction } from "./clarifications";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireBuyer } from "@/lib/auth/guards";
@@ -29,6 +30,14 @@ async function responseHours(itemId: string) {
   return { hours: Math.round(hours * 100) / 100, requestId: data!.request_id as string };
 }
 
+/** Si la partida espera aclaracion, compras sigue sin esperarla (cierra la pausa) antes de responder. */
+async function seguirSiEsperaAclaracion(itemId: string): Promise<Result> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("quote_items").select("estado").eq("id", itemId).single();
+  if (data?.estado !== "esperando_aclaracion") return { ok: true };
+  return continuarSinAclaracionAction(itemId);
+}
+
 export async function respondQuoteAction(itemId: string, values: QuoteFormValues): Promise<Result> {
   await requireBuyer();
   if (!idSchema.safeParse(itemId).success) return { ok: false, error: "Partida invalida" };
@@ -53,6 +62,8 @@ export async function respondQuoteAction(itemId: string, values: QuoteFormValues
     p5: cfg.p5,
   };
   const t = calcTabulador(q.costo, q.envio, factors);
+  const seguir = await seguirSiEsperaAclaracion(itemId);
+  if (!seguir.ok) return seguir;
   const rh = await responseHours(itemId);
 
   const { error } = await supabase.rpc("respond_item", {
@@ -91,6 +102,8 @@ export async function respondNotFoundAction(itemId: string, nota: string): Promi
   if (!idSchema.safeParse(itemId).success) return { ok: false, error: "Partida invalida" };
   const parsed = parseNotFoundNote(nota);
   if (!parsed.ok) return { ok: false, error: parsed.errors.nota };
+  const seguir = await seguirSiEsperaAclaracion(itemId);
+  if (!seguir.ok) return seguir;
   const rh = await responseHours(itemId);
   const supabase = await createClient();
   const { error } = await supabase.rpc("respond_item", {
