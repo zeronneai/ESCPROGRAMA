@@ -77,6 +77,8 @@ export interface ArticuloPlan {
   recibido_post: number; // recibido de OCs despues del corte
   existencia: number; // corte - ventas del portal + recibido
   pedido_tipico?: number | null; // 3 de cada 4 pedidos son de esta cantidad o menos
+  /** Pedidos Pegatron de linea que aun no se piden al proveedor (comprometido). */
+  pegatron?: { cantidad: number; pos: string[] } | null;
   historial: MesHist[];
   llegadas: Llegada[];
 }
@@ -169,7 +171,8 @@ export function calcular(a: ArticuloPlan, prov: PlanProveedor, p: Parametros, ho
   const plan = vr.real * (1 + p.crecimiento);
   const leadM = prov.entrega_dias / DIAS_MES;
   const transito = a.llegadas.reduce((s, l) => s + l.cantidad, 0);
-  const posicion = a.existencia + transito;
+  const comprometido = a.pegatron?.cantidad ?? 0;
+  const posicion = a.existencia + transito - comprometido;
   const china = prov.origen === "china";
   const reorden = china ? plan * prov.punto_meses : plan * (leadM + prov.base_meses);
   const objetivo = china ? plan * prov.cobertura_meses : plan * (leadM + prov.objetivo_meses);

@@ -22,6 +22,7 @@ const ocSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
   moneda: z.enum(["USD", "MXN"]).nullable().optional(),
   notas: z.string().trim().max(1000).default(""),
+  tipo: z.enum(["linea", "sobrepedido"], { message: "Elige si la orden es De línea o Sobrepedido" }),
   lineas: z.array(lineaSchema).min(1, "La orden no tiene renglones").max(200),
 });
 export type OcPegatronInput = z.input<typeof ocSchema>;
@@ -55,6 +56,33 @@ export async function crearPedidoPegatronAction(fd: FormData): Promise<{ ok: tru
   }
   revalidatePath("/pedidos-pegatron");
   return { ok: true, id: String(id) };
+}
+
+/** La jefa cambia la seccion (de linea / sobrepedido) de una OC. */
+export async function tipoPegatronAction(id: string, tipo: "linea" | "sobrepedido"): Promise<Result> {
+  const u = await requireUser();
+  if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas cambia la sección." };
+  if (!uuid.safeParse(id).success || !["linea", "sobrepedido"].includes(tipo)) return { ok: false, error: "Datos inválidos" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("pegatron_tipo", { p_id: id, p_tipo: tipo });
+  if (error) return { ok: false, error: /pegatron_tipo/.test(error.message) ? "Primero corre la actualización 0064 en Supabase." : friendlyError(error.message) };
+  revalidatePath("/pedidos-pegatron", "layout");
+  return { ok: true };
+}
+
+/** El comprador marca como pedidos todos los renglones pendientes de un articulo en una seccion. */
+export async function marcarArticuloPedidoAction(lineas: string[]): Promise<Result> {
+  const u = await requireUser();
+  if (u.rol !== "comprador") return { ok: false, error: "Solo el comprador marca lo pedido." };
+  const ids = z.array(uuid).min(1).max(500).safeParse(lineas);
+  if (!ids.success) return { ok: false, error: "Renglones inválidos" };
+  const supabase = await createClient();
+  for (const id of ids.data) {
+    const { error } = await supabase.rpc("pegatron_pedido", { p_linea: id, p_pedido: true });
+    if (error) return { ok: false, error: sinTablas(error.message) };
+  }
+  revalidatePath("/pedidos-pegatron", "layout");
+  return { ok: true };
 }
 
 /** ¿Ya se subio esa P/O? */

@@ -112,6 +112,21 @@ export function operacionesSuite() {
       expect((await q(A("jefa"), "select pedido_nombre from public.pegatron_oc_lineas where id=$1", [ls[0].id])).rows[0].pedido_nombre).toBeTruthy();
     });
 
+    it("pedidos Pegatron: seccion de linea o sobrepedido; solo la jefa la cambia", async () => {
+      const po = "07" + Math.floor(Math.random() * 1e8);
+      const datos = (x: object = {}) => JSON.stringify({ po_numero: po, lineas: [{ descripcion: "TAPE", cantidad: 10, unidad: "RL", articulo_esc: "ESC-TMCP1-00575 · Cinta" }], ...x });
+      expect(await failure(q(A("jefa"), "select public.pegatron_crear($1::jsonb)", [datos({ tipo: "otro" })]))).toMatch(/linea o sobrepedido/);
+      const id = (await q(A("jefa"), "select public.pegatron_crear($1::jsonb) as id", [datos({ tipo: "sobrepedido" })])).rows[0].id;
+      expect((await q(w.buyer1, "select tipo from public.pegatron_oc where id=$1", [id])).rows[0].tipo).toBe("sobrepedido");
+      expect((await q("postgres", "select titulo from public.notifications where tipo='pegatron_oc' and ref_id=$1 limit 1", [id])).rows[0].titulo).toMatch(/sobrepedido/);
+      expect(await failure(q(w.buyer1, "select public.pegatron_tipo($1,'linea')", [id]))).toMatch(/jefa de ventas/);
+      await q(A("jefa"), "select public.pegatron_tipo($1,'linea')", [id]);
+      expect((await q(w.buyer1, "select tipo from public.pegatron_oc where id=$1", [id])).rows[0].tipo).toBe("linea");
+      // Sin tipo queda de linea
+      const id2 = (await q(A("jefa"), "select public.pegatron_crear($1::jsonb) as id", [JSON.stringify({ po_numero: po + "B", lineas: [{ descripcion: "X", cantidad: 1, articulo_esc: "Algo local" }] })])).rows[0].id;
+      expect((await q(w.buyer1, "select tipo from public.pegatron_oc where id=$1", [id2])).rows[0].tipo).toBe("linea");
+    });
+
     it("catalogo: cada quien marca visto; los comentarios los ve el comprador", async () => {
       await q(w.seller1, "insert into public.catalogo_vistos (version) values ('t1')");
       expect((await q(w.seller1, "select count(*)::int as n from public.catalogo_vistos where version='t1'")).rows[0].n).toBe(1);

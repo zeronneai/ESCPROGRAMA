@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DateTime } from "luxon";
+import { claveDeArticulo } from "./pegatron-recuento";
 import {
   addDias,
   EN_CAMINO,
@@ -167,6 +168,27 @@ export async function cargarPlaneacion(supabase: SupabaseClient, soloProveedor?:
     }
   }
 
+  // Pedidos Pegatron de linea que todavia no se piden: se suman como comprometidos por clave.
+  const pegatron = new Map<string, { cantidad: number; pos: string[] }>();
+  {
+    type PRow = { po_numero: string; tipo?: string | null; pegatron_oc_lineas: { articulo_esc: string; cantidad: string; pedido_at: string | null }[] };
+    const traer = (cols: string) => supabase.from("pegatron_oc").select(`${cols}, pegatron_oc_lineas(articulo_esc, cantidad, pedido_at)`).limit(1000);
+    let { data, error } = await traer("po_numero, tipo");
+    if (error && /tipo/.test(error.message)) ({ data, error } = await traer("po_numero"));
+    for (const o of (error ? [] : (data ?? [])) as unknown as PRow[]) {
+      if (o.tipo === "sobrepedido") continue;
+      for (const l of o.pegatron_oc_lineas ?? []) {
+        if (l.pedido_at) continue;
+        const clave = claveDeArticulo(l.articulo_esc);
+        if (!clave || !claves.has(clave)) continue;
+        const p = pegatron.get(clave) ?? { cantidad: 0, pos: [] };
+        p.cantidad += Number(l.cantidad);
+        if (!p.pos.includes(o.po_numero)) p.pos.push(o.po_numero);
+        pegatron.set(clave, p);
+      }
+    }
+  }
+
   const articulos = arts.map((a) => {
     const vend = (ventas.get(a.clave) ?? []).reduce((s, v) => s + v.cantidad, 0);
     const existencia_corte = exist.get(a.clave) ?? 0;
@@ -188,6 +210,7 @@ export async function cargarPlaneacion(supabase: SupabaseClient, soloProveedor?:
       existencia,
       historial: corte ? historialConPortal(h, corte, hoy, ventas.get(a.clave) ?? [], existencia > 0) : h,
       llegadas: (llegadas.get(a.clave) ?? []).sort((x, y) => x.fecha.localeCompare(y.fecha)),
+      pegatron: pegatron.get(a.clave) ?? null,
     };
   });
 

@@ -172,6 +172,7 @@ export function Planeador({ prov, articulos, hoy }: { prov: PlanProveedor; artic
                     <td className="px-3 py-2 text-right">
                       {fmtNum(a.existencia)}
                       {a.ventas_portal > 0 && <span className="block text-[11px] text-slate-500">−{fmtNum(a.ventas_portal)} vendido</span>}
+                      {a.pegatron?.cantidad ? <span className="block text-[11px] font-semibold text-orange-700" title={`Pedidos Pegatron: ${a.pegatron.pos.join(", ")}`}>−{fmtNum(a.pegatron.cantidad)} Pegatron</span> : null}
                     </td>
                     <td className="px-3 py-2 text-right">{c.transito ? fmtNum(c.transito) : ""}</td>
                     <td className="px-3 py-2 text-right">{fmtNum(c.simple, 1)}</td>
@@ -236,6 +237,7 @@ function Detalle({ a, c, prov, p, hoy, pedir }: { a: ArticuloPlan; c: Calculo; p
         {a.ventas_portal > 0 && fila("Vendido en el portal desde el corte", `−${fmtNum(a.ventas_portal)}`)}
         {a.recibido_post > 0 && fila("Recibido de OCs desde el corte", `+${fmtNum(a.recibido_post)}`)}
         {fila("Existencia para planear", fmtNum(a.existencia))}
+        {a.pegatron?.cantidad ? fila(`Pegatron de línea por pedir (${a.pegatron.pos.join(", ")})`, `−${fmtNum(a.pegatron.cantidad)}`) : null}
         {fila("En camino", fmtNum(c.transito))}
         {a.llegadas.map((l) => (
           <div key={l.oc_id} className="flex justify-between gap-3 py-0.5 pl-3 text-xs text-slate-500">

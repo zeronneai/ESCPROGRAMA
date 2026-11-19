@@ -10,7 +10,13 @@ import { leerOcPegatron, textosPdf } from "@/lib/pegatron-po";
 type Renglon = { key: string; item: string; numero_parte: string; descripcion: string; cantidad: string; unidad: string; entrega: string; articulo_esc: string };
 const nuevo = (): Renglon => ({ key: Math.random().toString(36).slice(2), item: "", numero_parte: "", descripcion: "", cantidad: "", unidad: "", entrega: "", articulo_esc: "" });
 
-export function NuevaOcPegatron() {
+export type TipoPegatron = "linea" | "sobrepedido";
+export const TIPOS_PEGATRON: Record<TipoPegatron, { label: string; ayuda: string }> = {
+  linea: { label: "De línea", ayuda: "Productos de importación que manejamos siempre. Entran a la planeación de compras." },
+  sobrepedido: { label: "Sobrepedido", ayuda: "Productos locales o no comunes que se piden aparte." },
+};
+
+export function NuevaOcPegatron({ catalogo = [] }: { catalogo?: { clave: string; nombre: string }[] }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [leyendo, setLeyendo] = useState(false);
@@ -23,6 +29,7 @@ export function NuevaOcPegatron() {
   const [aviso, setAviso] = useState<{ tone: "error" | "success" | "info"; text: string } | null>(null);
   const [usada, setUsada] = useState<{ id: string; folio: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [tipo, setTipo] = useState<TipoPegatron | "">("");
 
   async function leer(f: File | null | undefined) {
     if (!f) return;
@@ -57,6 +64,7 @@ export function NuevaOcPegatron() {
 
   async function guardar() {
     setAviso(null);
+    if (!tipo) return irACampo('[data-campo="tipo-pegatron"]', "Elige si la orden es De línea o Sobrepedido.");
     if (faltan) {
       const i = rs.findIndex((r) => r.articulo_esc.trim().length < 2);
       return irACampo(`[data-articulo-esc="${i}"]`, `Falta el artículo ESC en ${faltan} renglón(es).`);
@@ -64,7 +72,7 @@ export function NuevaOcPegatron() {
     setBusy(true);
     const fd = new FormData();
     fd.set("datos", JSON.stringify({
-      po_numero: po, fecha: fecha || null, moneda: moneda || null, notas,
+      po_numero: po, fecha: fecha || null, moneda: moneda || null, notas, tipo,
       lineas: rs.map(({ key: _k, entrega, ...r }) => ({ ...r, entrega: entrega || null })),
     }));
     if (file) fd.set("file", file);
@@ -97,6 +105,21 @@ export function NuevaOcPegatron() {
 
       {rs.length > 0 && (
         <>
+          <Card className="space-y-2 p-4" data-campo="tipo-pegatron">
+            <p className="text-sm font-semibold text-slate-800">¿En qué sección va esta orden? *</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {(Object.keys(TIPOS_PEGATRON) as TipoPegatron[]).map((k) => {
+                const act = tipo === k;
+                return (
+                  <button key={k} type="button" aria-pressed={act} onClick={() => setTipo(k)}
+                    className={`rounded-xl border-2 px-4 py-3 text-left transition ${act ? (k === "linea" ? "border-brand-600 bg-brand-600 text-white shadow" : "border-orange-500 bg-orange-500 text-white shadow") : "border-slate-300 bg-white text-slate-800 hover:border-brand-300"}`}>
+                    <span className="block text-lg font-extrabold tracking-wide">{act ? "✓ " : ""}{TIPOS_PEGATRON[k].label.toUpperCase()}</span>
+                    <span className={`block text-xs ${act ? "text-white/85" : "text-slate-500"}`}>{TIPOS_PEGATRON[k].ayuda}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
           <Card className="grid gap-3 p-4 sm:grid-cols-4">
             <Field label="Orden de compra (P/O) *"><Input value={po} onChange={(e) => setPo(e.target.value)} className="font-mono" /></Field>
             <Field label="Fecha"><Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} /></Field>
@@ -125,13 +148,17 @@ export function NuevaOcPegatron() {
                 </div>
                 <div className={`rounded-lg border p-3 ${r.articulo_esc.trim().length >= 2 ? "border-green-200 bg-green-50/60" : "border-amber-300 bg-amber-50"}`}>
                   <Field label="Nombre / artículo ESC * (como lo conocemos nosotros)">
-                    <Input data-articulo-esc={i} value={r.articulo_esc} onChange={(e) => set(i, "articulo_esc", e.target.value)} placeholder="Ej. Rollo de papel wiper para cuarto limpio 10 m" maxLength={200} />
+                    <Input data-articulo-esc={i} list="catalogo-esc" value={r.articulo_esc} onChange={(e) => set(i, "articulo_esc", e.target.value)} placeholder={tipo === "linea" ? "Escribe la clave o el nombre: ESC-..." : "Ej. Rollo de papel wiper para cuarto limpio 10 m"} maxLength={200} />
                   </Field>
                 </div>
               </Card>
             ))}
           </div>
 
+          <datalist id="catalogo-esc">
+            {catalogo.map((c) => <option key={c.clave} value={`${c.clave} · ${c.nombre}`.slice(0, 200)} />)}
+          </datalist>
+          {tipo === "linea" && <p className="text-xs text-slate-500">En las de línea elige el artículo de la lista (con su clave ESC-): así compras lo suma en su planeación.</p>}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <Button variant="secondary" onClick={() => setRs((a) => [...a, nuevo()])}>+ Agregar renglón</Button>
             <span className={`text-sm ${faltan ? "text-amber-700" : "text-green-700"}`}>{faltan ? `Falta el artículo ESC en ${faltan} renglón(es)` : "Todos los renglones tienen artículo ESC"}</span>

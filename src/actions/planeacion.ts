@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
 import { addDias, folioOc, type EstadoOc } from "@/lib/planeacion";
+import { claveDeArticulo } from "@/lib/pegatron-recuento";
 import { hoyMx } from "@/lib/planeacion-server";
 import { friendlyError } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
@@ -21,6 +22,27 @@ async function comprador() {
   return u.rol === "comprador" ? u : null;
 }
 const NO = { ok: false as const, error: "Solo el comprador maneja la planeación de compras." };
+
+/** Al generar la OC, lo de Pegatron (de linea) de esos articulos queda marcado como pedido. */
+async function marcarPegatronPedido(supabase: Awaited<ReturnType<typeof createClient>>, claves: string[]) {
+  try {
+    const traer = (cols: string) => supabase.from("pegatron_oc").select(`${cols}, pegatron_oc_lineas(id, articulo_esc, pedido_at)`).limit(1000);
+    let { data, error } = await traer("id, tipo");
+    if (error && /tipo/.test(error.message)) ({ data, error } = await traer("id"));
+    if (error) return;
+    const set = new Set(claves.map((c) => c.toUpperCase()));
+    for (const o of (data ?? []) as unknown as { tipo?: string | null; pegatron_oc_lineas: { id: string; articulo_esc: string; pedido_at: string | null }[] }[]) {
+      if (o.tipo === "sobrepedido") continue;
+      for (const l of o.pegatron_oc_lineas ?? []) {
+        const c = claveDeArticulo(l.articulo_esc);
+        if (!l.pedido_at && c && set.has(c)) await supabase.rpc("pegatron_pedido", { p_linea: l.id, p_pedido: true });
+      }
+    }
+    revalidatePath("/pedidos-pegatron", "layout");
+  } catch {
+    // Si falla no se detiene la OC: el comprador puede marcarlo en Pedidos Pegatron.
+  }
+}
 
 const lineaNueva = z.object({ clave: z.string().trim().min(1).max(60), cantidad: z.number().positive().max(1e9), precio: z.number().min(0).nullable().optional() });
 
@@ -55,6 +77,7 @@ export async function crearOcAction(proveedorId: string, lineas: z.input<typeof 
     await supabase.from("plan_ocs").delete().eq("id", oc.id);
     return { ok: false, error: friendlyError(le.message) };
   }
+  await marcarPegatronPedido(supabase, [...filas.keys()]);
   refrescar(oc.id);
   return { ok: true, id: oc.id, folio };
 }

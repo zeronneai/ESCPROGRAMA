@@ -73,6 +73,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 56 | `0061_planeacion_stock_suficiente.sql` | Planeación: la venta real también cuenta como desabasto los días en que la existencia **no alcanzaba para un pedido normal** (no solo los días en cero). Después vuelve a correr `../cargas/planeacion_compras_inicial.sql`. |
 | 57 | `0062_guias_recoleccion_ocurre.sql` | Guías de los vendedores: eligen **Recolección u Ocurre** y Marketplaces lo ve en grande. |
 | 58 | `0063_cotizar_sin_esperar_aclaracion.sql` | El comprador puede **cotizar aunque esté pendiente una aclaración**: se cierra la pausa y el vendedor todavía puede contestar. |
+| 59 | `0064_pegatron_linea_sobrepedido.sql` | Pedidos Pegatron en dos secciones: **de línea** (importación, entra a planeación de compras) y **sobrepedido** (locales o no comunes), con recuento por artículo. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 
