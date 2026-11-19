@@ -1,3 +1,4 @@
+import { DateTime } from "luxon";
 import { z } from "zod";
 
 export const PAQUETERIAS = ["Paquete Express", "Estafeta", "Tinypack", "Porteo", "DHL", "Otra"] as const;
@@ -41,15 +42,69 @@ export const AMBAR_AFTER_HOURS = 1;
 export const ALERT_AFTER_HOURS = 2;
 export const REMIND_AFTER_HOURS = 1;
 
-/** Horas que lleva pendiente (desde que se pidio o se corrigieron los datos). */
-export function hoursPending(g: { estado: GuiaEstado; solicitada_at: string }, now: Date): number | null {
-  if (g.estado !== "solicitada" && g.estado !== "en_proceso") return null;
-  return (now.getTime() - new Date(g.solicitada_at).getTime()) / 3_600_000;
+/**
+ * Horario de guias: el reloj solo corre de lunes a viernes de 8:00 am a 4:30 pm (sin festivos).
+ * Lo que se pide despues de las 4:30 (o en fin de semana) empieza a contar el siguiente dia habil a las 8:00.
+ */
+export const HORARIO_GUIAS = { inicio: { hour: 8, minute: 0 }, fin: { hour: 16, minute: 30 }, texto: "8:00 am a 4:30 pm" } as const;
+export interface HorarioCfg { timezone?: string; holidays?: readonly string[] }
+const ZONA_GUIAS = "America/Chihuahua";
+
+function esHabil(d: DateTime, fest: ReadonlySet<string>) {
+  return d.weekday <= 5 && !fest.has(d.toISODate()!);
 }
 
-/** Alerta visual: ambar a la hora, roja (fuerte) a las 2 horas. */
-export function guiaAlert(g: { estado: GuiaEstado; solicitada_at: string }, now: Date): "roja" | "ambar" | null {
-  const h = hoursPending(g, now);
+/** Horas de horario de guias entre dos momentos. */
+export function horasLaborales(desde: Date, hasta: Date, cfg: HorarioCfg = {}): number {
+  if (hasta.getTime() <= desde.getTime()) return 0;
+  const zona = cfg.timezone ?? ZONA_GUIAS;
+  const fest = new Set(cfg.holidays ?? []);
+  const fin = DateTime.fromJSDate(hasta, { zone: zona });
+  let dia = DateTime.fromJSDate(desde, { zone: zona }).startOf("day");
+  let total = 0;
+  for (let i = 0; i < 4000 && dia <= fin; i++) {
+    if (esHabil(dia, fest)) {
+      const a = Math.max(dia.set(HORARIO_GUIAS.inicio).toMillis(), desde.getTime());
+      const b = Math.min(dia.set(HORARIO_GUIAS.fin).toMillis(), hasta.getTime());
+      if (b > a) total += b - a;
+    }
+    dia = dia.plus({ days: 1 });
+  }
+  return total / 3_600_000;
+}
+
+/** Si `at` cae fuera del horario, cuando empieza a contar (siguiente 8:00 habil). Dentro del horario: null. */
+export function empiezaAContar(at: Date, cfg: HorarioCfg = {}): Date | null {
+  const zona = cfg.timezone ?? ZONA_GUIAS;
+  const fest = new Set(cfg.holidays ?? []);
+  const t = DateTime.fromJSDate(at, { zone: zona });
+  const ini = t.set(HORARIO_GUIAS.inicio);
+  const fin = t.set(HORARIO_GUIAS.fin);
+  if (esHabil(t, fest) && t >= ini && t < fin) return null;
+  let d = esHabil(t, fest) && t < ini ? t.startOf("day") : t.startOf("day").plus({ days: 1 });
+  for (let i = 0; i < 30 && !esHabil(d, fest); i++) d = d.plus({ days: 1 });
+  return d.set(HORARIO_GUIAS.inicio).toJSDate();
+}
+
+/** "mañana a las 8:00 am", "el lunes 23 de noviembre a las 8:00 am" */
+export function textoInicio(inicio: Date, ahora: Date, cfg: HorarioCfg = {}): string {
+  const zona = cfg.timezone ?? ZONA_GUIAS;
+  const a = DateTime.fromJSDate(ahora, { zone: zona }).startOf("day");
+  const d = DateTime.fromJSDate(inicio, { zone: zona }).setLocale("es");
+  const dias = Math.round(d.startOf("day").diff(a, "days").days);
+  const dia = dias === 0 ? "hoy" : dias === 1 ? "mañana" : `el ${d.toFormat("cccc d 'de' LLLL")}`;
+  return `${dia} a las 8:00 am`;
+}
+
+/** Horas de horario que lleva pendiente (desde que se pidio o se corrigieron los datos). */
+export function hoursPending(g: { estado: GuiaEstado; solicitada_at: string }, now: Date, cfg: HorarioCfg = {}): number | null {
+  if (g.estado !== "solicitada" && g.estado !== "en_proceso") return null;
+  return horasLaborales(new Date(g.solicitada_at), now, cfg);
+}
+
+/** Alerta visual: ambar a la hora, roja (fuerte) a las 2 horas (horas de horario). */
+export function guiaAlert(g: { estado: GuiaEstado; solicitada_at: string }, now: Date, cfg: HorarioCfg = {}): "roja" | "ambar" | null {
+  const h = hoursPending(g, now, cfg);
   if (h === null) return null;
   if (h >= ALERT_AFTER_HOURS) return "roja";
   if (h >= AMBAR_AFTER_HOURS) return "ambar";
@@ -57,10 +112,12 @@ export function guiaAlert(g: { estado: GuiaEstado; solicitada_at: string }, now:
 }
 
 /** El vendedor puede recordar a partir de 1 hora y maximo una vez por hora. */
-export function canRemind(g: { estado: GuiaEstado; solicitada_at: string; ultimo_recordatorio_at: string | null }, now: Date): { ok: boolean; reason?: string } {
-  const h = hoursPending(g, now);
+export function canRemind(g: { estado: GuiaEstado; solicitada_at: string; ultimo_recordatorio_at: string | null }, now: Date, cfg: HorarioCfg = {}): { ok: boolean; reason?: string } {
+  const h = hoursPending(g, now, cfg);
   if (h === null) return { ok: false, reason: "La guía ya no está pendiente" };
   if (h < REMIND_AFTER_HOURS) {
+    const fuera = empiezaAContar(now, cfg);
+    if (fuera) return { ok: false, reason: `Fuera de horario (${HORARIO_GUIAS.texto}): podrás recordar cuando pase 1 hora dentro del horario` };
     const m = Math.ceil((REMIND_AFTER_HOURS - h) * 60);
     return { ok: false, reason: `Podrás recordar en ${m >= 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m} min`}` };
   }

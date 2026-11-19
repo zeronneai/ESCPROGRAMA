@@ -13,6 +13,8 @@ export interface GuiaPanelData {
   estado: GuiaEstado;
   solicitada_at: string;
   ultimo_recordatorio_at: string | null;
+  /** Festivos (no corre el reloj de guias). */
+  festivos?: string[];
   mensaje: string | null;
   /** Archivos de guia (uno por bulto o tarima); url null para el vendedor. */
   archivos: { nombre: string; rastreo: string | null; bulto: string | null; url: string | null }[];
@@ -34,7 +36,7 @@ export function GuiaPanel({ g, role, isOwner, events }: { g: GuiaPanelData; role
   const [askData, setAskData] = useState(false);
   const { run, busy, notice } = useRun();
   const isMkt = role === "marketplaces";
-  const remind = canRemind(g, new Date());
+  const remind = canRemind(g, new Date(), { holidays: g.festivos ?? [] });
   const pending = g.estado === "solicitada" || g.estado === "en_proceso";
 
   return (

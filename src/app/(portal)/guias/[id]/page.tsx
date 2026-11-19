@@ -4,7 +4,7 @@ import { GuiaPanel } from "@/components/guias/guia-panel";
 import { GuiaDatosView } from "@/components/guias/guia-datos";
 import { Chip } from "@/components/ops-ui";
 import { requireUser } from "@/lib/auth/guards";
-import { elapsedText, empaqueLabel, GUIA_ESTADOS, guiaAlert, guiaTitle, hoursPending, partidasDeGuia, resumenPartidas, SERVICIOS, type GuiaEstado, type Servicio } from "@/lib/ops/guias";
+import { elapsedText, empaqueLabel, empiezaAContar, GUIA_ESTADOS, guiaAlert, guiaTitle, HORARIO_GUIAS, hoursPending, textoInicio, partidasDeGuia, resumenPartidas, SERVICIOS, type GuiaEstado, type Servicio } from "@/lib/ops/guias";
 import { fmtDate, signedUrl } from "@/lib/ops/server";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
@@ -30,8 +30,10 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
   const estado = g.estado as GuiaEstado;
   const st = GUIA_ESTADOS[estado];
   const now = new Date();
-  const alert = guiaAlert(g, now);
-  const h = hoursPending(g, now);
+  const horario = { timezone: cfg.timezone, holidays: cfg.holidays };
+  const alert = guiaAlert(g, now, horario);
+  const h = hoursPending(g, now, horario);
+  const arranca = h === 0 ? empiezaAContar(new Date(g.solicitada_at), horario) : null;
   // El vendedor solo ve los numeros de guia; los archivos los descargan Marketplaces y los jefes.
   type ArchivoGuia = { path: string; nombre?: string; rastreo?: string; bulto?: string };
   const lista: ArchivoGuia[] = Array.isArray(g.archivos) && g.archivos.length
@@ -98,9 +100,14 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
           ))}
         </ol>
       )}
+      {arranca && arranca > now && (
+        <div className="rounded-lg border border-slate-300 bg-slate-100 px-4 py-3 text-sm text-slate-800">
+          Se pidió fuera del horario de guías ({HORARIO_GUIAS.texto}). <b>Empieza a contar {textoInicio(arranca, now, horario)}.</b>
+        </div>
+      )}
       {alert && h !== null && (
         <div className={`rounded-lg border px-4 py-3 text-sm ${alert === "roja" ? "animate-pulse border-2 border-red-700 bg-red-600 text-white shadow-lg" : "border-amber-300 bg-amber-50 text-amber-900"}`}>
-          {alert === "roja" ? <strong className="text-base">ATRASADA: lleva {elapsedText(h)} sin resolverse (límite 2 horas). </strong> : <>Lleva {elapsedText(h)} pendiente. A las 2 horas se pone en rojo. </>}
+          {alert === "roja" ? <strong className="text-base">ATRASADA: lleva {elapsedText(h)} sin resolverse (límite 2 horas en horario). </strong> : <>Lleva {elapsedText(h)} pendiente en horario. A las 2 horas se pone en rojo. </>}
           {g.recordatorios > 0 && `Recordatorios enviados: ${g.recordatorios}.`}
         </div>
       )}
@@ -108,7 +115,7 @@ export default async function Guia({ params }: { params: Promise<{ id: string }>
       {mkt && datos}
 
       <GuiaPanel
-        g={{ id: g.id, estado, solicitada_at: g.solicitada_at, ultimo_recordatorio_at: g.ultimo_recordatorio_at, mensaje: g.mensaje, archivos, varios, numero_rastreo: g.numero_rastreo, atendida_nombre: g.atendida_nombre, form, partidas: partidasForm }}
+        g={{ id: g.id, estado, solicitada_at: g.solicitada_at, ultimo_recordatorio_at: g.ultimo_recordatorio_at, festivos: cfg.holidays.slice(), mensaje: g.mensaje, archivos, varios, numero_rastreo: g.numero_rastreo, atendida_nombre: g.atendida_nombre, form, partidas: partidasForm }}
         role={u.rol}
         isOwner={u.id === g.vendedor_id}
         events={(ev ?? []).map((e) => ({ id: e.id, texto: e.tipo === "comentario" ? e.nota : `${EV[e.tipo] ?? e.tipo}${e.nota ? `: ${e.nota}` : ""}`, autor: e.autor_nombre, fecha: e.created_at, comentario: e.tipo === "comentario" }))}

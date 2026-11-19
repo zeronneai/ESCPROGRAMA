@@ -1,11 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { datosFacturaGuiaAction, proveedorGuiaAction, saveGuiaAction, subirOcGuiaAction } from "@/actions/guias";
-import { irACampo } from "@/components/feedback-global";
+import { irACampo, toast } from "@/components/feedback-global";
 import { areaCls, CustomerLookup, useRun } from "@/components/ops-ui";
 import { Alert, Button, Field, Input, Select } from "@/components/ui";
-import { DESTINO_ESC, ENTREGA_MODOS, PAQUETERIAS, RECOLECCION_MODOS, SERVICIOS, guiaTitle, partirDireccion, resumenPartidas, type GuiaInput } from "@/lib/ops/guias";
+import { DESTINO_ESC, empiezaAContar, ENTREGA_MODOS, HORARIO_GUIAS, textoInicio, PAQUETERIAS, RECOLECCION_MODOS, SERVICIOS, guiaTitle, partirDireccion, resumenPartidas, type GuiaInput } from "@/lib/ops/guias";
 import { contenidoOc, domicilioOc, leerOcMicrosip } from "@/lib/oc-microsip";
 import { textosPdf } from "@/lib/pegatron-po";
 import { ESTADOS_MX } from "@/lib/validation/customer";
@@ -32,6 +32,18 @@ export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDo
 }) {
   const destinoEsc = { ...DESTINO_ESC, contacto_nombre: contactoEsc?.nombre ?? "", telefono: contactoEsc?.telefono ?? "" };
   // Compras casi siempre pide guias de su proveedor hacia ESC: empieza en recoleccion.
+  // Fuera del horario de guias (8:00 a 4:30): avisar que empieza a contar el siguiente dia habil.
+  const [fuera, setFuera] = useState<string | null>(null);
+  useEffect(() => {
+    const revisar = () => {
+      const ahora = new Date();
+      const ini = empiezaAContar(ahora);
+      setFuera(ini ? textoInicio(ini, ahora) : null);
+    };
+    revisar();
+    const t = setInterval(revisar, 60_000);
+    return () => clearInterval(t);
+  }, []);
   const [v, setV] = useState<F>(() => ({ ...EMPTY, ...(referencia && !id ? { sentido: "recoleccion", ...destinoEsc } : {}), ...initial }));
   const reco = v.sentido === "recoleccion";
   const [oc, setOc] = useState<File | null>(null);
@@ -131,6 +143,7 @@ export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDo
           }
           return r;
         }, (r) => {
+          if (!id && fuera) toast(`Guía pedida fuera de horario: empieza a contar ${fuera}.`, "info");
           if (onDone) {
             onDone();
             router.refresh();
@@ -138,6 +151,11 @@ export function GuiaForm({ id, initial, partidas: iniciales, facturas = [], onDo
         });
       }}
     >
+      {fuera && !id && (
+        <div className="rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+          <b>Estás fuera del horario de guías ({HORARIO_GUIAS.texto}).</b> Puedes pedirla, pero el tiempo empieza a contar <b>{fuera}</b>.
+        </div>
+      )}
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
       {title && <p className="rounded-md bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-800">Título: {title}</p>}
 

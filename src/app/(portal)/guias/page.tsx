@@ -4,7 +4,7 @@ import { Icon } from "@/components/icons";
 import { Chip } from "@/components/ops-ui";
 import { Card, EmptyState, FilterChip, PageHeader, StatCard } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guards";
-import { elapsedText, GUIA_ESTADOS, guiaAlert, guiaTitle, hoursPending, type GuiaEstado } from "@/lib/ops/guias";
+import { elapsedText, empiezaAContar, GUIA_ESTADOS, guiaAlert, guiaTitle, HORARIO_GUIAS, hoursPending, textoInicio, type GuiaEstado } from "@/lib/ops/guias";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -30,6 +30,8 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
   if (error && /sentido|origen_nombre/.test(error.message)) ({ data, error } = await consulta(BASE));
   const all = (data ?? []) as unknown as Row[];
   const now = new Date();
+  const horario = { timezone: cfg.timezone, holidays: cfg.holidays };
+  const fueraAhora = empiezaAContar(now, horario);
   const isSeller = u.rol === "vendedor";
   const puedePedir = isSeller || u.rol === "comprador";
   const isMkt = u.rol === "marketplaces";
@@ -43,8 +45,8 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
           Number(b.urgente) - Number(a.urgente) ||
           a.solicitada_at.localeCompare(b.solicitada_at),
     );
-  const vencidas = pendientes.filter((g) => guiaAlert(g, now) === "roja").length;
-  const conAlarma = pendientes.filter((g) => guiaAlert(g, now) === "ambar").length;
+  const vencidas = pendientes.filter((g) => guiaAlert(g, now, horario) === "roja").length;
+  const conAlarma = pendientes.filter((g) => guiaAlert(g, now, horario) === "ambar").length;
   const today = new Date().toLocaleDateString("en-CA", { timeZone: cfg.timezone });
   const listasHoy = all.filter((g) => g.lista_at && new Date(g.lista_at).toLocaleDateString("en-CA", { timeZone: cfg.timezone }) === today).length;
   const done = all.filter((g) => g.lista_at).slice(0, 50);
@@ -66,6 +68,10 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
           </Link>
         )}
       />
+      <p className={`rounded-lg px-3 py-2 text-xs ${fueraAhora ? "border border-slate-300 bg-slate-100 font-medium text-slate-700" : "text-slate-500"}`}>
+        Horario de guías: lunes a viernes de {HORARIO_GUIAS.texto}. El tiempo solo corre dentro del horario.
+        {fueraAhora && ` Ahorita estamos fuera de horario: lo que se pida empieza a contar ${textoInicio(fueraAhora, now, horario)}.`}
+      </p>
       {error && <Card className="border-red-200 bg-red-50 text-sm text-red-800">No se pudieron cargar las guías: {error.message}</Card>}
       <AutoRefresh segundos={60} />
       {vencidas > 0 && (
@@ -104,8 +110,9 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
           <ul className="divide-y divide-slate-100">
             {rows.map((g) => {
               const st = GUIA_ESTADOS[g.estado];
-              const alert = guiaAlert(g, now);
-              const h = hoursPending(g, now);
+              const alert = guiaAlert(g, now, horario);
+              const h = hoursPending(g, now, horario);
+              const arranca = h === 0 ? empiezaAContar(new Date(g.solicitada_at), horario) : null;
               return (
                 <li key={g.id}>
                   <Link href={`/guias/${g.id}`} className={`flex flex-col gap-1.5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between ${alert === "roja" ? "border-l-8 border-red-600 bg-red-100 hover:bg-red-200" : alert === "ambar" ? "border-l-4 border-amber-500 bg-amber-50 hover:bg-amber-100" : "hover:bg-slate-50"}`}>
@@ -128,7 +135,9 @@ export default async function Guias({ searchParams }: { searchParams: Promise<{ 
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2 text-xs">
-                      {h !== null && <span className={alert === "roja" ? "text-sm font-bold text-red-700" : alert === "ambar" ? "font-semibold text-amber-700" : "text-slate-500"}>Hace {elapsedText(h)}</span>}
+                      {h !== null && (arranca && arranca > now
+                        ? <span className="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-slate-600">Empieza a contar {textoInicio(arranca, now, horario)}</span>
+                        : <span className={alert === "roja" ? "text-sm font-bold text-red-700" : alert === "ambar" ? "font-semibold text-amber-700" : "text-slate-500"}>Lleva {elapsedText(h)}</span>)}
                       <Chip cls={st.chip}>{st.label}</Chip>
                     </div>
                   </Link>

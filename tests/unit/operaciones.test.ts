@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sacSchema } from "@/lib/ops/calidad";
 import { avanceLabel, consumoSchema } from "@/lib/ops/consumo";
-import { canRemind, elapsedText, guiaAlert, guiaSchema, guiaTitle, partidasDeGuia, resumenPartidas } from "@/lib/ops/guias";
+import { canRemind, elapsedText, empiezaAContar, guiaAlert, guiaSchema, guiaTitle, horasLaborales, hoursPending, partidasDeGuia, resumenPartidas, textoInicio } from "@/lib/ops/guias";
 
 const now = new Date("2026-11-02T18:00:00Z");
 const ago = (h: number) => new Date(now.getTime() - h * 3_600_000).toISOString();
@@ -16,6 +16,28 @@ describe("guias", () => {
     expect(guiaAlert({ estado: "en_proceso", solicitada_at: ago(1.2) }, now)).toBe("ambar");
     expect(guiaAlert({ estado: "solicitada", solicitada_at: ago(2.1) }, now)).toBe("roja");
     expect(guiaAlert({ estado: "lista", solicitada_at: ago(30) }, now)).toBeNull();
+  });
+  it("horario de guias: solo cuenta de 8:00 a 4:30, lunes a viernes", () => {
+    // Chihuahua = UTC-6. Jueves 19/nov 17:00 -> viernes 20/nov 9:00 = 1 hora de horario.
+    const pedida = new Date("2026-11-19T23:00:00Z");
+    expect(horasLaborales(pedida, new Date("2026-11-20T15:00:00Z"))).toBeCloseTo(1, 5);
+    expect(hoursPending({ estado: "solicitada", solicitada_at: pedida.toISOString() }, new Date("2026-11-20T13:00:00Z"))).toBe(0);
+    expect(guiaAlert({ estado: "solicitada", solicitada_at: pedida.toISOString() }, new Date("2026-11-20T14:30:00Z"))).toBeNull(); // 8:30
+    expect(guiaAlert({ estado: "solicitada", solicitada_at: pedida.toISOString() }, new Date("2026-11-20T16:01:00Z"))).toBe("roja"); // 10:01
+    // Pedida 4:00 pm: corre media hora hoy y sigue manana a las 8
+    expect(horasLaborales(new Date("2026-11-19T22:00:00Z"), new Date("2026-11-20T15:00:00Z"))).toBeCloseTo(1.5, 5);
+    // Viernes 5 pm -> empieza el lunes 8:00; el fin de semana no cuenta
+    const vie = new Date("2026-11-20T23:00:00Z");
+    expect(empiezaAContar(vie)?.toISOString()).toBe("2026-11-23T14:00:00.000Z");
+    expect(horasLaborales(vie, new Date("2026-11-23T15:00:00Z"))).toBeCloseTo(1, 5);
+    expect(textoInicio(empiezaAContar(vie)!, vie)).toBe("el lunes 23 de noviembre a las 8:00 am");
+    expect(textoInicio(empiezaAContar(pedida)!, pedida)).toBe("mañana a las 8:00 am");
+    // 7:00 am de un dia habil empieza hoy a las 8; dentro del horario no hay aviso
+    expect(textoInicio(empiezaAContar(new Date("2026-11-19T13:00:00Z"))!, new Date("2026-11-19T13:00:00Z"))).toBe("hoy a las 8:00 am");
+    expect(empiezaAContar(new Date("2026-11-19T20:00:00Z"))).toBeNull();
+    // Festivo: no cuenta
+    expect(horasLaborales(new Date("2026-11-16T14:00:00Z"), new Date("2026-11-16T22:30:00Z"), { holidays: ["2026-11-16"] })).toBe(0);
+    expect(canRemind({ estado: "solicitada", solicitada_at: pedida.toISOString(), ultimo_recordatorio_at: null }, new Date("2026-11-20T03:00:00Z")).reason).toMatch(/Fuera de horario/);
   });
   it("recordar: a partir de 1 hora y uno por hora", () => {
     expect(canRemind({ estado: "solicitada", solicitada_at: ago(0.5), ultimo_recordatorio_at: null }, now)).toMatchObject({ ok: false, reason: "Podrás recordar en 30 min" });

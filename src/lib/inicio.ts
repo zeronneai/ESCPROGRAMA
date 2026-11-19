@@ -1,4 +1,5 @@
 import "server-only";
+import { horasLaborales } from "@/lib/ops/guias";
 import { almacenVentasActivo } from "@/lib/almacen-ventas";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DateTime } from "luxon";
@@ -219,8 +220,9 @@ async function guias(c: Ctx, propias: boolean, mkt: boolean): Promise<Bloque> {
   const { data } = await q.limit(5000);
   const rows = (data ?? []) as { estado: string; solicitada_at: string; urgente: boolean; lista_at: string | null }[];
   const abiertas = rows.filter((g) => g.estado === "solicitada" || g.estado === "en_proceso");
-  const hace2 = DateTime.fromISO(c.nowIso).minus({ hours: 2 }).toISO()!;
-  const mas24 = abiertas.filter((g) => g.solicitada_at < hace2).length;
+  // Mas de 2 horas dentro del horario de guias (8:00 a 4:30, lunes a viernes).
+  const ahora = new Date(c.nowIso);
+  const mas24 = abiertas.filter((g) => horasLaborales(new Date(g.solicitada_at), ahora, { timezone: c.tz }) >= 2).length;
   const urgentes = abiertas.filter((g) => g.urgente).length;
   const faltan = rows.filter((g) => g.estado === "requiere_datos").length;
   const hoyIni = DateTime.fromISO(c.today, { zone: c.tz }).startOf("day").toUTC().toISO()!;
