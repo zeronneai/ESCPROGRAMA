@@ -1,5 +1,6 @@
 "use client";
 
+import { toast } from "@/components/feedback-global";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 import { convertCustomerAction, listSucursalesAction, saveCustomerAction, saveSucursalAction, searchCustomersAction, setCustomerActiveAction, setCustomerKindAction } from "@/actions/customers";
@@ -485,6 +486,7 @@ export function CustomerPicker({
     onChange(c);
     setMode("search");
     setQ("");
+    toast(`Elegiste a ${c.nombre}`, "success");
   };
 
   if (mode === "new" || (mode === "edit" && value)) {
@@ -500,8 +502,14 @@ export function CustomerPicker({
     const missing = requireForQuote ? customerMissing(value) : [];
     return (
       <div className="space-y-2">
-        <div className={`flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between ${missing.length ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}>
-          <CustomerSummary c={value} missing={missing} />
+        <div key={value.id} className={`toast-in flex flex-col gap-2 rounded-xl border-2 p-3 sm:flex-row sm:items-center sm:justify-between ${missing.length ? "border-amber-400 bg-amber-50 ring-4 ring-amber-100" : "border-green-500 bg-green-50 ring-4 ring-green-100"}`}>
+          <div className="flex min-w-0 items-start gap-3">
+            <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${missing.length ? "bg-amber-500" : "bg-green-600"}`} aria-hidden>{missing.length ? "!" : "✓"}</span>
+            <div className="min-w-0">
+              <p className={`text-xs font-bold uppercase tracking-wide ${missing.length ? "text-amber-800" : "text-green-800"}`}>{missing.length ? "Cliente elegido: faltan datos" : "Cliente elegido"}</p>
+              <CustomerSummary c={value} missing={missing} />
+            </div>
+          </div>
           <div className="flex shrink-0 flex-wrap gap-2">
             {value.tipo === "prospecto" && (
               <Button

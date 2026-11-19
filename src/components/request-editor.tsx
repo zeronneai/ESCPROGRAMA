@@ -11,7 +11,7 @@ import {
 } from "@/actions/requests";
 import { CustomerPicker } from "@/components/customers";
 import { Alert, Button, Card, Field, Input, Select } from "@/components/ui";
-import { irACampo } from "@/components/feedback-global";
+import { irACampo, toast } from "@/components/feedback-global";
 import { customerMissing, type CustomerRecord } from "@/lib/validation/customer";
 import {
   IMAGE_TYPES,
@@ -136,40 +136,44 @@ export function RequestEditor({ initial, customer: initialCustomer }: { initial:
     });
   }
 
-  async function addImage(index: number, file: File) {
+  /** Sube la imagen a la partida; regresa el id de la referencia o null si no se pudo. */
+  async function addImage(index: number, file: File): Promise<string | null> {
     setNotice(null);
     if (!IMAGE_TYPES.includes(file.type)) {
-      setNotice({ tone: "error", text: "Solo se aceptan imagenes PNG, JPG, WEBP o GIF" });
-      return;
+      toast(`"${file.name}" no es imagen: solo PNG, JPG, WEBP o GIF.`, "error");
+      return null;
     }
     if (file.size > MAX_IMAGE_BYTES) {
-      setNotice({ tone: "error", text: "La imagen pesa mas de 5 MB" });
-      return;
+      toast(`"${file.name}" pesa más de 5 MB.`, "error");
+      return null;
     }
     // El archivo necesita que el borrador exista (politicas de Storage).
-    if (!(await save())) return;
+    if (!(await save())) return null;
     const fd = new FormData();
     fd.set("requestId", getValues().request_id);
     fd.set("itemId", getValues().items[index].id);
     fd.set("file", file);
     const r = await uploadReferenceAction(fd);
     if (!r.ok) {
-      setNotice({ tone: "error", text: r.error });
-      return;
+      toast(`No se subió la imagen: ${r.error}`, "error");
+      return null;
     }
     const refs = getValues().items[index].refs;
     setValue(`items.${index}.refs`, [...refs, { id: r.id, tipo: "imagen", url: r.path }], { shouldDirty: true });
     if (r.signedUrl) setPreviews((p) => ({ ...p, [r.id]: r.signedUrl! }));
     await save();
+    toast(`Imagen subida a la partida ${index + 1}`, "success");
+    return r.id;
   }
 
   function addLink(index: number, url: string): boolean {
     if (!isHttpUrl(url)) {
-      setNotice({ tone: "error", text: "El link no es valido: debe iniciar con http:// o https://" });
+      toast("El link no es válido: debe iniciar con http:// o https://", "error");
       return false;
     }
     const refs = getValues().items[index].refs;
     setValue(`items.${index}.refs`, [...refs, { id: crypto.randomUUID(), tipo: "link", url: url.trim() }], { shouldDirty: true });
+    toast(`Link agregado a la partida ${index + 1}`, "success");
     return true;
   }
 
@@ -202,9 +206,12 @@ export function RequestEditor({ initial, customer: initialCustomer }: { initial:
         </Alert>
       )}
 
-      <Card className="space-y-3" data-campo="cliente">
+      <Card className={`space-y-3 border-l-4 ${customer ? (missing.length ? "border-l-amber-400" : "border-l-green-500") : "border-l-slate-300"}`} data-campo="cliente">
         <div className="space-y-1.5">
-          <p className="text-sm font-medium text-slate-700">Cliente *</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-slate-800">Cliente *</p>
+            <Estado ok={!!customer && !missing.length} texto={!customer ? "Falta elegir cliente" : missing.length ? "Faltan datos del cliente" : "Cliente listo"} />
+          </div>
           <CustomerPicker
             value={customer}
             onChange={(c) => {
@@ -253,9 +260,15 @@ export function RequestEditor({ initial, customer: initialCustomer }: { initial:
       </Button>
 
       <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-4 space-y-2 border-t border-slate-200 bg-slate-50/95 px-4 py-3 backdrop-blur md:bottom-0">
-        {problems.length > 0 && (
-          <p className="text-xs text-amber-800">
-            Para enviar falta: {problems.map((p) => p.message).join(" · ")}
+        {problems.length > 0 ? (
+          <p className="text-xs font-medium text-amber-800">
+            <span className="mr-1 rounded-full bg-amber-200 px-2 py-0.5 font-bold">Faltan {problems.length}</span>
+            {problems.map((p) => p.message).join(" · ")}
+          </p>
+        ) : (
+          <p className="flex items-center gap-2 text-sm font-semibold text-green-800">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-600 text-xs text-white" aria-hidden>✓</span>
+            Todo listo: ya puedes enviar la solicitud
           </p>
         )}
         <div className="flex flex-wrap gap-2">
@@ -291,26 +304,37 @@ function ItemCard(props: {
   previews: Record<string, string>;
   register: ReturnType<typeof useForm<FormValues>>["register"];
   onRemove: () => void;
-  onAddImage: (file: File) => Promise<void>;
+  onAddImage: (file: File) => Promise<string | null>;
   onAddLink: (url: string) => boolean;
   onRemoveRef: (id: string) => void;
   descLength: number;
 }) {
   const { index: i, register } = props;
   const [link, setLink] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [subiendo, setSubiendo] = useState(0);
+  const [nuevas, setNuevas] = useState<string[]>([]);
+  const busy = subiendo > 0;
 
   async function handleFiles(files: FileList | File[] | null) {
     if (!files) return;
-    setBusy(true);
-    for (const f of Array.from(files)) await props.onAddImage(f);
-    setBusy(false);
+    const lista = Array.from(files);
+    setSubiendo(lista.length);
+    for (const f of lista) {
+      const id = await props.onAddImage(f);
+      setSubiendo((n) => Math.max(0, n - 1));
+      if (id) {
+        setNuevas((x) => [...x, id]);
+        setTimeout(() => setNuevas((x) => x.filter((y) => y !== id)), 4000);
+      }
+    }
   }
+  const nImg = props.refs.filter((r) => r.tipo === "imagen").length;
+  const nLink = props.refs.length - nImg;
 
   return (
     <Card
       data-partida={i}
-      className="space-y-3"
+      className={`space-y-3 border-l-4 ${props.problems.length ? "border-l-amber-400" : "border-l-green-500"}`}
       // Pegar imagenes desde el portapapeles dentro de la partida.
       onPaste={(e: React.ClipboardEvent) => {
         const files = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith("image/"));
@@ -321,7 +345,10 @@ function ItemCard(props: {
       }}
     >
       <div className="flex items-center justify-between">
-        <h2 className="font-medium">Partida {i + 1}</h2>
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 className="font-semibold">Partida {i + 1}</h2>
+          <Estado ok={!props.problems.length} texto={props.problems.length ? (props.problems.length === 1 ? "Falta 1 dato" : `Faltan ${props.problems.length} datos`) : "Completa"} />
+        </div>
         {props.total > 1 && (
           <Button type="button" variant="ghost" onClick={props.onRemove}>
             Quitar
@@ -360,29 +387,48 @@ function ItemCard(props: {
       </div>
 
       <div className="space-y-2">
-        <p className="text-sm font-medium text-slate-700">Referencias (opcional: imagen o link)</p>
+        <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-slate-700">
+          Referencias (opcional: imagen o link)
+          {props.refs.length > 0 && (
+            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">
+              ✓ {[nImg ? `${nImg} imagen${nImg > 1 ? "es" : ""}` : "", nLink ? `${nLink} link${nLink > 1 ? "s" : ""}` : ""].filter(Boolean).join(" y ")} {props.refs.length > 1 ? "agregados" : nImg ? "subida" : "agregado"}
+            </span>
+          )}
+        </p>
         <ul className="flex flex-wrap gap-2">
-          {props.refs.map((r) => (
-            <li key={r.id} className="flex items-center gap-1 rounded border border-slate-200 bg-slate-50 p-1 text-xs">
-              {r.tipo === "imagen" ? (
-                props.previews[r.id] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={props.previews[r.id]} alt="Referencia" className="h-16 w-16 rounded object-cover" />
+          {props.refs.map((r) => {
+            const nueva = nuevas.includes(r.id);
+            return (
+              <li key={r.id} className={`relative flex items-center gap-1 rounded-lg border p-1 text-xs transition ${nueva ? "toast-in border-green-500 bg-green-50 ring-4 ring-green-200" : "border-slate-200 bg-slate-50"}`}>
+                {r.tipo === "imagen" ? (
+                  props.previews[r.id] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={props.previews[r.id]} alt="Referencia" className="h-16 w-16 rounded object-cover" />
+                  ) : (
+                    <span className="px-2 py-5">Imagen</span>
+                  )
                 ) : (
-                  <span>Imagen</span>
-                )
-              ) : (
-                <span className="max-w-[16rem] truncate">{r.url}</span>
-              )}
-              <button type="button" className="px-1 text-red-600" onClick={() => props.onRemoveRef(r.id)} aria-label="Quitar referencia">
-                x
-              </button>
+                  <span className="max-w-[16rem] truncate">{r.url}</span>
+                )}
+                {r.tipo === "imagen" && (
+                  <span className="absolute -left-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-green-600 text-[11px] font-bold text-white shadow" title="Imagen subida">✓</span>
+                )}
+                <button type="button" className="px-1 text-red-600" onClick={() => props.onRemoveRef(r.id)} aria-label="Quitar referencia">
+                  x
+                </button>
+              </li>
+            );
+          })}
+          {Array.from({ length: subiendo }).map((_, k) => (
+            <li key={`sub-${k}`} className="flex h-[4.6rem] w-[4.6rem] flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-brand-300 bg-brand-50 text-[11px] font-medium text-brand-700">
+              <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden><circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" /><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg>
+              Subiendo
             </li>
           ))}
         </ul>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="cursor-pointer rounded-md border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-100">
-            {busy ? "Subiendo..." : "Subir imagen"}
+          <label className={`rounded-md border px-3 py-2 text-sm font-medium ${busy ? "cursor-wait border-slate-300 bg-slate-200 text-slate-500" : "cursor-pointer border-brand-300 bg-white text-brand-700 hover:bg-brand-50"}`}>
+            {busy ? `Subiendo ${subiendo} imagen${subiendo > 1 ? "es" : ""}...` : "Subir imagen"}
             <input type="file" accept={IMAGE_TYPES.join(",")} multiple className="hidden" disabled={busy} onChange={(e) => { void handleFiles(e.target.files); e.target.value = ""; }} />
           </label>
           <span className="text-xs text-slate-500">o pega una imagen (Ctrl+V) en esta partida</span>
@@ -395,7 +441,17 @@ function ItemCard(props: {
         </div>
       </div>
 
-      {props.problems.length > 0 && <p className="text-xs text-amber-800">Falta: {props.problems.join("; ")}</p>}
+      {props.problems.length > 0 && <p className="rounded-md bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">Falta: {props.problems.join("; ")}</p>}
     </Card>
+  );
+}
+
+/** Pastilla de estado: verde con palomita cuando ya esta, ambar cuando falta algo. */
+function Estado({ ok, texto }: { ok: boolean; texto: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${ok ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+      <span aria-hidden>{ok ? "✓" : "!"}</span>
+      {texto}
+    </span>
   );
 }
