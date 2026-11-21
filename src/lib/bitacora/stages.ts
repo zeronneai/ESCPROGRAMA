@@ -30,6 +30,9 @@ export interface BitacoraRow {
   motivo_perdida: string | null;
   origen: "vendedor" | "portal" | "sitio_web" | "lead";
   archived_at: string | null;
+  /** En pausa: no corre el seguimiento (despues de varios intentos). */
+  pausada_at?: string | null;
+  pausa_motivo?: string | null;
   created_at: string;
   updated_at: string;
 }

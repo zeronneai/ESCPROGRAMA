@@ -99,6 +99,44 @@ export function bitacoraSuite() {
       expect(linked.rows[0].request_id).toBe(request);
     });
 
+    it("prospecto en pausa: no corre el seguimiento; al reanudar regresa la fecha", async () => {
+      const c = await newCustomer(w.seller1, w.ids.s1);
+      const id = await newEntry(w.seller1, w.ids.s1, c);
+      await rpc(w.seller1, "update public.bitacora set proximo_seguimiento=current_date - 3 where id=$1", [id]);
+      expect(await failure(rpc(w.seller2, "select public.bitacora_pausa($1, true, 'x')", [id]))).toMatch(/Solo el vendedor/);
+      await rpc(w.seller1, "select public.bitacora_pausa($1, true, 'Varios intentos sin respuesta')", [id]);
+      let b = (await rpc(w.seller1, "select pausada_at, pausa_motivo, proximo_seguimiento, pausa_seguimiento from public.bitacora where id=$1", [id])).rows[0];
+      expect(b.pausada_at).not.toBeNull();
+      expect(b.pausa_motivo).toBe("Varios intentos sin respuesta");
+      expect(b.proximo_seguimiento).toBeNull();
+      const ev = (await rpc(w.seller1, "select nota from public.bitacora_eventos where bitacora_id=$1 and tipo='comentario' order by created_at desc limit 1", [id])).rows[0];
+      expect(ev.nota).toMatch(/^En pausa: Varios intentos/);
+      // La jefa la reanuda: como la fecha ya paso, queda para hoy
+      await rpc(jefa, "select public.bitacora_pausa($1, false)", [id]);
+      b = (await rpc(w.seller1, "select pausada_at, proximo_seguimiento = current_date as hoy from public.bitacora where id=$1", [id])).rows[0];
+      expect(b.pausada_at).toBeNull();
+      expect(b.hoy).toBe(true);
+      // Si en pausa le ponen fecha de seguimiento, se reanuda solo
+      await rpc(w.seller1, "select public.bitacora_pausa($1, true)", [id]);
+      await rpc(w.seller1, "update public.bitacora set proximo_seguimiento=current_date + 5 where id=$1", [id]);
+      expect((await rpc(w.seller1, "select pausada_at from public.bitacora where id=$1", [id])).rows[0].pausada_at).toBeNull();
+    });
+
+    it("la jefa sube una factura a nombre de un vendedor; el vendedor no puede", async () => {
+      const folio = "J" + Math.floor(Math.random() * 1e8);
+      const datos = JSON.stringify({ folio, uuid: randomUUID(), nombre: "CLIENTE JEFA " + folio, pago: "contado", total: 500, moneda: "MXN", lineas: [{ clave: null, descripcion: "Guante", cantidad: 2 }] });
+      expect(await failure(rpc(w.seller1, "select public.venta_desde_factura_por($1::jsonb, $2)", [datos, w.ids.s2]))).toMatch(/Solo la jefa/);
+      expect(await failure(rpc(jefa, "select public.venta_desde_factura_por($1::jsonb, $2)", [datos, w.ids.b1]))).toMatch(/Vendedor no encontrado/);
+      const r = (await rpc(jefa, "select public.venta_desde_factura_por($1::jsonb, $2) as r", [datos, w.ids.s1])).rows[0].r;
+      const v = (await rpc(w.seller1, "select vendedor_id, factura from public.ventas where id=$1", [r.venta_id])).rows[0];
+      expect(v).toMatchObject({ vendedor_id: w.ids.s1, factura: folio });
+      expect((await rpc(w.seller1, "select count(*)::int n from public.notifications where user_id=$1 and tipo='venta_por_jefa' and ref_id=$2", [w.ids.s1, r.venta_id])).rows[0].n).toBe(1);
+      // Una venta normal de la jefa sigue quedando a su nombre
+      const datos2 = JSON.stringify({ folio: folio + "B", uuid: randomUUID(), nombre: "CLIENTE JEFA B " + folio, pago: "contado", total: 100, moneda: "MXN", lineas: [{ clave: null, descripcion: "X", cantidad: 1 }] });
+      const r2 = (await rpc(jefa, "select public.venta_desde_factura($1::jsonb) as r", [datos2])).rows[0].r;
+      expect((await rpc(jefa, "select vendedor_id from public.ventas where id=$1", [r2.venta_id])).rows[0].vendedor_id).toBe(jefaId);
+    });
+
     it("la jefa ve solicitudes y precios de todos los vendedores, pero no costos", async () => {
       const { request, item } = await newQuotedItem(w, "Producto jefa", "100", {}, w.seller2);
       expect((await rpc(jefa, "select id from public.quote_requests where id=$1", [request])).rowCount).toBe(1);

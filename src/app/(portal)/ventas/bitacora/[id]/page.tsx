@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DateTime } from "luxon";
 import { BitacoraEditor } from "@/components/bitacora-editor";
+import { PausaProspecto } from "@/components/bitacora-pausa";
 import { PageHeader } from "@/components/ui";
 import { requireSalesViewer } from "@/lib/auth/sales";
 import { loadBitacoraDetail } from "@/lib/bitacora/detail";
@@ -9,7 +10,7 @@ import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function RegistroVentas({ params }: { params: Promise<{ id: string }> }) {
-  await requireSalesViewer();
+  const user = await requireSalesViewer();
   const { id } = await params;
   const supabase = await createClient();
   const [d, cfg] = await Promise.all([loadBitacoraDetail(supabase, id), getBusinessSettings(supabase)]);
@@ -23,6 +24,9 @@ export default async function RegistroVentas({ params }: { params: Promise<{ id:
         title={d.customer?.nombre ?? "Registro"}
         subtitle={`Prospección · ${d.entry.profiles?.nombre ?? "Sin vendedor"} · solo lectura`}
       />
+      {d.entry.resultado === "abierta" && !d.entry.archived_at && d.entry.vendedor_id && (
+        <PausaProspecto id={d.entry.id} pausadaAt={d.entry.pausada_at ?? null} motivo={d.entry.pausa_motivo ?? null} puede={user.rol === "jefe_ventas"} />
+      )}
       <BitacoraEditor
         mode="readonly"
         entry={d.entry}

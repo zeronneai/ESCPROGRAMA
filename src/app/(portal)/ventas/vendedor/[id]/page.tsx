@@ -55,7 +55,13 @@ export default async function VendedorVentas({ params, searchParams }: { params:
   return (
     <div className="space-y-5">
       <Link href="/ventas" className="text-sm text-slate-500 hover:text-slate-800">← Resumen de ventas</Link>
-      <PageHeader title={seller.nombre} subtitle={`${seller.correo}${seller.activo ? "" : " · inactivo"} · solo lectura`} />
+      <PageHeader
+        title={seller.nombre}
+        subtitle={`${seller.correo}${seller.activo ? "" : " · inactivo"}${viewer.rol === "jefe_ventas" ? "" : " · solo lectura"}`}
+        actions={viewer.rol === "jefe_ventas" && seller.activo && seller.id !== viewer.id ? (
+          <Link href={`/vendedor/bitacora/venta/factura?por=${seller.id}`} className="inline-flex items-center rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">Subir factura a nombre de {seller.nombre.split(" ")[0]}</Link>
+        ) : null}
+      />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <StatCard label="Ventas hoy" value={hoyV.length} tone={hoyV.length || movHoy ? "green" : "amber"} hint={`${movHoy ?? 0} movimiento(s) de prospección`} />
         <StatCard label="Ventas del mes" value={mesV.length} hint={`${money(mesV.filter((v) => v.moneda === "MXN").reduce((a, v) => a + Number(v.monto ?? 0), 0))} · ${visitasMes.length} visita(s) sin venta`} />

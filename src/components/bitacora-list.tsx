@@ -62,6 +62,7 @@ export function BitacoraList({ rows, hrefFor, showSeller = false, today }: { row
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 text-xs md:flex-col md:items-end">
+                {r.pausada_at && r.resultado === "abierta" && <span className="rounded-full bg-slate-700 px-2 py-0.5 font-bold text-white">⏸ En pausa</span>}
                 {seguimiento && (
                   <span className={`rounded-full px-2 py-0.5 font-medium ${seguimiento === "vencido" ? "bg-red-100 text-red-800" : seguimiento === "hoy" ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-600"}`}>
                     Seguimiento {seguimiento === "hoy" ? "hoy" : fmt(r.proximo_seguimiento)}

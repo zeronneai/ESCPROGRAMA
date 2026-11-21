@@ -94,3 +94,16 @@ export async function archiveBitacoraAction(id: string, archive: boolean): Promi
   refresh(id);
   return { ok: true };
 }
+
+
+/** Poner en pausa (o reanudar) un prospecto: mientras esta en pausa no corre el seguimiento. */
+export async function pausaBitacoraAction(id: string, pausar: boolean, motivo?: string): Promise<Result> {
+  await requireUser();
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { ok: false, error: "Registro inválido" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("bitacora_pausa", { p_id: id, p_pausar: pausar, p_motivo: (motivo ?? "").slice(0, 300) || null });
+  if (error) return { ok: false, error: /bitacora_pausa/.test(error.message) ? "Falta correr la actualización 0065 en la base." : friendlyError(error.message) };
+  revalidatePath("/vendedor/bitacora", "layout");
+  revalidatePath("/ventas", "layout");
+  return { ok: true };
+}

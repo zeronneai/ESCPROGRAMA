@@ -258,14 +258,22 @@ export async function ventaDesdeFacturaAction(fd: FormData): Promise<Result<{ id
   const sub = await subirArchivos(supabase, fd);
   if ("error" in sub) return { ok: false, error: sub.error };
   if (!sub.pdf.path && !sub.xml.path) return { ok: false, error: "Sube el PDF (o el XML) de la factura." };
-  const { data, error } = await supabase.rpc("venta_desde_factura", {
-    p: {
-      ...p.data,
-      lineas: p.data.lineas.map((l) => ({ ...l, cantidad: Math.ceil(l.cantidad) })),
-      pdf_path: sub.pdf.path, pdf_nombre: sub.pdf.nombre ?? sub.xml.nombre, xml_path: sub.xml.path,
-    },
-  });
-  if (error) return { ok: false, error: friendlyError(error.message) };
+  const datosRpc = {
+    ...p.data,
+    lineas: p.data.lineas.map((l) => ({ ...l, cantidad: Math.ceil(l.cantidad) })),
+    pdf_path: sub.pdf.path, pdf_nombre: sub.pdf.nombre ?? sub.xml.nombre, xml_path: sub.xml.path,
+  };
+  // La jefa puede subir la factura a nombre de un vendedor (vacaciones, etc.).
+  const por = String(fd.get("por") ?? "");
+  const aNombreDe = u.rol === "jefe_ventas" && /^[0-9a-f-]{36}$/i.test(por) && por !== u.id ? por : null;
+  const { data, error } = aNombreDe
+    ? await supabase.rpc("venta_desde_factura_por", { p: datosRpc, p_vendedor: aNombreDe })
+    : await supabase.rpc("venta_desde_factura", { p: datosRpc });
+  if (error) {
+    if (aNombreDe && /venta_desde_factura_por/.test(error.message)) return { ok: false, error: "Falta correr la actualización 0065 en la base para subir facturas a nombre de un vendedor." };
+    return { ok: false, error: friendlyError(error.message) };
+  }
+  if (aNombreDe) revalidatePath(`/ventas/vendedor/${aNombreDe}`);
   const r = data as { venta_id: string };
   revalidatePath("/vendedor/bitacora");
   revalidatePath("/entregas");

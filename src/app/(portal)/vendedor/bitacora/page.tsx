@@ -68,6 +68,7 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
     .filter((r) => {
       if (grupo === "seguimiento") return r.resultado === "abierta" && !!r.proximo_seguimiento && r.proximo_seguimiento <= today;
       if (grupo === "cerrados") return r.resultado !== "abierta";
+      if (grupo === "pausa") return r.resultado === "abierta" && !!r.pausada_at;
       if (grupo) return r.resultado === "abierta" && prospectGroup(r) === grupo;
       return true;
     })
@@ -179,6 +180,7 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
           <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
             <FilterChip href={phref({ grupo: undefined })} active={!grupo}>Todos {prospectos.length}</FilterChip>
             <FilterChip href={phref({ grupo: "seguimiento" })} active={grupo === "seguimiento"}>Seguimiento pendiente {seguimientos}</FilterChip>
+            <FilterChip href={phref({ grupo: "pausa" })} active={grupo === "pausa"}>En pausa {abiertos.filter((r) => r.pausada_at).length}</FilterChip>
             <FilterChip href={phref({ grupo: "cerrados" })} active={grupo === "cerrados"}>Cerrados {prospectos.length - abiertos.length}</FilterChip>
           </div>
           <Card className="p-0">

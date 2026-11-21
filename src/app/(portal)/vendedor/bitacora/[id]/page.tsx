@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DateTime } from "luxon";
 import { BitacoraEditor } from "@/components/bitacora-editor";
+import { PausaProspecto } from "@/components/bitacora-pausa";
 import { PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guards";
 import { loadBitacoraDetail } from "@/lib/bitacora/detail";
@@ -22,6 +23,9 @@ export default async function RegistroBitacora({ params }: { params: Promise<{ i
         title={d.customer?.nombre ?? "Registro"}
         subtitle={`Prospección · creado ${DateTime.fromISO(d.entry.created_at, { zone: cfg.timezone }).setLocale("es-MX").toFormat("d LLL yyyy")}${d.entry.archived_at ? " · archivado" : ""}`}
       />
+      {d.entry.resultado === "abierta" && !d.entry.archived_at && d.entry.vendedor_id && (
+        <PausaProspecto id={d.entry.id} pausadaAt={d.entry.pausada_at ?? null} motivo={d.entry.pausa_motivo ?? null} puede={mode === "edit" || user.rol === "jefe_ventas"} />
+      )}
       <BitacoraEditor
         jefa={user.rol === "jefe_ventas"}
         key={d.entry.updated_at}
