@@ -92,7 +92,7 @@ async function cotizacionesVendedor(c: Ctx): Promise<Bloque> {
   };
 }
 
-async function cotizacionesCompras(c: Ctx, lectura: boolean): Promise<Bloque> {
+async function cotizacionesCompras(c: Ctx, lectura: boolean, gerente = false): Promise<Bloque> {
   const { data } = await c.sb
     .from("quote_requests")
     .select("id, due_at, quote_items!quote_items_request_id_fkey(estado)")
@@ -106,16 +106,17 @@ async function cotizacionesCompras(c: Ctx, lectura: boolean): Promise<Bloque> {
   const acl = rows.reduce((a, r) => a + r.quote_items.filter((i) => i.estado === "esperando_aclaracion").length, 0);
   const vencidas = conPend.filter((r) => r.due_at && r.due_at < c.nowIso).length;
   const pronto = conPend.filter((r) => r.due_at && r.due_at >= c.nowIso && r.due_at < DateTime.fromISO(c.nowIso).plus({ hours: 24 }).toISO()!).length;
-  const href = lectura ? "/indicadores" : "/comprador";
+  // La gerente tiene su vista de cotizaciones (sin datos del comprador); el CEO ve los indicadores.
+  const href = gerente ? "/cotizaciones" : lectura ? "/indicadores" : "/comprador";
   const alertas: Alerta[] = [];
-  if (vencidas) alertas.push({ texto: `${vencidas} solicitud(es) de cotización fuera de plazo`, href, tono: "red" });
+  if (vencidas) alertas.push({ texto: `${vencidas} solicitud(es) de cotización fuera de plazo`, href: gerente ? "/cotizaciones?etapa=por_cotizar" : href, tono: "red" });
   if (!lectura && act) alertas.push({ texto: `${act} actualización(es) de precio solicitadas por ventas`, href, tono: "amber" });
   return {
     alertas,
     seccion: {
       id: "cotizaciones", titulo: lectura ? "Cotizaciones (compras)" : "Cotizaciones por atender", icon: "inbox", href,
       metricas: [
-        { label: "Partidas por cotizar", valor: pend, tono: tonoSi(pend), hint: `${conPend.length} solicitud(es)` },
+        { label: "Partidas por cotizar", valor: pend, tono: tonoSi(pend), hint: `${conPend.length} solicitud(es)`, ...(gerente ? { href: "/cotizaciones?etapa=por_cotizar" } : {}) },
         { label: "Fuera de plazo", valor: vencidas, tono: tonoSi(vencidas, "red") },
         { label: "Vencen en 24 h", valor: pronto, tono: tonoSi(pronto) },
         { label: "Actualizaciones de precio", valor: act, tono: tonoSi(act) },
@@ -463,7 +464,7 @@ export async function cargarTablero(sb: SupabaseClient, uid: string, rol: Rol, t
       case "ceo":
         return [pagos(c), ventas(c, false), cotizacionesCompras(c, true), calidad(c, false), guias(c, false, false), consumo(c, "lectura"), encuesta(c, false), evalProveedores(c), controlCambios(c)];
       case "gerente":
-        return [ventas(c, false), cotizacionesCompras(c, true), calidad(c, false), guias(c, false, false), consumo(c, "lectura"), prospeccion(c, false), encuesta(c, false), evalProveedores(c), controlCambios(c)];
+        return [ventas(c, false), cotizacionesCompras(c, true, true), calidad(c, false), guias(c, false, false), consumo(c, "lectura"), prospeccion(c, false), encuesta(c, false), evalProveedores(c), controlCambios(c)];
       case "coordinador_iso":
         return [calidad(c, false), controlCambios(c), encuesta(c, false), evalProveedores(c), soloResumen(ventas(c, false)), soloResumen(guias(c, false, false))];
       case "marketplaces":
