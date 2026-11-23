@@ -122,8 +122,10 @@ export function recepcionSuite() {
       await q(w.seller1, "update public.ventas set porcentaje_cobrado=100, fecha_cobro=public.local_today() where id=$1", [v]);
       const ls = await q(w.seller1, "select comision::numeric c from public.venta_lineas where venta_id=$1 order by comision", [v]);
       expect(ls.rows.map((r) => Number(r.c))).toEqual([18, 20]);
-      // Pagada: el vendedor ya no la cambia; la jefa si
-      expect(await failure(q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l1, importe: 600, comision_pct: 4 }])]))).toMatch(/solo la jefa/);
+      // Pagada: el vendedor ya no cambia lo que tiene valor; la jefa si
+      expect(await failure(q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l1, importe: 600, comision_pct: 4 }])]))).toMatch(/solo puedes llenar lo que falta/);
+      // Mandar lo mismo no truena
+      await q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l1, importe: 600, comision_pct: 3 }])]);
       await q(jefa, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l1, importe: 600, comision_pct: 4 }])]);
       expect(Number((await q(jefa, "select comision::numeric c from public.venta_lineas where id=$1", [l1])).rows[0].c)).toBe(24);
       // La jefa ve las comisiones de todos
@@ -136,6 +138,21 @@ export function recepcionSuite() {
       const r = (await q(w.seller1, "select public.venta_desde_factura($1::jsonb) as r", [datos])).rows[0].r;
       const ls = await q(w.seller1, "select descripcion, importe::numeric i, comision_pct::numeric p, comision::numeric c from public.venta_lineas where venta_id=$1 order by descripcion", [r.venta_id]);
       expect(ls.rows.map((x) => [x.descripcion, Number(x.i), x.p == null ? null : Number(x.p), x.c == null ? null : Number(x.c)])).toEqual([["Bata", 300, null, null], ["Guante", 700, 2.5, 17.5]]);
+    });
+    it("comisiones: venta pagada sin comision (de antes): el vendedor llena lo que falta; la jefa revisa; luego ya no cambia", async () => {
+      const v = (await q(w.seller1, "insert into public.ventas (customer_id, monto, pago, factura, porcentaje_cobrado) values ($1, 500, 'contado', 'OLD-1', 100) returning id", [w.customerId])).rows[0].id;
+      const l1 = (await q(w.seller1, "insert into public.venta_lineas (venta_id, descripcion, cantidad) values ($1, 'Guante', 1) returning id", [v])).rows[0].id;
+      const l2 = (await q(w.seller1, "insert into public.venta_lineas (venta_id, descripcion, cantidad) values ($1, 'Bata', 1) returning id", [v])).rows[0].id;
+      expect(await failure(q(jefa, "select public.venta_comision_revisar($1, true)", [v]))).toMatch(/Falta el importe/);
+      await q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l1, importe: 300, comision_pct: 2 }])]);
+      await q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l2, importe: 130, comision_pct: 2 }])]);
+      expect(await failure(q(w.seller1, "select public.venta_comision_revisar($1, true)", [v]))).toMatch(/Solo la jefa/);
+      await q(jefa, "select public.venta_comision_revisar($1, true)", [v]);
+      expect((await q(w.seller1, "select comision_revisada_at is not null r from public.ventas where id=$1", [v])).rows[0].r).toBe(true);
+      expect(await failure(q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l1, importe: 300, comision_pct: 2 }])]))).toMatch(/ya reviso/);
+      await q(jefa, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l1, importe: 300, comision_pct: 3 }])]);
+      await q(jefa, "select public.venta_comision_revisar($1, false)", [v]);
+      expect((await q(w.seller1, "select comision_revisada_at from public.ventas where id=$1", [v])).rows[0].comision_revisada_at).toBeNull();
     });
   });
 }

@@ -38,7 +38,7 @@ export function ComisionesVenta({ ventaId, lineas, moneda, editable, pagada, res
         <div>
           <p className="font-semibold text-slate-900">Comisión por artículo</p>
           <p className="text-xs text-slate-500">
-            Importe sin IVA × % = comisión. {pagada ? (editable ? "Ya está pagada: solo la jefa de ventas puede cambiarla." : "Ya está pagada.") : "Es obligatoria para marcar la venta como pagada."}
+            Importe sin IVA × % = comisión. {pagada ? "Ya está pagada: el vendedor solo puede llenar lo que falta; para corregir, la jefa de ventas." : "Es obligatoria para marcar la venta como pagada."}
           </p>
         </div>
         <p className="text-right">

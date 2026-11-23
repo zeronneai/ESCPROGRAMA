@@ -127,3 +127,15 @@ export async function comisionesVentaAction(ventaId: string, lineas: unknown): P
   revalidatePath("/ventas/comisiones");
   return { ok: true };
 }
+
+/** Jefa de ventas: marca (o quita) la revision de la comision de una venta. */
+export async function revisarComisionAction(ventaId: string, revisada: boolean): Promise<Result> {
+  await requireUser();
+  if (!uuid.safeParse(ventaId).success) return { ok: false, error: "Venta inválida" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("venta_comision_revisar", { p_venta: ventaId, p_revisada: revisada });
+  if (error) return { ok: false, error: /venta_comision_revisar/.test(error.message) ? "Falta correr la actualización 0074 en la base." : friendlyError(error.message) };
+  revalidatePath("/ventas/comisiones");
+  revalidatePath("/vendedor/comisiones");
+  return { ok: true };
+}

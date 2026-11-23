@@ -88,6 +88,7 @@ const NAV: Record<Rol, NavItem[]> = {
   gerente: [
     { href: "/ventas", label: "Ventas", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
     { href: "/cotizaciones", label: "Cotizaciones", short: "Cotiz.", icon: "inbox" },
+    { href: "/ventas/comisiones", label: "Comisiones", short: "Comisión", icon: "dollar" },
     { href: "/calidad", label: "Calidad", icon: "alert" },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/guias", label: "Guías", icon: "package" },
@@ -152,6 +153,7 @@ const NAV: Record<Rol, NavItem[]> = {
   ceo: [
     { href: "/pagos", label: "Pagos a proveedores", short: "Pagos", icon: "dollar" },
     { href: "/ventas", label: "Ventas", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
+    { href: "/ventas/comisiones", label: "Comisiones", icon: "dollar", secondary: true },
     { href: "/calidad", label: "Calidad", icon: "alert" },
     { href: "/minutas", label: "Minutas", icon: "list", secondary: true },
     { href: "/consumo", label: "Consumo interno", icon: "clipboard", secondary: true },

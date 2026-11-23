@@ -16,6 +16,7 @@ export interface ComFactura {
   moneda: string;
   monto: number | null;
   pagada: boolean;
+  revisada: boolean;
   lineas: ComLinea[];
   comision: number;
   faltan: number;
@@ -25,3 +26,6 @@ export interface ComVendedor {
   nombre: string;
   facturas: ComFactura[];
 }
+
+/** Quien ve la pantalla: el vendedor (las suyas, las llena), la jefa (todas, corrige y revisa) o la gerente (solo revisadas, solo totales). */
+export type ModoComisiones = "vendedor" | "jefa" | "gerente";

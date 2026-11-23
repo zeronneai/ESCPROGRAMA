@@ -28,7 +28,7 @@ export default async function Venta({ params, searchParams }: { params: Promise<
           lineas={d.lineas}
           moneda={d.venta.moneda}
           pagada={Number(d.venta.porcentaje_cobrado) >= 100}
-          editable={u.rol === "jefe_ventas" || (d.venta.vendedor_id === u.id && Number(d.venta.porcentaje_cobrado) < 100)}
+          editable={u.rol === "jefe_ventas" || (d.venta.vendedor_id === u.id && (Number(d.venta.porcentaje_cobrado) < 100 || d.lineas.some((l) => l.importe == null || l.comision_pct == null)))}
           resaltar={comision === "1"}
         />
       )}
