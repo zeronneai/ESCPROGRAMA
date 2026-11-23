@@ -145,9 +145,11 @@ export function emisionesSuite() {
     it("estatus cliente/prospecto: registra la conversion y solo comprador o jefa regresan a prospecto", async () => {
       const tag = randomUUID().slice(0, 6);
       const id = (await rpc(w.seller1, "insert into public.customers (nombre, tipo, created_by) values ($2,'prospecto',$1) returning id", [w.ids.s1, `Prospecto ${tag}`])).rows[0].id;
-      await rpc(w.seller1, "update public.customers set tipo='cliente' where id=$1", [id]);
+      // El vendedor no lo pasa a cliente a mano: solo con la factura (o el comprador en su catalogo).
+      expect(await failure(rpc(w.seller1, "update public.customers set tipo='cliente' where id=$1", [id]))).toMatch(/solo al subir el PDF de su factura/);
+      await rpc(w.buyer1, "update public.customers set tipo='cliente' where id=$1", [id]);
       const c = (await rpc("postgres", "select tipo, tipo_inicial, convertido_at is not null as conv, convertido_por from public.customers where id=$1", [id])).rows[0];
-      expect(c).toEqual({ tipo: "cliente", tipo_inicial: "prospecto", conv: true, convertido_por: w.ids.s1 });
+      expect(c).toEqual({ tipo: "cliente", tipo_inicial: "prospecto", conv: true, convertido_por: w.ids.b1 });
       expect(await failure(rpc(w.seller1, "update public.customers set tipo='prospecto' where id=$1", [id]))).toMatch(/Solo el comprador o la jefa/);
       await rpc(w.buyer1, "update public.customers set tipo='prospecto' where id=$1", [id]);
       expect((await rpc("postgres", "select convertido_at from public.customers where id=$1", [id])).rows[0].convertido_at).toBeNull();
@@ -174,7 +176,7 @@ export function emisionesSuite() {
       await rpc("postgres", "insert into public.item_references (item_id, tipo, url) select id, 'link', 'https://x.example' from public.quote_items where request_id=$1", [req]);
       await rpc(w.seller1, "update public.quote_requests set estado='enviada', due_at=now() + interval '2 days' where id=$1", [req]);
       // Ya como cliente sin RFC no es completo; con su RFC si.
-      await rpc(w.seller1, "update public.customers set tipo='cliente' where id=$1", [p]);
+      await rpc(w.buyer1, "update public.customers set tipo='cliente' where id=$1", [p]);
       expect((await rpc("postgres", "select public.customer_is_complete($1) as ok", [p])).rows[0].ok).toBe(false);
       await rpc(w.seller1, "update public.customers set rfc='PRO010101AB1' where id=$1", [p]);
       expect((await rpc("postgres", "select public.customer_is_complete($1) as ok", [p])).rows[0].ok).toBe(true);

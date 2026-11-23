@@ -8,7 +8,6 @@ import { useState, useTransition } from "react";
 import { DateTime } from "luxon";
 import { addBitacoraArticuloAction, removeBitacoraArticuloAction, updateBitacoraArticuloAction } from "@/actions/articulos";
 import { addBitacoraCommentAction, archiveBitacoraAction, claimBitacoraAction, createBitacoraAction, updateBitacoraAction } from "@/actions/bitacora";
-import { convertCustomerAction } from "@/actions/customers";
 import { ArticulosList } from "@/components/articulos-picker";
 import { CustomerPicker, KindBadge } from "@/components/customers";
 import type { BitacoraArticulo } from "@/lib/articulos";
@@ -233,15 +232,12 @@ export function BitacoraEditor({
             {v.monto_venta && ` · $${Number(v.monto_venta).toLocaleString("es-MX")} ${v.moneda}`}. Sus ventas siguen en Ventas diarias.
           </p>
         ) : (
-          <p className="text-xs text-slate-500">Cuando compre, registra la venta: pasa a cliente y este prospecto se cierra como ganado.</p>
+          <p className="text-xs text-slate-500">Cuando compre, sube el PDF de su factura: pasa a cliente y este prospecto se cierra solo.</p>
         )}
         {!ro && mode !== "new" && customer && basePath.startsWith("/vendedor") && (
           <div className="flex flex-wrap gap-2">
             <Link href={`/vendedor/bitacora/venta/factura?cliente=${customer.id}`} className="inline-flex items-center rounded-md bg-green-600 px-3 py-2 text-xs font-medium text-white hover:bg-green-700">
               {v.fecha_pedido ? "Registrar otra venta con factura (PDF)" : "Registrar su primera venta con factura (PDF)"}
-            </Link>
-            <Link href={`/vendedor/bitacora/venta/nueva?cliente=${customer.id}`} className="inline-flex items-center rounded-md border border-green-600 bg-white px-3 py-2 text-xs font-medium text-green-700 hover:bg-green-50">
-              Venta sin factura
             </Link>
           </div>
         )}
@@ -318,15 +314,6 @@ export function BitacoraEditor({
             </div>
             {!ro && (
               <div className="flex shrink-0 flex-wrap gap-2">
-                {customer.tipo === "prospecto" && (
-                  <Button className="bg-green-600 text-xs hover:bg-green-700" loading={busy === "convert"} onClick={() => run("convert", async () => {
-                    const r = await convertCustomerAction(customer.id);
-                    if (!r.ok) return setNotice({ tone: "error", text: r.error });
-                    setCustomer(r.customer);
-                    setNotice({ tone: "success", text: `${customer.nombre} ya es cliente. Este registro pasa a Ventas diarias.` });
-                    router.refresh();
-                  })}>Ya es cliente</Button>
-                )}
                 <Link href={`${jefa ? "/ventas/clientes" : "/vendedor/clientes"}?editar=${customer.id}`} className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100">
                   {bitacoraMissing(customer).length ? "Completar datos" : "Editar datos"}
                 </Link>
@@ -375,12 +362,14 @@ export function BitacoraEditor({
           <div className="space-y-1">
             <span className="block text-sm font-medium text-slate-700">Resultado</span>
             <div className="flex flex-wrap gap-1.5">
-              {(["abierta", "ganada", "perdida"] as const).map((r) => (
-                <button key={r} type="button" disabled={ro} onClick={() => set("resultado", r)} className={`rounded-full border px-3 py-1.5 text-xs font-medium ${v.resultado === r ? (r === "ganada" ? "border-green-600 bg-green-600 text-white" : r === "perdida" ? "border-red-600 bg-red-600 text-white" : "border-slate-800 bg-slate-800 text-white") : "border-slate-300 bg-white text-slate-700"}`}>
-                  {r === "abierta" ? "En proceso" : r === "ganada" ? "Venta cerrada" : "Perdida"}
+              {/* "Ya es cliente" no se marca a mano: se cierra solo al subir el PDF de su factura. */}
+              {(v.resultado === "ganada" ? (["ganada"] as const) : (["abierta", "perdida"] as const)).map((r) => (
+                <button key={r} type="button" disabled={ro || r === "ganada"} onClick={() => set("resultado", r)} className={`rounded-full border px-3 py-1.5 text-xs font-medium ${v.resultado === r ? (r === "ganada" ? "border-green-600 bg-green-600 text-white" : r === "perdida" ? "border-red-600 bg-red-600 text-white" : "border-slate-800 bg-slate-800 text-white") : "border-slate-300 bg-white text-slate-700"}`}>
+                  {r === "abierta" ? "En proceso" : r === "ganada" ? "Ya es cliente (con factura)" : "Perdida"}
                 </button>
               ))}
             </div>
+            {v.resultado !== "ganada" && <p className="text-xs text-slate-500">Pasa a cliente solo al subir el PDF de su factura.</p>}
             {v.resultado === "perdida" && (
               <div className="space-y-1.5 pt-1">
                 <Input value={v.motivo_perdida} disabled={ro} onChange={(e) => set("motivo_perdida", e.target.value)} placeholder="¿Por qué se perdió?" list="motivos-bit" />

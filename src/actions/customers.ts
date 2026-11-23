@@ -64,17 +64,6 @@ export async function searchCustomersAction(q: string): Promise<CustomerRecord[]
   return ((data ?? []) as CustomerRecord[]).map((c) => ({ ...c }));
 }
 
-/** El prospecto ya compro: pasa a Cliente (queda la fecha y quien lo convirtio). */
-export async function convertCustomerAction(id: string): Promise<Result<{ customer: CustomerRecord }>> {
-  await requireUser();
-  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "Cliente inválido" };
-  const supabase = await createClient();
-  const { data, error } = await supabase.from("customers").update({ tipo: "cliente" }).eq("id", id).select(COLS).single();
-  if (error) return { ok: false, error: friendlyError(error.message) };
-  revalidatePath("/vendedor/bitacora");
-  return { ok: true, customer: data as CustomerRecord };
-}
-
 /** Comprador o jefa de ventas: regresar a prospecto (la base lo valida). */
 export async function setCustomerKindAction(id: string, tipo: "cliente" | "prospecto"): Promise<Result> {
   await requireUser();

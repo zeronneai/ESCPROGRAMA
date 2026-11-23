@@ -130,7 +130,7 @@ export const FAQ: Faq[] = [
   {
     id: "prospecto-cliente", q: "¿Cuál es la diferencia entre cliente y prospecto?", roles: V,
     keys: ["diferencia", "prospecto", "cliente", "convertir", "ya es cliente", "volvio", "compro"],
-    a: ["Cliente: ya nos compra. Sus ventas van en Ventas diarias.", "Prospecto: aún no nos compra. Se le da seguimiento en Prospección.", "Cuando un prospecto compra, registra su primera venta: pasa a cliente solo y cuenta como prospecto convertido."],
+    a: ["Cliente: ya nos compra. Sus ventas van en Ventas diarias.", "Prospecto: aún no nos compra. Se le da seguimiento en Prospección.", "Cuando un prospecto compra, sube el PDF de su factura (Registrar venta con factura): pasa a cliente solo y cuenta como prospecto convertido. No hay botón para marcarlo a mano. Si la factura salió con otro nombre, en el prospecto usa “Unir con su venta”."],
   },
 
   {

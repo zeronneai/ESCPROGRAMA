@@ -10,6 +10,7 @@ export async function ventasCandidatas(supabase: SupabaseClient, vendedorId: str
     .select("customer_id, factura, fecha, monto, moneda, customers(nombre, parent_id)")
     .eq("vendedor_id", vendedorId)
     .eq("tipo", "venta")
+    .eq("origen", "factura")
     .is("cancelada_at", null)
     .gte("fecha", desde)
     .order("fecha", { ascending: false })

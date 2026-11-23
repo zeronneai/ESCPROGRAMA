@@ -3,7 +3,7 @@
 import { toast } from "@/components/feedback-global";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { convertCustomerAction, listSucursalesAction, saveCustomerAction, saveSucursalAction, searchCustomersAction, setCustomerActiveAction, setCustomerKindAction } from "@/actions/customers";
+import { listSucursalesAction, saveCustomerAction, saveSucursalAction, searchCustomersAction, setCustomerActiveAction, setCustomerKindAction } from "@/actions/customers";
 import { Icon } from "@/components/icons";
 import { Alert, Button, Card, EmptyState, Field, Input, Select, Spinner } from "@/components/ui";
 import {
@@ -511,23 +511,6 @@ export function CustomerPicker({
             </div>
           </div>
           <div className="flex shrink-0 flex-wrap gap-2">
-            {value.tipo === "prospecto" && (
-              <Button
-                type="button"
-                className="bg-green-600 text-xs hover:bg-green-700"
-                loading={pending}
-                onClick={() =>
-                  start(async () => {
-                    setErr(null);
-                    const r = await convertCustomerAction(value.id);
-                    if (r.ok) onChange(r.customer);
-                    else setErr(r.error);
-                  })
-                }
-              >
-                Ya es cliente
-              </Button>
-            )}
             <Button type="button" variant={missing.length ? "primary" : "secondary"} className="text-xs" onClick={() => setMode("edit")}>
               {missing.length ? "Completar datos" : "Editar"}
             </Button>
@@ -685,21 +668,6 @@ export function ClientsDirectory({
                       {c.convertido_at && <p className="mt-0.5 text-xs text-green-700">Se volvió cliente el {new Date(c.convertido_at).toLocaleDateString("es-MX", { dateStyle: "medium" })}</p>}
                     </div>
                     {!readOnly && <div className="flex shrink-0 flex-wrap gap-2">
-                      {c.tipo === "prospecto" && (
-                        <Button
-                          className="bg-green-600 text-xs hover:bg-green-700"
-                          disabled={pending}
-                          onClick={() =>
-                            start(async () => {
-                              const r = await convertCustomerAction(c.id);
-                              if (r.ok) upsert(r.customer);
-                              else setNotice(r.error);
-                            })
-                          }
-                        >
-                          Ya es cliente
-                        </Button>
-                      )}
                       {c.tipo === "cliente" && role !== "vendedor" && (
                         <Button
                           variant="ghost"

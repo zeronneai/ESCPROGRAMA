@@ -70,7 +70,7 @@ export function bitacoraSuite() {
     it("convertir el prospecto a cliente queda en la bitacora del registro", async () => {
       const c = await newCustomer(w.seller1, w.ids.s1);
       const id = await newEntry(w.seller1, w.ids.s1, c);
-      await rpc(w.seller1, "update public.customers set tipo='cliente' where id=$1", [c]);
+      await rpc(w.buyer1, "update public.customers set tipo='cliente' where id=$1", [c]);
       const ev = await rpc(w.seller1, "select nota from public.bitacora_eventos where bitacora_id=$1 and tipo='estatus_cliente'", [id]);
       expect(ev.rows[0].nota).toMatch(/convertido a cliente/);
     });
@@ -87,7 +87,8 @@ export function bitacoraSuite() {
       const after = await rpc(w.seller1, "select fecha_cotizacion is not null as cot, fecha_pedido is not null as ped from public.bitacora where request_id=$1", [request]);
       const venta = await rpc(w.seller1, "select v.origen, v.monto > 0 as monto, (select count(*)::int from public.venta_lineas l where l.venta_id=v.id) as lineas from public.ventas v where v.request_id=$1", [request]);
       expect(venta.rows).toEqual([{ origen: "portal", monto: true, lineas: 1 }]);
-      expect((await rpc(w.seller1, "select tipo from public.customers where id=$1", [w.customerId])).rows[0].tipo).toBe("cliente");
+      // La partida ganada registra la venta, pero sin factura no lo vuelve cliente.
+      expect((await rpc(w.seller1, "select tipo from public.customers where id=$1", [w.customerId])).rows[0].tipo).toBe("prospecto");
       expect(after.rows[0]).toEqual({ cot: true, ped: true });
     });
 
@@ -113,10 +114,15 @@ export function bitacoraSuite() {
       expect(ev.rows.map((x) => x.nota).join("|")).toMatch(new RegExp(`primera venta \\(factura ${folio}\\)`));
     });
 
-    it("marcar a mano al prospecto como cliente cierra su prospeccion", async () => {
+    it("el vendedor no marca a mano 'Ya es cliente' ni 'Venta cerrada'; solo con factura", async () => {
       const c = await newCustomer(w.seller1, w.ids.s1);
       const id = await newEntry(w.seller1, w.ids.s1, c);
-      await rpc(w.seller1, "update public.customers set tipo='cliente' where id=$1", [c]);
+      expect(await failure(rpc(w.seller1, "update public.customers set tipo='cliente' where id=$1", [c]))).toMatch(/solo al subir el PDF/);
+      expect(await failure(rpc(w.seller1, "update public.bitacora set resultado='ganada' where id=$1", [id]))).toMatch(/solo al subir el PDF/);
+      await rpc(w.seller1, "insert into public.ventas (customer_id, monto, pago) values ($1, 100, 'contado')", [c]);
+      expect((await rpc(w.seller1, "select resultado from public.bitacora where id=$1", [id])).rows[0].resultado).toBe("abierta");
+      // Si el comprador lo corrige en su catalogo, se cierra
+      await rpc(w.buyer1, "update public.customers set tipo='cliente' where id=$1", [c]);
       expect((await rpc(w.seller1, "select resultado from public.bitacora where id=$1", [id])).rows[0].resultado).toBe("ganada");
     });
 
