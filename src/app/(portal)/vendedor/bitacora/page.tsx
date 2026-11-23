@@ -67,10 +67,12 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
   const prospRows = prospectos
     .filter((r) => {
       if (grupo === "seguimiento") return r.resultado === "abierta" && !!r.proximo_seguimiento && r.proximo_seguimiento <= today;
-      if (grupo === "cerrados") return r.resultado !== "abierta";
+      if (grupo === "clientes") return r.resultado === "ganada";
+      if (grupo === "cerrados") return r.resultado === "perdida";
       if (grupo === "pausa") return r.resultado === "abierta" && !!r.pausada_at;
       if (grupo) return r.resultado === "abierta" && prospectGroup(r) === grupo;
-      return true;
+      // Los que ya se volvieron clientes (o se perdieron) salen de prospeccion; quedan en su historial.
+      return r.resultado === "abierta";
     })
     .filter((r) => !buscar || [r.customers?.nombre, r.necesidad, r.customers?.giro, r.customers?.estado_geo, r.comentarios].some((f) => f?.toLowerCase().includes(buscar)))
     .sort((a, b) => Number(a.resultado !== "abierta") - Number(b.resultado !== "abierta") || b.updated_at.localeCompare(a.updated_at));
@@ -178,10 +180,11 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
             <button className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">Buscar</button>
           </form>
           <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">
-            <FilterChip href={phref({ grupo: undefined })} active={!grupo}>Todos {prospectos.length}</FilterChip>
+            <FilterChip href={phref({ grupo: undefined })} active={!grupo}>Activos {abiertos.length}</FilterChip>
             <FilterChip href={phref({ grupo: "seguimiento" })} active={grupo === "seguimiento"}>Seguimiento pendiente {seguimientos}</FilterChip>
             <FilterChip href={phref({ grupo: "pausa" })} active={grupo === "pausa"}>En pausa {abiertos.filter((r) => r.pausada_at).length}</FilterChip>
-            <FilterChip href={phref({ grupo: "cerrados" })} active={grupo === "cerrados"}>Cerrados {prospectos.length - abiertos.length}</FilterChip>
+            <FilterChip href={phref({ grupo: "clientes" })} active={grupo === "clientes"}>Historial: se volvieron clientes {prospectos.filter((r) => r.resultado === "ganada").length}</FilterChip>
+            <FilterChip href={phref({ grupo: "cerrados" })} active={grupo === "cerrados"}>Perdidos {prospectos.filter((r) => r.resultado === "perdida").length}</FilterChip>
           </div>
           <Card className="p-0">
             <BitacoraList rows={prospRows} hrefFor={(id) => `/vendedor/bitacora/${id}`} today={today} />

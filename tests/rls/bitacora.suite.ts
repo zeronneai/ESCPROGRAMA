@@ -99,6 +99,27 @@ export function bitacoraSuite() {
       expect(linked.rows[0].request_id).toBe(request);
     });
 
+    it("el prospecto compra con factura en una sucursal (domicilio de entrega): sale de prospeccion como cliente", async () => {
+      const c = await newCustomer(w.seller1, w.ids.s1);
+      const id = await newEntry(w.seller1, w.ids.s1, c);
+      const folio = "P" + Math.floor(Math.random() * 1e8);
+      const datos = JSON.stringify({ folio, uuid: randomUUID(), customer_id: c, pago: "contado", total: 800, moneda: "MXN", entrega_nombre: "Planta 2", entrega_direccion: "Calle Falsa 123 " + folio, lineas: [{ clave: null, descripcion: "Guante", cantidad: 3 }] });
+      const r = (await rpc(w.seller1, "select public.venta_desde_factura($1::jsonb) as r", [datos])).rows[0].r;
+      expect(r.sucursal_id).toBeTruthy();
+      const b = (await rpc(w.seller1, "select resultado, fecha_pedido is not null as ped, monto_venta::numeric as monto from public.bitacora where id=$1", [id])).rows[0];
+      expect(b).toMatchObject({ resultado: "ganada", ped: true });
+      expect((await rpc(w.seller1, "select tipo from public.customers where id=$1", [c])).rows[0].tipo).toBe("cliente");
+      const ev = await rpc(w.seller1, "select nota from public.bitacora_eventos where bitacora_id=$1 and tipo='estatus_cliente'", [id]);
+      expect(ev.rows.map((x) => x.nota).join("|")).toMatch(new RegExp(`primera venta \\(factura ${folio}\\)`));
+    });
+
+    it("marcar a mano al prospecto como cliente cierra su prospeccion", async () => {
+      const c = await newCustomer(w.seller1, w.ids.s1);
+      const id = await newEntry(w.seller1, w.ids.s1, c);
+      await rpc(w.seller1, "update public.customers set tipo='cliente' where id=$1", [c]);
+      expect((await rpc(w.seller1, "select resultado from public.bitacora where id=$1", [id])).rows[0].resultado).toBe("ganada");
+    });
+
     it("prospecto en pausa: no corre el seguimiento; al reanudar regresa la fecha", async () => {
       const c = await newCustomer(w.seller1, w.ids.s1);
       const id = await newEntry(w.seller1, w.ids.s1, c);
