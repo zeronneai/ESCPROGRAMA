@@ -146,3 +146,20 @@ describe("ceo y pagos", () => {
     expect(decideRoute({ pathname: "/pagos", hasUser: true, profile: p("vendedor") })).toEqual({ type: "redirect", to: "/inicio" });
   });
 });
+
+describe("recepcion de facturas", () => {
+  const p = (rol: GuardProfile["rol"]): GuardProfile => ({ activo: true, must_change_password: false, rol });
+  const d = (pathname: string, rol: GuardProfile["rol"]) => decideRoute({ pathname, hasUser: true, profile: p(rol) });
+  it("finanzas entra a recibir; el vendedor entrega las suyas; nadie mas", () => {
+    expect(d("/finanzas/recepcion", "aux_finanzas")).toEqual({ type: "next" });
+    expect(d("/finanzas/recepcion/x", "supervisor_finanzas")).toEqual({ type: "next" });
+    expect(d("/finanzas/recepcion", "jefe_ventas")).toEqual({ type: "next" });
+    expect(d("/finanzas/recepcion", "vendedor")).toEqual({ type: "redirect", to: "/inicio" });
+    expect(d("/finanzas/recepcion", "comprador")).toEqual({ type: "redirect", to: "/inicio" });
+    expect(d("/vendedor/recepcion-facturas", "vendedor")).toEqual({ type: "next" });
+    expect(d("/vendedor/recepcion-facturas", "jefe_ventas")).toEqual({ type: "next" });
+    expect(d("/vendedor/recepcion-facturas", "aux_finanzas")).toEqual({ type: "redirect", to: "/inicio" });
+    expect(d("/vendedor/solicitudes", "aux_finanzas")).toEqual({ type: "redirect", to: "/inicio" });
+    expect(d("/comprador", "aux_finanzas")).toEqual({ type: "redirect", to: "/inicio" });
+  });
+});

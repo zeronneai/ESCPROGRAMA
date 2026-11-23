@@ -78,6 +78,8 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 61 | `0066_prospecto_a_cliente.sql` | **El prospecto que compra sale de Prospección** (aunque la venta quede en una sucursal o lo marquen cliente a mano) y queda en el historial "Se volvieron clientes". Corrige los que ya estaban así. |
 | 62 | `0067_unir_prospecto_cliente.sql` | **Unir un prospecto con el cliente de su factura** cuando la factura salió con otro nombre (razón social) y se subió en Ventas diarias. Se queda con su nombre popular y toma RFC y razón social. |
 | 63 | `0068_cliente_solo_con_factura.sql` | **Un prospecto pasa a cliente solo al subir el PDF de su factura** (se quitan "Ya es cliente" y "Venta cerrada"). Reabre los prospectos marcados a mano como cerrados sin ninguna venta. |
+| 64 | `0069_rol_aux_finanzas.sql` | **Puesto Auxiliar de administración y finanzas.** Córrelo solo, en su propia ejecución. |
+| 65 | `0070_recepcion_facturas.sql` | **Recepción de facturas pagadas**: el vendedor entrega sus facturas cobradas agrupadas por pago; finanzas las recibe, rechaza con motivo y anota. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

@@ -15,6 +15,7 @@ import { pagosSuite } from "./pagos.suite";
 import { planeacionSuite } from "./planeacion.suite";
 import { calcTabulador } from "@/lib/pricing/tabulador";
 import { DATABASE_URL, as, failure, pool, type Actor } from "./helpers";
+import { recepcionSuite } from "./recepcion.suite";
 
 const seller1 = randomUUID();
 const seller2 = randomUUID();
@@ -567,6 +568,7 @@ almacenSuite();
   riesgosSuite();
 pagosSuite();
 planeacionSuite();
+recepcionSuite();
 
 afterAll(async () => {
   await pool?.end();

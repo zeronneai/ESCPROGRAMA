@@ -52,6 +52,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/vendedor/bitacora", label: "Bitácora", icon: "target" },
     { href: "/vendedor/solicitudes/nueva", label: "Nueva solicitud", short: "Nueva", icon: "plus", cta: true },
     { href: "/guias", label: "Guías", icon: "package" },
+    { href: "/vendedor/recepcion-facturas", label: "Recepción de facturas", short: "Facturas", icon: "dollar", secondary: true },
     { href: "/vendedor/clientes", label: "Clientes", icon: "building", secondary: true },
     { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
     { href: "/calidad", label: "Quejas de cliente", icon: "alert", secondary: true },
@@ -70,6 +71,8 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/ventas/clientes", label: "Clientes", icon: "building" },
     { href: "/pedidos-pegatron", label: "Pedidos Pegatron", short: "Pegatron", icon: "cart" },
     { href: "/guias", label: "Guías", icon: "package", secondary: true },
+    { href: "/vendedor/recepcion-facturas", label: "Mis facturas a finanzas", icon: "dollar", secondary: true },
+    { href: "/finanzas/recepcion", label: "Recepción de facturas (finanzas)", icon: "inbox", secondary: true },
     { href: "/calidad", label: "Quejas y acciones correctivas", icon: "alert", secondary: true },
     { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },
     { href: "/evaluaciones/clientes", label: "Evaluación de clientes", icon: "users", secondary: true },
@@ -162,11 +165,18 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/almacen/inventario", label: "Inventario", icon: "package", secondary: true, match: ["/almacen/inventario", "/almacen/etiqueta"] },
   ],
   supervisor_finanzas: [
+    { href: "/finanzas/recepcion", label: "Recepción de facturas", short: "Facturas", icon: "inbox" },
     { href: "/minutas", label: "Minutas", icon: "list" },
     { href: "/documentos", label: "Documentos", icon: "list", secondary: true },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/entregas", label: "Entregas (facturas)", icon: "truck", secondary: true },
     { href: "/almacen/inventario", label: "Inventario", icon: "package", secondary: true, match: ["/almacen/inventario", "/almacen/etiqueta"] },
+  ],
+  aux_finanzas: [
+    { href: "/finanzas/recepcion", label: "Recepción de facturas", short: "Facturas", icon: "inbox" },
+    { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
+    { href: "/documentos", label: "Documentos", icon: "list", secondary: true },
+    { href: "/minutas", label: "Minutas", icon: "clipboard", secondary: true },
   ],
 };
 

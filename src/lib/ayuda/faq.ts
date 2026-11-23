@@ -21,6 +21,27 @@ const ISO: Rol[] = ["coordinador_iso"];
 const MKT: Rol[] = ["marketplaces"];
 
 export const FAQ: Faq[] = [
+  // ----- Recepcion de facturas (finanzas)
+  {
+    id: "recepcion-vendedor", q: "¿Cómo entrego mis facturas pagadas a finanzas?", roles: ["vendedor", "jefe_ventas"], paths: ["/vendedor/recepcion-facturas"],
+    keys: ["entregar", "facturas", "fisicas", "finanzas", "pagadas", "recepcion", "comprobante", "pago"],
+    a: [
+      "En \"Recepción de facturas\" salen tus facturas cobradas al 100%. Si una no sale, márcala como cobrada en Ventas diarias.",
+      "1) Palomea las que traes. 2) Agrega el pago con que te pagaron (fecha, monto total, forma y referencia) y palomea las facturas que cubre: un comprobante de $10,000 puede pagar 4 facturas. 3) Entrégalas.",
+      "Finanzas las palomea como recibidas o las rechaza con el motivo; te llega aviso. Una rechazada la puedes volver a entregar.",
+    ],
+    links: [{ label: "Recepción de facturas", href: "/vendedor/recepcion-facturas" }],
+  },
+  {
+    id: "recepcion-finanzas", q: "¿Cómo recibo las facturas de los vendedores?", roles: ["aux_finanzas", "supervisor_finanzas"], paths: ["/finanzas/recepcion"],
+    keys: ["recibir", "facturas", "vendedor", "rechazar", "buscar", "folio", "fisica"],
+    a: [
+      "Abre al vendedor. Escribe el folio de cada factura física en el buscador: si solo hay una coincidencia, Enter la marca como recibida.",
+      "Si una está en la lista pero no vino en físico, dale Rechazar y escribe el motivo. Si trajo una que no está en la lista, déjalo como anotación en su entrega.",
+      "Cada factura muestra con qué pago se cobró (fecha, monto, forma y referencia).",
+    ],
+    links: [{ label: "Recepción de facturas", href: "/finanzas/recepcion" }],
+  },
   // ----- General
   {
     id: "catalogo-2026", q: "¿Dónde está el Catálogo ESC 2026 y cómo dejo un comentario?",

@@ -2,7 +2,7 @@
  * Decision pura de acceso por ruta (se usa en el middleware y se prueba aparte).
  */
 import { CATALOGO_VISIBLE } from "@/lib/marca";
-export type Rol = "vendedor" | "comprador" | "jefe_ventas" | "gerente" | "coordinador_iso" | "marketplaces" | "almacen" | "supervisor_almacen" | "supervisor_finanzas" | "ceo";
+export type Rol = "vendedor" | "comprador" | "jefe_ventas" | "gerente" | "coordinador_iso" | "marketplaces" | "almacen" | "supervisor_almacen" | "supervisor_finanzas" | "aux_finanzas" | "ceo";
 
 export interface GuardProfile {
   activo: boolean;
@@ -80,7 +80,7 @@ export function decideRoute(input: {
       : { type: "redirect", to: homeFor(profile.rol) };
   }
   // La jefa de ventas tambien lleva su propia bitacora (prospeccion y ventas diarias).
-  const bitacoraJefa = profile.rol === "jefe_ventas" && (pathname === "/vendedor/bitacora" || pathname.startsWith("/vendedor/bitacora/"));
+  const bitacoraJefa = profile.rol === "jefe_ventas" && (pathname === "/vendedor/bitacora" || pathname.startsWith("/vendedor/bitacora/") || pathname === "/vendedor/recepcion-facturas");
   if (pathname.startsWith("/vendedor") && profile.rol !== "vendedor" && !bitacoraJefa) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
@@ -101,6 +101,10 @@ export function decideRoute(input: {
   }
   // Cotizaciones (solo lectura, sin datos del comprador): la gerente.
   if (under("/cotizaciones") && profile.rol !== "gerente") {
+    return { type: "redirect", to: homeFor(profile.rol) };
+  }
+  // Recepcion de facturas fisicas: finanzas las recibe; la jefa de ventas lo consulta.
+  if (under("/finanzas") && !["aux_finanzas", "supervisor_finanzas", "jefe_ventas"].includes(profile.rol)) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   // Pagos a proveedores extranjeros: comprador y CEO.

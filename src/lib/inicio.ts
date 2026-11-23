@@ -437,6 +437,41 @@ async function controlCambios(c: Ctx): Promise<Bloque> {
 }
 
 /** Siempre: minutas por firmar. */
+/** Recepcion de facturas fisicas: el vendedor entrega las cobradas; finanzas las recibe. */
+async function recepcionFacturas(c: Ctx, modo: "vendedor" | "finanzas"): Promise<Bloque> {
+  if (modo === "finanzas") {
+    const { data, error } = await c.sb.rpc("finanzas_vendedores");
+    if (error) return { seccion: null, alertas: [] };
+    const rows = (data ?? []) as { id: string; nombre: string; por_revisar: number }[];
+    const pend = rows.reduce((a, r) => a + r.por_revisar, 0);
+    const vends = rows.filter((r) => r.por_revisar > 0).length;
+    return {
+      alertas: pend ? [{ texto: `${pend} factura(s) por recibir de ${vends} vendedor(es)`, href: "/finanzas/recepcion", tono: "amber" }] : [],
+      seccion: { id: "recepcion", titulo: "Recepción de facturas", icon: "inbox", href: "/finanzas/recepcion", metricas: [
+        { label: "Por recibir", valor: pend, tono: tonoSi(pend), hint: `${vends} vendedor(es)` },
+      ] },
+    };
+  }
+  const [{ data: cobradas }, { data: rec, error }] = await Promise.all([
+    c.sb.from("ventas").select("id").eq("vendedor_id", c.uid).eq("tipo", "venta").is("cancelada_at", null).gte("porcentaje_cobrado", 100).not("factura", "is", null).limit(2000),
+    c.sb.from("factura_recepcion").select("venta_id, estado").eq("vendedor_id", c.uid).limit(5000),
+  ]);
+  if (error) return { seccion: null, alertas: [] };
+  const vivas = new Set((rec ?? []).filter((r) => r.estado !== "rechazada").map((r) => r.venta_id));
+  const rech = new Set((rec ?? []).filter((r) => r.estado === "rechazada").map((r) => r.venta_id));
+  const porEntregar = (cobradas ?? []).filter((v) => !vivas.has(v.id)).length;
+  const rechazadas = [...rech].filter((id) => !vivas.has(id)).length;
+  const enRevision = (rec ?? []).filter((r) => r.estado === "por_revisar").length;
+  return {
+    alertas: rechazadas ? [{ texto: `Finanzas rechazó ${rechazadas} factura(s): revisa el motivo`, href: "/vendedor/recepcion-facturas", tono: "red" }] : [],
+    seccion: { id: "recepcion", titulo: "Facturas a finanzas", icon: "dollar", href: "/vendedor/recepcion-facturas", metricas: [
+      { label: "Cobradas sin entregar", valor: porEntregar, hint: "Facturas físicas" },
+      { label: "En revisión", valor: enRevision },
+      { label: "Rechazadas", valor: rechazadas, tono: tonoSi(rechazadas, "red") },
+    ] },
+  };
+}
+
 async function generales(c: Ctx): Promise<Alerta[]> {
   const { data: firmas } = await c.sb.from("minuta_firmas").select("minuta_id, minutas!inner(estado)").eq("user_id", c.uid).is("firmada_at", null).eq("minutas.estado", "enviada");
   const nf = (firmas ?? []).length;
@@ -456,7 +491,7 @@ export async function cargarTablero(sb: SupabaseClient, uid: string, rol: Rol, t
   const plan: Promise<Bloque>[] = (() => {
     switch (rol) {
       case "vendedor":
-        return [cotizacionesVendedor(c), ventas(c, true), prospeccion(c, true), guias(c, true, false), entregas(c, "propias"), encuesta(c, true), calidad(c, true), consumo(c, "propio")];
+        return [cotizacionesVendedor(c), ventas(c, true), prospeccion(c, true), guias(c, true, false), recepcionFacturas(c, "vendedor"), entregas(c, "propias"), encuesta(c, true), calidad(c, true), consumo(c, "propio")];
       case "comprador":
         return [cotizacionesCompras(c, false), pagos(c), pegatron(c), consumo(c, "atender"), evalProveedores(c), soloResumen(ventas(c, false)), soloResumen(calidad(c, false)), controlCambios(c)];
       case "jefe_ventas":
@@ -473,7 +508,8 @@ export async function cargarTablero(sb: SupabaseClient, uid: string, rol: Rol, t
       case "supervisor_almacen":
         return [entregas(c, "almacen"), evalProveedores(c), consumo(c, "propio")];
       case "supervisor_finanzas":
-        return [consumo(c, "propio")];
+      case "aux_finanzas":
+        return [recepcionFacturas(c, "finanzas"), consumo(c, "propio")];
       default:
         return [];
     }

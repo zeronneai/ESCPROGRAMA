@@ -10,6 +10,7 @@ export const ROL_LABEL: Record<Rol, string> = {
   almacen: "Almacén",
   supervisor_almacen: "Supervisor de almacén",
   supervisor_finanzas: "Supervisor de finanzas",
+  aux_finanzas: "Auxiliar de administración y finanzas",
   ceo: "CEO",
 };
 
