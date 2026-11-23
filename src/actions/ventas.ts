@@ -139,3 +139,52 @@ export async function revisarComisionAction(ventaId: string, revisada: boolean):
   revalidatePath("/vendedor/comisiones");
   return { ok: true };
 }
+
+export interface VentaSinImporte {
+  id: string;
+  factura: string | null;
+  pdf: boolean;
+  xml: boolean;
+  lineas: { id: string; clave: string | null; descripcion: string; cantidad: number | null; comision_pct: number | null }[];
+}
+
+/** Jefa: ventas subidas con factura a las que les falta el importe de algun articulo (para volver a leerlas). */
+export async function ventasSinImporteAction(): Promise<Result<{ ventas: VentaSinImporte[] }>> {
+  const u = await requireUser();
+  if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("venta_lineas")
+    .select("venta_id, ventas!inner(id, factura, factura_path, xml_path, origen, cancelada_at)")
+    .is("importe", null)
+    .eq("ventas.origen", "factura")
+    .is("ventas.cancelada_at", null)
+    .limit(5000);
+  if (error) return { ok: false, error: /importe/.test(error.message) ? "Falta correr la actualización 0072 en la base." : friendlyError(error.message) };
+  type R = { venta_id: string; ventas: { id: string; factura: string | null; factura_path: string | null; xml_path: string | null } };
+  const ids = [...new Set(((data ?? []) as unknown as R[]).filter((r) => r.ventas.factura_path || r.ventas.xml_path).map((r) => r.venta_id))];
+  const info = new Map(((data ?? []) as unknown as R[]).map((r) => [r.venta_id, r.ventas]));
+  const ventas: VentaSinImporte[] = [];
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data: ls } = await supabase.from("venta_lineas").select("id, venta_id, descripcion, cantidad, comision_pct, created_at, articulos(clave)").in("venta_id", ids.slice(i, i + 200)).order("created_at");
+    type L = { id: string; venta_id: string; descripcion: string; cantidad: string | null; comision_pct: string | null; articulos: { clave: string } | null };
+    const por = new Map<string, VentaSinImporte["lineas"]>();
+    for (const l of (ls ?? []) as unknown as L[]) {
+      const x = por.get(l.venta_id) ?? [];
+      x.push({ id: l.id, clave: l.articulos?.clave ?? null, descripcion: l.descripcion, cantidad: l.cantidad == null ? null : Number(l.cantidad), comision_pct: l.comision_pct == null ? null : Number(l.comision_pct) });
+      por.set(l.venta_id, x);
+    }
+    for (const id of ids.slice(i, i + 200)) {
+      const v = info.get(id)!;
+      ventas.push({ id, factura: v.factura, pdf: !!v.factura_path, xml: !!v.xml_path, lineas: por.get(id) ?? [] });
+    }
+  }
+  return { ok: true, ventas };
+}
+
+/** Jefa: guarda los importes leidos de la factura (sin tocar el % de comision). */
+export async function guardarImportesAction(ventaId: string, importes: { id: string; importe: number; comision_pct: number | null }[]): Promise<Result> {
+  const u = await requireUser();
+  if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas." };
+  return comisionesVentaAction(ventaId, importes);
+}

@@ -197,3 +197,18 @@ describe("ventas en pesos y dolares por separado", () => {
     expect(fmtMonedas({ mxn: 5, usd: 0 })).toBe("$5");
   });
 });
+
+describe("volver a leer el importe de facturas ya subidas", () => {
+  it("empareja por orden, por clave o por descripcion", async () => {
+    const { emparejarImportes } = await import("@/lib/comisiones");
+    const g = [
+      { id: "a", clave: "ESC-1", descripcion: "Guante nitrilo", cantidad: 10 },
+      { id: "b", clave: null, descripcion: "Flete", cantidad: 1 },
+    ];
+    expect([...emparejarImportes(g, [{ clave: "ESC-1", descripcion: "Guante nitrilo talla M", cantidad: 10, importe: 500 }, { clave: null, descripcion: "Flete", cantidad: 1, importe: 150 }])]).toEqual([["a", 500], ["b", 150]]);
+    // En otro orden y con un renglon de mas
+    expect([...emparejarImportes(g, [{ clave: null, descripcion: "FLETE", cantidad: 1, importe: 150 }, { clave: "ESC-9", descripcion: "Bata", cantidad: 2, importe: 80 }, { clave: "esc-1", descripcion: "x", cantidad: 10, importe: 500 }])].sort()).toEqual([["a", 500], ["b", 150]]);
+    // Cantidad distinta: no se adivina
+    expect(emparejarImportes([{ id: "a", clave: "ESC-1", descripcion: "Guante", cantidad: 10 }], [{ clave: "ESC-1", descripcion: "Guante", cantidad: 3, importe: 9 }]).size).toBe(0);
+  });
+});

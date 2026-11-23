@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { DateTime } from "luxon";
 import { ComisionesTabla } from "@/components/ventas/comisiones-tabla";
+import { LeerImportes } from "@/components/ventas/leer-importes";
 import { Card, FilterChip, PageHeader } from "@/components/ui";
 import type { ComFactura, ComVendedor, ModoComisiones } from "@/lib/comisiones";
 import { getBusinessSettings } from "@/lib/quotes/server";
@@ -126,6 +127,7 @@ export async function ComisionesVista({ sp, ruta, modo, vendedorId }: { sp: Comi
             : `${ver === "pagadas" ? "Ventas cobradas al 100%" : ver === "por_cobrar" ? "Ventas que todavía no se cobran al 100% (su comisión puede cambiar)" : ver === "revisadas" ? "Comisiones revisadas" : "Todas las ventas"} con ${campo === "pago" ? "fecha de pago" : "fecha de factura"} del ${fechaTxt(d0)} al ${fechaTxt(d1)}.`}
         </p>
       </Card>
+      {modo === "jefa" && !error && <LeerImportes />}
       <ComisionesTabla vendedores={vendedores} modo={modo} />
     </div>
   );
