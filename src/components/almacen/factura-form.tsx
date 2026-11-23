@@ -5,9 +5,10 @@ import { clienteFacturaAction, crearSalidaAction, folioUsadoAction, ventaDesdeFa
 import { CustomerLookup, useRun } from "@/components/ops-ui";
 import { Alert, Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
 import { leerFacturaXml, type FacturaLeida } from "@/lib/factura-lector";
+import { repartirEnvio } from "@/components/ventas/comision-editor";
 import { leerFacturaPdf } from "@/lib/pdf-cliente";
 
-type Linea = { clave: string; descripcion: string; unidad: string; cantidad: string; precio?: number | null; descuentoPct?: number | null; importe?: number | null; comision?: string };
+type Linea = { clave: string; descripcion: string; unidad: string; cantidad: string; precio?: number | null; descuentoPct?: number | null; importe?: number | null; comision?: string; envio?: string };
 const mx = (n: number) => n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 type Cliente = { nombre: string; razon: string; rfc: string; direccion: string; telefono: string };
 type Cobro = { total: string; moneda: "MXN" | "USD"; pago: "contado" | "credito"; dias: string; tc: string };
@@ -62,6 +63,16 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
   const [match, setMatch] = useState<ClienteFactura | null>(null);
   const [elegido, setElegido] = useState<{ id: string; nombre: string } | null>(cliente);
   const [cambiar, setCambiar] = useState(false);
+  // Envio incluido en los articulos (se resta del importe para la comision).
+  const [envioModo, setEnvioModo] = useState<"no" | "total" | "articulo">("no");
+  const [envioTotal, setEnvioTotal] = useState("");
+  const repartir = (t: string) => {
+    setEnvioTotal(t);
+    setLineas((x) => {
+      const rep = repartirEnvio(x.map((y) => y.importe ?? 0), Number(t || 0));
+      return x.map((y, i) => ({ ...y, envio: rep[i] ? String(rep[i]) : "" }));
+    });
+  };
   const [cobro, setCobro] = useState<Cobro>({ total: "", moneda: "MXN", pago: "contado", dias: "", tc: "" });
   const [fijo, setFijo] = useState<Fijo>(SIN_FIJO);
   const [confirmado, setConfirmado] = useState(false);
@@ -191,7 +202,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
   const datosLineas = () =>
     lineas.map((l) => ({
       clave: l.clave || null, descripcion: l.descripcion, unidad: l.unidad || null, cantidad: Number(l.cantidad),
-      ...(venta ? { importe: l.importe ?? null, comision_pct: l.comision && l.comision.trim() !== "" ? Number(l.comision) : null } : {}),
+      ...(venta ? { importe: l.importe ?? null, comision_pct: l.comision && l.comision.trim() !== "" ? Number(l.comision) : null, envio: l.envio && Number(l.envio) > 0 ? Number(l.envio) : null } : {}),
     }));
 
   function guardar() {
@@ -287,7 +298,25 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
                   </label>
                 )}
               </div>
-              {venta && <p className="text-xs text-slate-500">El % de comisión de cada artículo lo puedes poner ahora o después, pero es obligatorio para marcar la venta como pagada.</p>}
+              {venta && <p className="text-xs text-slate-500">El % de comisión de cada artículo lo puedes poner ahora o después, pero es obligatorio para marcar la venta como pagada. Si el envío viene como renglón aparte (servicios diversos), ponle 0%.</p>}
+              {venta && (
+                <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                  ¿El envío viene incluido en los artículos?
+                  {(["no", "total", "articulo"] as const).map((m) => (
+                    <button key={m} type="button" onClick={() => { setEnvioModo(m); if (m === "no") setLineas((x) => x.map((y) => ({ ...y, envio: "" }))); if (m === "total") repartir(envioTotal); }}
+                      className={`rounded-full border px-2.5 py-0.5 ${envioModo === m ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white text-slate-700"}`}>
+                      {m === "no" ? "No" : m === "total" ? "Sí, en el total" : "Sí, por artículo"}
+                    </button>
+                  ))}
+                  {envioModo === "total" && (
+                    <span className="flex items-center gap-1">
+                      Envío total $
+                      <input value={envioTotal} onChange={(e) => repartir(e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="0.00" className="w-24 rounded border border-slate-300 px-2 py-1 text-right text-sm" />
+                      <span className="text-slate-500">(se reparte entre los artículos según su importe)</span>
+                    </span>
+                  )}
+                </div>
+              )}
               <ul className="divide-y divide-slate-100 rounded-md border border-slate-200">
                 {lineas.map((l, i) => {
                   const enCat = l.clave && catalogo[l.clave.toUpperCase()];
@@ -311,6 +340,20 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
                       </div>
                       <input value={l.cantidad} readOnly={!!fijo.cant[i]} onChange={(e) => setL(i, "cantidad", e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="Cant." className={`w-20 rounded border border-slate-300 px-2 py-1.5 text-right text-sm ${fijo.cant[i] ? FIJO_CLS : FALTA_CLS}`} aria-label="Cantidad" />
                       <span className="w-24 truncate text-xs text-slate-500">{l.unidad}</span>
+                      {venta && envioModo === "articulo" && (
+                        <label className="flex items-center gap-1 text-xs text-slate-600" title="Envío incluido en este artículo (se resta del importe para la comisión)">
+                          − envío
+                          <input
+                            value={l.envio ?? ""}
+                            onChange={(e) => setLineas((x) => x.map((y, j) => (j === i ? { ...y, envio: e.target.value.replace(/[^\d.]/g, "") } : y)))}
+                            inputMode="decimal"
+                            placeholder="0"
+                            className="w-16 rounded border border-slate-300 px-2 py-1.5 text-right text-sm"
+                            aria-label="Envío incluido"
+                          />
+                        </label>
+                      )}
+                      {venta && envioModo === "total" && Number(l.envio || 0) > 0 && <span className="text-xs text-slate-500">− envío ${mx(Number(l.envio))}</span>}
                       {venta && (
                         <label className="flex items-center gap-1 text-xs text-slate-600" title="% de comisión de este artículo (obligatorio al marcar la venta pagada)">
                           % com.
@@ -322,7 +365,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
                             className="w-14 rounded border border-slate-300 px-2 py-1.5 text-right text-sm"
                             aria-label="Porcentaje de comisión"
                           />
-                          {l.comision && l.importe != null ? <span className="w-20 tabular-nums text-slate-700">= ${mx(Math.round(l.importe * Number(l.comision)) / 100)}</span> : null}
+                          {l.comision && l.importe != null ? <span className="w-20 tabular-nums text-slate-700">= ${mx(Math.round(Math.max(l.importe - Number(l.envio || 0), 0) * Number(l.comision)) / 100)}</span> : null}
                         </label>
                       )}
                       {!fijo.lineas && <button type="button" onClick={() => setLineas((x) => x.filter((_, j) => j !== i))} className="text-xs text-red-700">Quitar</button>}

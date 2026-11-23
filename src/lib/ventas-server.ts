@@ -13,18 +13,24 @@ export async function loadVenta(supabase: SupabaseClient, id: string) {
     supabase.from("customers").select(CUST_MIN).eq("id", venta.customer_id).maybeSingle(),
     supabase
       .from("venta_lineas")
-      .select("id, articulo_id, descripcion, cantidad, importe, comision_pct, comision, articulos(clave)")
+      .select("id, articulo_id, descripcion, cantidad, importe, envio, comision_pct, comision, articulos(clave)")
       .eq("venta_id", id)
       .order("created_at")
-      .then((r) => (r.error ? supabase.from("venta_lineas").select("id, articulo_id, descripcion, cantidad, articulos(clave)").eq("venta_id", id).order("created_at") : r)),
+      .then((r) =>
+        r.error
+          ? supabase.from("venta_lineas").select("id, articulo_id, descripcion, cantidad, importe, comision_pct, comision, articulos(clave)").eq("venta_id", id).order("created_at")
+              .then((r2) => (r2.error ? supabase.from("venta_lineas").select("id, articulo_id, descripcion, cantidad, articulos(clave)").eq("venta_id", id).order("created_at") : r2))
+          : r,
+      ),
     venta.request_id ? supabase.from("quote_requests").select("folio").eq("id", venta.request_id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from("profiles").select("nombre").eq("id", venta.vendedor_id).maybeSingle(),
   ]);
-  type LRow = { id: string; articulo_id: string | null; descripcion: string; cantidad: number | null; articulos: unknown; importe?: number | null; comision_pct?: number | null; comision?: number | null };
+  type LRow = { id: string; articulo_id: string | null; descripcion: string; cantidad: number | null; articulos: unknown; importe?: number | null; envio?: number | null; comision_pct?: number | null; comision?: number | null };
   const lineas: VentaLinea[] = ((ls ?? []) as unknown as LRow[]).map((l) => ({
     id: l.id, articulo_id: l.articulo_id, descripcion: l.descripcion, cantidad: l.cantidad === null ? null : Number(l.cantidad),
     clave: (l.articulos as unknown as { clave: string } | null)?.clave ?? null,
     importe: l.importe == null ? null : Number(l.importe),
+    envio: l.envio == null ? null : Number(l.envio),
     comision_pct: l.comision_pct == null ? null : Number(l.comision_pct),
     comision: l.comision == null ? null : Number(l.comision),
   }));

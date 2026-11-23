@@ -40,9 +40,10 @@ export async function ComisionesVista({ sp, ruta, modo, vendedorId }: { sp: Comi
   const d1 = propio ? (sp.hasta && FECHA.test(sp.hasta) ? sp.hasta : "2100-12-31") : to.toISODate()!;
   const col = campo === "pago" ? "fecha_cobro" : "fecha";
 
+  const armar = (lineasCols: string) => {
   let q = supabase
     .from("ventas")
-    .select("id, vendedor_id, factura, fecha, fecha_cobro, monto, moneda, porcentaje_cobrado, comision_revisada_at, customers(nombre), venta_lineas(id, descripcion, cantidad, importe, comision_pct, comision, articulos(clave))")
+    .select(`id, vendedor_id, factura, fecha, fecha_cobro, monto, moneda, porcentaje_cobrado, comision_revisada_at, customers(nombre), venta_lineas(${lineasCols})`)
     .eq("tipo", "venta")
     .is("cancelada_at", null)
     .order("fecha", { ascending: false })
@@ -53,16 +54,20 @@ export async function ComisionesVista({ sp, ruta, modo, vendedorId }: { sp: Comi
   if (ver === "revisadas") q = q.not("comision_revisada_at", "is", null);
   if (ver === "por_revisar") q = q.is("comision_revisada_at", null);
   if (!sinFecha) q = q.gte(col, d0).lte(col, d1);
-  const [{ data, error }, { data: vends }] = await Promise.all([q, supabase.from("profiles").select("id, nombre").in("rol", ["vendedor", "jefe_ventas"])]);
+  return q;
+  };
+  // Sin la actualizacion 0075 todavia no existe el envio por articulo.
+  const [r0, { data: vends }] = await Promise.all([armar("id, descripcion, cantidad, importe, envio, comision_pct, comision, articulos(clave)"), supabase.from("profiles").select("id, nombre").in("rol", ["vendedor", "jefe_ventas"])]);
+  const { data, error } = r0.error && /envio/.test(r0.error.message) ? await armar("id, descripcion, cantidad, importe, comision_pct, comision, articulos(clave)") : r0;
   const nombres = new Map((vends ?? []).map((p) => [p.id as string, p.nombre as string]));
 
-  type L = { id: string; descripcion: string; cantidad: string | null; importe: string | null; comision_pct: string | null; comision: string | null; articulos: { clave: string } | null };
+  type L = { id: string; descripcion: string; cantidad: string | null; importe: string | null; envio?: string | null; comision_pct: string | null; comision: string | null; articulos: { clave: string } | null };
   type V = { id: string; vendedor_id: string; factura: string | null; fecha: string; fecha_cobro: string | null; monto: string | null; moneda: string; porcentaje_cobrado: string; comision_revisada_at: string | null; customers: { nombre: string } | null; venta_lineas: L[] };
   const porVend = new Map<string, ComVendedor>();
   for (const v of (data ?? []) as unknown as V[]) {
     const lineas = (v.venta_lineas ?? []).map((l) => ({
       id: l.id, clave: l.articulos?.clave ?? null, descripcion: l.descripcion, cantidad: l.cantidad == null ? null : Number(l.cantidad),
-      importe: l.importe == null ? null : Number(l.importe), pct: l.comision_pct == null ? null : Number(l.comision_pct), comision: l.comision == null ? null : Number(l.comision),
+      importe: l.importe == null ? null : Number(l.importe), envio: l.envio == null ? null : Number(l.envio), pct: l.comision_pct == null ? null : Number(l.comision_pct), comision: l.comision == null ? null : Number(l.comision),
     }));
     const f: ComFactura = {
       id: v.id, factura: v.factura, cliente: v.customers?.nombre ?? "Cliente", fecha: v.fecha.slice(0, 10), fecha_cobro: v.fecha_cobro, moneda: v.moneda,

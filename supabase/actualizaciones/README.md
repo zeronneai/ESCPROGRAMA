@@ -84,6 +84,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 67 | `0072_comisiones.sql` | **Comisiones por artículo**: % por artículo (obligatorio para marcar la venta pagada), y la jefa las ve por vendedor y por factura en Ventas > Comisiones. |
 | 68 | `0073_fecha_pago_obligatoria.sql` | **Fecha de pago obligatoria** al marcar una venta pagada (no futura ni antes de la venta). Las ya pagadas se quedan igual. |
 | 69 | `0074_comisiones_revision.sql` | **Comisiones: revisión de la jefa.** El vendedor llena las faltantes (aunque ya esté pagada); la jefa revisa; la gerente ve solo lo revisado. |
+| 70 | `0075_envio_en_comision.sql` | **Envío incluido en los artículos**: se resta del importe y la comisión se calcula sobre lo que queda. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

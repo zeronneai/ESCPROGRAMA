@@ -58,6 +58,7 @@ const lineaSalida = z.object({
   // Venta: importe sin IVA del renglon y % de comision (opcional al registrar; obligatorio al marcarla pagada).
   importe: z.coerce.number().min(0).max(999_999_999).nullable().optional(),
   comision_pct: z.coerce.number().min(0, "El % de comisión va de 0 a 100").max(100, "El % de comisión va de 0 a 100").nullable().optional(),
+  envio: z.coerce.number().min(0).max(999_999_999).nullable().optional(),
 });
 const salidaSchema = z.object({
   folio: z.string().trim().min(1, "Escribe el folio de la factura").max(40),

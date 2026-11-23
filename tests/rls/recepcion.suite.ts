@@ -154,5 +154,20 @@ export function recepcionSuite() {
       await q(jefa, "select public.venta_comision_revisar($1, false)", [v]);
       expect((await q(w.seller1, "select comision_revisada_at from public.ventas where id=$1", [v])).rows[0].comision_revisada_at).toBeNull();
     });
+    it("comisiones: el envio incluido se resta del importe", async () => {
+      const v = (await q(w.seller1, "insert into public.ventas (customer_id, monto, pago, factura) values ($1, 1160, 'contado', 'ENV-1') returning id", [w.customerId])).rows[0].id;
+      const l1 = (await q(w.seller1, "insert into public.venta_lineas (venta_id, descripcion, cantidad) values ($1, 'Guante', 1) returning id", [v])).rows[0].id;
+      expect(await failure(q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l1, importe: 1000, comision_pct: 5, envio: 1200 }])]))).toMatch(/mayor que el importe/);
+      await q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l1, importe: 1000, comision_pct: 5, envio: 200 }])]);
+      expect(Number((await q(w.seller1, "select comision::numeric c from public.venta_lineas where id=$1", [l1])).rows[0].c)).toBe(40);
+      // Sin mandar envio se conserva
+      await q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l1, importe: 1000, comision_pct: 4 }])]);
+      expect(Number((await q(w.seller1, "select comision::numeric c from public.venta_lineas where id=$1", [l1])).rows[0].c)).toBe(32);
+      // Desde la factura
+      const datos = JSON.stringify({ folio: "EN" + randomUUID().slice(0, 6), uuid: randomUUID(), customer_id: w.customerId, pago: "contado", total: 1160, moneda: "MXN",
+        lineas: [{ clave: null, descripcion: "Guante", cantidad: 1, importe: 500, comision_pct: 10, envio: 100 }] });
+      const r = (await q(w.seller1, "select public.venta_desde_factura($1::jsonb) as r", [datos])).rows[0].r;
+      expect(Number((await q(w.seller1, "select comision::numeric c from public.venta_lineas where venta_id=$1", [r.venta_id])).rows[0].c)).toBe(40);
+    });
   });
 }

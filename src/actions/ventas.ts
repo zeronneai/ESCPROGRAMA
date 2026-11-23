@@ -111,6 +111,8 @@ const comisionSchema = z.array(
     id: z.string().uuid(),
     importe: z.union([z.null(), z.coerce.number().min(0, "Importe inválido").max(999_999_999)]),
     comision_pct: z.union([z.null(), z.coerce.number().min(0, "El % va de 0 a 100").max(100, "El % va de 0 a 100")]),
+    // Envio incluido en el articulo (se resta del importe para la comision).
+    envio: z.coerce.number().min(0, "Envío inválido").max(999_999_999).optional(),
   }),
 ).max(200);
 
@@ -192,21 +194,23 @@ export async function guardarImportesAction(ventaId: string, importes: { id: str
   return comisionesVentaAction(ventaId, importes);
 }
 
-export interface LineaCobro { id: string; clave: string | null; descripcion: string; cantidad: number | null; importe: number | null; comision_pct: number | null }
+export interface LineaCobro { id: string; clave: string | null; descripcion: string; cantidad: number | null; importe: number | null; envio: number | null; comision_pct: number | null }
 
 /** Articulos de una venta con su importe y % (para pedir la comision al marcarla cobrada). */
 export async function lineasCobroAction(ventaId: string): Promise<Result<{ lineas: LineaCobro[] }>> {
   await requireUser();
   if (!uuid.safeParse(ventaId).success) return { ok: false, error: "Venta inválida" };
   const supabase = await createClient();
-  const { data, error } = await supabase.from("venta_lineas").select("id, descripcion, cantidad, importe, comision_pct, created_at, articulos(clave)").eq("venta_id", ventaId).order("created_at");
+  const traer = (cols: string) => supabase.from("venta_lineas").select(cols).eq("venta_id", ventaId).order("created_at");
+  let { data, error } = await traer("id, descripcion, cantidad, importe, envio, comision_pct, created_at, articulos(clave)");
+  if (error && /envio/.test(error.message)) ({ data, error } = await traer("id, descripcion, cantidad, importe, comision_pct, created_at, articulos(clave)"));
   if (error) return { ok: false, error: /importe|comision/.test(error.message) ? "Falta correr la actualización 0072 en la base." : friendlyError(error.message) };
-  type L = { id: string; descripcion: string; cantidad: string | null; importe: string | null; comision_pct: string | null; articulos: { clave: string } | null };
+  type L = { id: string; descripcion: string; cantidad: string | null; importe: string | null; envio?: string | null; comision_pct: string | null; articulos: { clave: string } | null };
   return {
     ok: true,
     lineas: ((data ?? []) as unknown as L[]).map((l) => ({
       id: l.id, clave: l.articulos?.clave ?? null, descripcion: l.descripcion, cantidad: l.cantidad == null ? null : Number(l.cantidad),
-      importe: l.importe == null ? null : Number(l.importe), comision_pct: l.comision_pct == null ? null : Number(l.comision_pct),
+      importe: l.importe == null ? null : Number(l.importe), envio: l.envio == null ? null : Number(l.envio), comision_pct: l.comision_pct == null ? null : Number(l.comision_pct),
     })),
   };
 }

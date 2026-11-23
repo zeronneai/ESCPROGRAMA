@@ -8,6 +8,8 @@ export interface VentaLinea {
   clave?: string | null;
   /** Importe sin IVA del articulo y su % de comision (comision = importe x %). */
   importe?: number | null;
+  /** Envio incluido en el articulo (se resta del importe para la comision). */
+  envio?: number | null;
   comision_pct?: number | null;
   comision?: number | null;
 }

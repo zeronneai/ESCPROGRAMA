@@ -7,10 +7,10 @@ import { comisionesVentaAction, revisarComisionAction } from "@/actions/ventas";
 import { toast } from "@/components/feedback-global";
 import { Button, Card, Input, StatCard } from "@/components/ui";
 import type { ComFactura, ComVendedor, ModoComisiones } from "@/lib/comisiones";
+import { ComisionEditor, comisionDe, filaDe, payloadDe, type CampoCom, type FilaCom } from "@/components/ventas/comision-editor";
 import { fmtMonedas2 as fmtMonedas, money, money2, porMoneda } from "@/lib/ventas";
 
 const fecha = (d: string | null) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString("es-MX", { day: "numeric", month: "short" }) : "");
-const r2 = (n: number) => Math.round(n * 100) / 100;
 
 function Estado({ f }: { f: ComFactura }) {
   if (f.revisada) return <span className="rounded-full bg-green-600 px-2 py-0.5 text-xs font-semibold text-white">✓ Revisada</span>;
@@ -24,18 +24,17 @@ function Estado({ f }: { f: ComFactura }) {
 function FacturaComision({ f, modo }: { f: ComFactura; modo: "vendedor" | "jefa" }) {
   const router = useRouter();
   const [pend, start] = useTransition();
-  const ini = f.lineas.map((l) => ({ importe: l.importe != null ? String(l.importe) : "", pct: l.pct != null ? String(l.pct) : "" }));
-  const [v, setV] = useState(ini);
+  const ini = f.lineas.map((l) => filaDe(l));
+  const [filas, setFilas] = useState<FilaCom[]>(ini);
   const jefa = modo === "jefa";
   // Vendedor: si ya la reviso la jefa, no; si esta pagada, solo lo que falta.
-  const puede = (i: number, k: "importe" | "pct") => jefa || (!f.revisada && (!f.pagada || ini[i][k] === ""));
-  const editable = f.lineas.some((_, i) => puede(i, "importe") || puede(i, "pct"));
-  const cambio = v.some((x, i) => x.importe !== ini[i].importe || x.pct !== ini[i].pct);
-  const total = v.reduce((a, x) => a + (x.importe !== "" && x.pct !== "" ? r2((Number(x.importe) * Number(x.pct)) / 100) : 0), 0);
-  const set = (i: number, k: "importe" | "pct", val: string) => setV((s) => s.map((x, j) => (j === i ? { ...x, [k]: val.replace(/[^\d.]/g, "") } : x)));
+  const puede = (i: number, k: CampoCom) => jefa || (!f.revisada && (!f.pagada || ini[i][k] === ""));
+  const editable = f.lineas.some((_, i) => puede(i, "imp") || puede(i, "pct") || puede(i, "env"));
+  const cambio = filas.some((x, i) => x.imp !== ini[i].imp || x.pct !== ini[i].pct || x.env !== ini[i].env);
+  const total = filas.reduce((a, x) => a + (comisionDe(x) ?? 0), 0);
   const guardar = () =>
     start(async () => {
-      const r = await comisionesVentaAction(f.id, f.lineas.map((l, i) => ({ id: l.id, importe: v[i].importe === "" ? null : Number(v[i].importe), comision_pct: v[i].pct === "" ? null : Number(v[i].pct) })));
+      const r = await comisionesVentaAction(f.id, filas.map(payloadDe));
       if (!r.ok) return toast(r.error, "error");
       toast(`Comisión de ${f.factura ?? "la venta"} guardada`, "success");
       router.refresh();
@@ -63,30 +62,8 @@ function FacturaComision({ f, modo }: { f: ComFactura; modo: "vendedor" | "jefa"
           <span className="font-bold tabular-nums text-slate-900">{money2(cambio ? total : f.comision, f.moneda)}</span>
         </span>
       </div>
-      <div className="divide-y divide-slate-100">
-        {f.lineas.map((l, i) => {
-          const c = v[i].importe !== "" && v[i].pct !== "" ? r2((Number(v[i].importe) * Number(v[i].pct)) / 100) : null;
-          return (
-            <div key={l.id} className="flex flex-col gap-2 px-3 py-2 text-sm sm:flex-row sm:items-center">
-              <span className="min-w-0 flex-1">
-                {l.clave && <span className="font-mono text-xs text-slate-500">{l.clave} · </span>}
-                {l.descripcion}
-                {l.cantidad != null && <span className="text-xs text-slate-500"> · {l.cantidad} pza(s)</span>}
-              </span>
-              <label className="flex items-center gap-1 text-xs text-slate-600">
-                Importe
-                <input value={v[i].importe} disabled={!puede(i, "importe")} onChange={(e) => set(i, "importe", e.target.value)} inputMode="decimal" placeholder="0.00"
-                  className={`w-24 rounded border px-2 py-1 text-right text-sm disabled:bg-slate-50 disabled:text-slate-600 ${v[i].importe === "" ? "border-amber-400 bg-amber-50" : "border-slate-300"}`} />
-              </label>
-              <label className="flex items-center gap-1 text-xs text-slate-600">
-                %
-                <input value={v[i].pct} disabled={!puede(i, "pct")} onChange={(e) => set(i, "pct", e.target.value)} inputMode="decimal" placeholder="0"
-                  className={`w-14 rounded border px-2 py-1 text-right text-sm disabled:bg-slate-50 disabled:text-slate-600 ${v[i].pct === "" ? "border-amber-400 bg-amber-50" : "border-slate-300"}`} />
-              </label>
-              <span className="w-28 text-right font-medium tabular-nums">{c == null ? "-" : money2(c, f.moneda)}</span>
-            </div>
-          );
-        })}
+      <div className="p-2">
+        <ComisionEditor filas={filas} setFilas={setFilas} moneda={f.moneda} puede={editable ? puede : () => false} />
       </div>
       {(editable || jefa) && (
         <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-3 py-2">

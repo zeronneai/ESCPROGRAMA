@@ -30,6 +30,7 @@ export default async function Venta({ params, searchParams }: { params: Promise<
           pagada={Number(d.venta.porcentaje_cobrado) >= 100}
           editable={u.rol === "jefe_ventas" || (d.venta.vendedor_id === u.id && (Number(d.venta.porcentaje_cobrado) < 100 || d.lineas.some((l) => l.importe == null || l.comision_pct == null)))}
           resaltar={comision === "1"}
+          jefa={u.rol === "jefe_ventas"}
         />
       )}
       <VentaForm venta={d.venta} lineas={d.lineas} customer={d.customer} today={DateTime.now().setZone(cfg.timezone).toISODate()!} readOnly={d.venta.vendedor_id !== u.id} requestFolio={d.folio} />

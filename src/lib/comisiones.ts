@@ -4,6 +4,7 @@ export interface ComLinea {
   descripcion: string;
   cantidad: number | null;
   importe: number | null;
+  envio: number | null;
   pct: number | null;
   comision: number | null;
 }

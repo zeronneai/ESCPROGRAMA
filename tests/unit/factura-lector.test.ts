@@ -212,3 +212,14 @@ describe("volver a leer el importe de facturas ya subidas", () => {
     expect(emparejarImportes([{ id: "a", clave: "ESC-1", descripcion: "Guante", cantidad: 10 }], [{ clave: "ESC-1", descripcion: "Guante", cantidad: 3, importe: 9 }]).size).toBe(0);
   });
 });
+
+describe("envio incluido en la comision", () => {
+  it("reparte el envio segun el importe y lo resta", async () => {
+    const { repartirEnvio, comisionDe } = await import("@/components/ventas/comision-editor");
+    expect(repartirEnvio([300, 700], 100)).toEqual([30, 70]);
+    expect(repartirEnvio([1, 1, 1], 100).reduce((a, x) => a + x, 0)).toBeCloseTo(100, 2);
+    expect(repartirEnvio([0, 0], 50)).toEqual([0, 0]);
+    expect(comisionDe({ id: "a", clave: null, descripcion: "x", cantidad: 1, imp: "1000", env: "200", pct: "5" })).toBe(40);
+    expect(comisionDe({ id: "a", clave: null, descripcion: "x", cantidad: 1, imp: "1000", env: "", pct: "5" })).toBe(50);
+  });
+});

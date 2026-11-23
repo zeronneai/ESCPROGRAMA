@@ -92,8 +92,10 @@ function campoDelError(texto: string, cerca: HTMLElement): HTMLElement | null {
 
 export function FeedbackGlobal() {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [pendientes, setPendientes] = useState(0);
+  const [pendientes, setPendientes] = useState(0); // acciones del servidor (guardar)
+  const [cargas, setCargas] = useState(0); // recargas de pantalla (cambiar de pagina, refrescar datos)
   const [mostrarPildora, setMostrarPildora] = useState(false);
+  const [lento, setLento] = useState<0 | 1 | 2>(0);
   const idRef = useRef(0);
 
   // Ventanitas de aviso
@@ -112,20 +114,24 @@ export function FeedbackGlobal() {
   // Acciones del servidor en curso (todas las de Next llevan el encabezado Next-Action).
   useEffect(() => {
     const original = window.fetch;
-    const esAccion = (init?: RequestInit) => {
+    const tiene = (init: RequestInit | undefined, nombre: string) => {
       const h = init?.headers;
       if (!h) return false;
-      if (h instanceof Headers) return h.has("Next-Action") || h.has("next-action");
-      if (Array.isArray(h)) return h.some(([k]) => k.toLowerCase() === "next-action");
-      return Object.keys(h).some((k) => k.toLowerCase() === "next-action");
+      if (h instanceof Headers) return h.has(nombre);
+      if (Array.isArray(h)) return h.some(([k]) => k.toLowerCase() === nombre.toLowerCase());
+      return Object.keys(h).some((k) => k.toLowerCase() === nombre.toLowerCase());
     };
     const wrapped: typeof fetch = async (input, init) => {
-      if (!esAccion(init)) return original(input, init);
-      setPendientes((n) => n + 1);
+      const accion = tiene(init, "Next-Action");
+      // Recarga de pantalla (no la precarga de enlaces, que pasa en segundo plano).
+      const carga = !accion && tiene(init, "RSC") && !tiene(init, "Next-Router-Prefetch");
+      if (!accion && !carga) return original(input, init);
+      const set = accion ? setPendientes : setCargas;
+      set((n) => n + 1);
       try {
         return await original(input, init);
       } finally {
-        setPendientes((n) => Math.max(0, n - 1));
+        set((n) => Math.max(0, n - 1));
       }
     };
     window.fetch = wrapped;
@@ -133,14 +139,19 @@ export function FeedbackGlobal() {
       if (window.fetch === wrapped) window.fetch = original;
     };
   }, []);
+  const ocupado = pendientes + cargas > 0;
   useEffect(() => {
-    if (pendientes === 0) {
+    if (!ocupado) {
       setMostrarPildora(false);
+      setLento(0);
       return;
     }
-    const t = setTimeout(() => setMostrarPildora(true), 350);
-    return () => clearTimeout(t);
-  }, [pendientes]);
+    const t = setTimeout(() => setMostrarPildora(true), 300);
+    // Si tarda, se avisa que sigue trabajando; si tarda mucho, se ofrece recargar.
+    const t1 = setTimeout(() => setLento(1), 8000);
+    const t2 = setTimeout(() => setLento(2), 25000);
+    return () => { clearTimeout(t); clearTimeout(t1); clearTimeout(t2); };
+  }, [ocupado]);
 
   // Campos obligatorios vacios (validacion del navegador): ir al primero y decir cual falta.
   useEffect(() => {
@@ -212,15 +223,24 @@ export function FeedbackGlobal() {
         ))}
       </div>
       {mostrarPildora && (
-        <div className="toast-in pointer-events-none fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 md:bottom-6" role="status" aria-live="polite">
-          <span className="flex items-center gap-2 rounded-full bg-brand-950/90 px-4 py-2 text-sm font-medium text-white shadow-lg ring-1 ring-white/10 backdrop-blur">
-            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
-              <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-            </svg>
-            Cargando...
-          </span>
-        </div>
+        <>
+          {/* Barra arriba mientras trabaja (tambien en recargas que no son de un enlace). */}
+          <div className="pointer-events-none fixed inset-x-0 top-0 z-[70] h-1" aria-hidden>
+            <div className="nav-progress-run h-full bg-gradient-to-r from-sky-400 via-brand-500 to-brand-700" />
+          </div>
+          <div className={`toast-in fixed bottom-24 left-1/2 z-[60] -translate-x-1/2 md:bottom-6 ${lento === 2 ? "pointer-events-auto" : "pointer-events-none"}`} role="status" aria-live="polite">
+            <span className="flex items-center gap-2 rounded-full bg-brand-950/90 px-4 py-2 text-sm font-medium text-white shadow-lg ring-1 ring-white/10 backdrop-blur">
+              <svg className="h-4 w-4 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.3" strokeWidth="3" />
+                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+              </svg>
+              {lento === 2 ? "Está tardando más de lo normal..." : lento === 1 ? (pendientes ? "Sigue guardando, no cierres la pantalla..." : "Sigue cargando, la conexión va lenta...") : pendientes ? "Guardando..." : "Cargando..."}
+              {lento === 2 && (
+                <button type="button" onClick={() => location.reload()} className="ml-1 rounded-full bg-white/15 px-2.5 py-0.5 text-xs hover:bg-white/25">Recargar</button>
+              )}
+            </span>
+          </div>
+        </>
       )}
     </>
   );
