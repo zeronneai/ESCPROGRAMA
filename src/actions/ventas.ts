@@ -148,18 +148,21 @@ export interface VentaSinImporte {
   lineas: { id: string; clave: string | null; descripcion: string; cantidad: number | null; comision_pct: number | null }[];
 }
 
-/** Jefa: ventas subidas con factura a las que les falta el importe de algun articulo (para volver a leerlas). */
+/** Ventas subidas con factura a las que les falta el importe de algun articulo (para volver a leerlas).
+ *  La jefa: todas; el vendedor: solo las suyas. */
 export async function ventasSinImporteAction(): Promise<Result<{ ventas: VentaSinImporte[] }>> {
   const u = await requireUser();
-  if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas." };
+  if (u.rol !== "jefe_ventas" && u.rol !== "vendedor") return { ok: false, error: "No autorizado." };
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let q = supabase
     .from("venta_lineas")
-    .select("venta_id, ventas!inner(id, factura, factura_path, xml_path, origen, cancelada_at)")
+    .select("venta_id, ventas!inner(id, vendedor_id, factura, factura_path, xml_path, origen, cancelada_at)")
     .is("importe", null)
     .eq("ventas.origen", "factura")
     .is("ventas.cancelada_at", null)
     .limit(5000);
+  if (u.rol === "vendedor") q = q.eq("ventas.vendedor_id", u.id);
+  const { data, error } = await q;
   if (error) return { ok: false, error: /importe/.test(error.message) ? "Falta correr la actualización 0072 en la base." : friendlyError(error.message) };
   type R = { venta_id: string; ventas: { id: string; factura: string | null; factura_path: string | null; xml_path: string | null } };
   const ids = [...new Set(((data ?? []) as unknown as R[]).filter((r) => r.ventas.factura_path || r.ventas.xml_path).map((r) => r.venta_id))];
@@ -182,9 +185,9 @@ export async function ventasSinImporteAction(): Promise<Result<{ ventas: VentaSi
   return { ok: true, ventas };
 }
 
-/** Jefa: guarda los importes leidos de la factura (sin tocar el % de comision). */
+/** Guarda los importes leidos de la factura (sin tocar el % de comision). El vendedor solo en las suyas (lo revisa la base). */
 export async function guardarImportesAction(ventaId: string, importes: { id: string; importe: number; comision_pct: number | null }[]): Promise<Result> {
   const u = await requireUser();
-  if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas." };
+  if (u.rol !== "jefe_ventas" && u.rol !== "vendedor") return { ok: false, error: "No autorizado." };
   return comisionesVentaAction(ventaId, importes);
 }

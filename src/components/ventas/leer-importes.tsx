@@ -69,7 +69,7 @@ export function LeerImportes() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="font-semibold text-slate-900">Importes de facturas anteriores</p>
-          <p className="text-xs text-slate-600">Las facturas subidas antes de las comisiones no tienen el importe de cada artículo. Esto vuelve a leer su PDF o XML y lo llena (no cambia ningún %).</p>
+          <p className="text-xs text-slate-600">Las facturas subidas antes de las comisiones no tienen el importe de cada artículo. Esto vuelve a leer su PDF o XML y lo llena solo; después nada más pones el %.</p>
         </div>
         <Button type="button" variant="secondary" onClick={correr} loading={estado === "leyendo"} disabled={estado === "leyendo"}>
           {estado === "fin" ? "Volver a leer" : "Leer importes"}

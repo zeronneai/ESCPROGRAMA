@@ -127,7 +127,7 @@ export async function ComisionesVista({ sp, ruta, modo, vendedorId }: { sp: Comi
             : `${ver === "pagadas" ? "Ventas cobradas al 100%" : ver === "por_cobrar" ? "Ventas que todavía no se cobran al 100% (su comisión puede cambiar)" : ver === "revisadas" ? "Comisiones revisadas" : "Todas las ventas"} con ${campo === "pago" ? "fecha de pago" : "fecha de factura"} del ${fechaTxt(d0)} al ${fechaTxt(d1)}.`}
         </p>
       </Card>
-      {modo === "jefa" && !error && <LeerImportes />}
+      {modo !== "gerente" && !error && <LeerImportes />}
       <ComisionesTabla vendedores={vendedores} modo={modo} />
     </div>
   );
