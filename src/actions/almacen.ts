@@ -8,6 +8,8 @@ import { ALMACEN, SUBEN_FACTURA, type TipoRecepcion } from "@/lib/almacen";
 import { friendlyError } from "@/lib/quotes/server";
 import { almacenVentasActivo } from "@/lib/almacen-ventas";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { asegurarTiposCambio } from "@/lib/tipo-cambio";
 import type { Result } from "./requests";
 
 const uuid = z.string().uuid();
@@ -234,6 +236,7 @@ const ventaFacturaSchema = z.object({
   entrega_direccion: z.string().trim().max(300).nullable().optional(),
   total: z.coerce.number({ message: "Escribe el total de la factura" }).positive("Escribe el total de la factura").max(999_999_999),
   moneda: z.enum(["MXN", "USD"]),
+  tipo_cambio: z.coerce.number().min(5, "Revisa el tipo de cambio").max(60, "Revisa el tipo de cambio").nullable().optional(),
   pago: z.enum(["contado", "credito"]),
   dias_credito: z.coerce.number().int().min(1).max(365).nullable().optional(),
   lineas: z.array(lineaSalida).min(1, "La factura no tiene artículos"),
@@ -275,6 +278,11 @@ export async function ventaDesdeFacturaAction(fd: FormData): Promise<Result<{ id
   }
   if (aNombreDe) revalidatePath(`/ventas/vendedor/${aNombreDe}`);
   const r = data as { venta_id: string };
+  // Venta en dolares: el tipo de cambio de la factura; si no lo trae, el del dia (se baja de internet).
+  if (p.data.moneda === "USD") {
+    if (p.data.tipo_cambio) await supabase.rpc("venta_tipo_cambio_factura", { p_venta: r.venta_id, p_tc: p.data.tipo_cambio });
+    else await asegurarTiposCambio(createAdminClient());
+  }
   revalidatePath("/vendedor/bitacora");
   revalidatePath("/entregas");
   return { ok: true, id: r.venta_id };

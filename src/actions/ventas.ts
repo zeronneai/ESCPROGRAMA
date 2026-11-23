@@ -4,7 +4,9 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
 import { friendlyError } from "@/lib/quotes/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { asegurarTiposCambio } from "@/lib/tipo-cambio";
 import { lineaSchema, ventaSchema, type VentaInput, type VentaLinea } from "@/lib/ventas";
 import type { Result } from "./requests";
 
@@ -41,6 +43,8 @@ export async function saveVentaAction(id: string | null, input: VentaInput, line
     if (error) return { ok: false, error: friendlyError(error.message) };
     ventaId = data.id;
   }
+  // En dolares: si todavia no hay tipo de cambio de ese dia, se baja de internet.
+  if (!visita && parsed.data.moneda === "USD") await asegurarTiposCambio(createAdminClient());
   if (visita) {
     refresh(ventaId!);
     return { ok: true, id: ventaId! };

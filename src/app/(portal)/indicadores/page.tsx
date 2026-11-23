@@ -7,7 +7,8 @@ import { satisfaccion } from "@/lib/evaluaciones";
 import { ROL_LABEL } from "@/lib/ops/roles";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
-import { cobroEstado, money, saldo, type VentaRow } from "@/lib/ventas";
+import { cobroEstado, money, saldoMxn, sumaMxn, type VentaRow } from "@/lib/ventas";
+import { conTipoCambio } from "@/lib/ventas-server";
 
 type Tone = "green" | "amber" | "red" | "default";
 interface Ind {
@@ -76,27 +77,27 @@ async function ventasGrupos(c: Ctx, sellerId: string | null): Promise<Grupo[]> {
     return sellerId ? (q as unknown as { eq: (a: string, b: string) => T }).eq(k, sellerId) : q;
   }
   const [{ data: vs }, { data: iss }, { data: bit }, { count: conv }, { data: enc }] = await Promise.all([
-    scope(c.supabase.from("ventas").select("vendedor_id, fecha, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at, request_id, created_at").eq("tipo", "venta").gte("fecha", c.m1.toISODate()!), "vendedor_id").limit(20000),
+    scope(c.supabase.from("ventas").select("id, vendedor_id, fecha, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at, request_id, created_at").eq("tipo", "venta").gte("fecha", c.m1.toISODate()!), "vendedor_id").limit(20000),
     scope(c.supabase.from("quote_issues").select("request_id, emitida_at").gte("emitida_at", c.m0.toUTC().toISO()!), "emitida_por").limit(10000),
     scope(c.supabase.from("bitacora").select("resultado, proximo_seguimiento, archived_at"), "vendedor_id").is("archived_at", null).limit(10000),
     scope(c.supabase.from("customers").select("id", { count: "exact", head: true }).gte("convertido_at", c.m0.toUTC().toISO()!), "convertido_por"),
     scope(c.supabase.from("encuestas_cliente").select("respuestas, escala, respondida_at, eval_periodos!inner(estado)").not("respondida_at", "is", null), "vendedor_id").limit(5000),
   ]);
-  const { data: cart } = await scope(c.supabase.from("ventas").select("monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at").eq("tipo", "venta").is("cancelada_at", null).lt("porcentaje_cobrado", 100), "vendedor_id").limit(20000);
-  const ventas = (vs ?? []) as unknown as VentaRow[];
+  const { data: cart } = await scope(c.supabase.from("ventas").select("id, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at").eq("tipo", "venta").is("cancelada_at", null).lt("porcentaje_cobrado", 100), "vendedor_id").limit(20000);
+  const ventas = await conTipoCambio(c.supabase, (vs ?? []) as unknown as VentaRow[]);
   const vivas = ventas.filter((v) => !v.cancelada_at);
   const mes = vivas.filter((v) => v.fecha >= c.m0.toISODate()!);
   const ant = vivas.filter((v) => v.fecha < c.m0.toISODate()!);
-  const sum = (l: VentaRow[]) => l.filter((v) => v.moneda === "MXN").reduce((a, v) => a + Number(v.monto ?? 0), 0);
+  const sum = (l: VentaRow[]) => sumaMxn(l).total;
   const cot = new Set((iss ?? []).map((i) => i.request_id));
   const ganadas = new Set(mes.filter((v) => v.request_id && cot.has(v.request_id)).map((v) => v.request_id));
   const conversion = pct(ganadas.size, cot.size);
   const abiertos = (bit ?? []).filter((b) => b.resultado === "abierta");
   const alDia = abiertos.filter((b) => !b.proximo_seguimiento || b.proximo_seguimiento >= c.today).length;
   const seg = pct(alDia, abiertos.length);
-  const pend = (cart ?? []) as unknown as VentaRow[];
-  const totalPend = pend.reduce((a, v) => a + saldo(v), 0);
-  const vencido = pend.filter((v) => cobroEstado(v, c.today) === "vencida").reduce((a, v) => a + saldo(v), 0);
+  const pend = await conTipoCambio(c.supabase, (cart ?? []) as unknown as VentaRow[]);
+  const totalPend = pend.reduce((a, v) => a + saldoMxn(v), 0);
+  const vencido = pend.filter((v) => cobroEstado(v, c.today) === "vencida").reduce((a, v) => a + saldoMxn(v), 0);
   const pv = pct(Math.round(vencido), Math.round(totalPend));
   const sat = satisfaccion((enc ?? []) as { respuestas: Record<string, number>; escala: number }[]);
   return [

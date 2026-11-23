@@ -21,3 +21,18 @@ export async function loadVenta(supabase: SupabaseClient, id: string) {
   }));
   return { venta, customer: c, lineas, folio: (r as { folio: string | null } | null)?.folio ?? null, vendedor: (p as { nombre: string } | null)?.nombre ?? null };
 }
+
+/**
+ * Agrega el tipo de cambio a las ventas en USD (para sumarlas en pesos).
+ * Si la base todavia no tiene la actualizacion 0071, regresa las ventas igual.
+ */
+export async function conTipoCambio<T extends { id?: string; moneda: string }>(supabase: SupabaseClient, rows: T[]): Promise<(T & { tipo_cambio: number | null })[]> {
+  const ids = [...new Set(rows.filter((r) => r.moneda === "USD" && r.id).map((r) => r.id!))];
+  const tc = new Map<string, number | null>();
+  for (let i = 0; i < ids.length; i += 300) {
+    const { data, error } = await supabase.from("ventas").select("id, tipo_cambio").in("id", ids.slice(i, i + 300));
+    if (error) break;
+    for (const d of data ?? []) tc.set(d.id as string, d.tipo_cambio == null ? null : Number(d.tipo_cambio));
+  }
+  return rows.map((r) => ({ ...r, tipo_cambio: r.id ? (tc.get(r.id) ?? null) : null }));
+}

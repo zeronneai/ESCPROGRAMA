@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { computeDeadlineNotices, computeSinResultado, type DispatchedItem } from "@/lib/quotes/deadlines";
 import { effectiveDueAt } from "@/lib/quotes/clock";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { asegurarTiposCambio } from "@/lib/tipo-cambio";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,7 +14,8 @@ type Pause = { clarification_requested_at: string; resumed_at: string | null };
  *  - comprador: solicitud por vencer o vencida, y actualizaciones por vencer o vencidas;
  *  - vendedor: cotizaciones enviadas con mas de 15 dias sin resultado;
  *  - evaluaciones de proveedores y clientes programadas a 6 meses: se activan solas;
- *  - CEO: pagos a proveedores extranjeros urgentes o que vencen en 2 dias o menos.
+ *  - CEO: pagos a proveedores extranjeros urgentes o que vencen en 2 dias o menos;
+ *  - tipos de cambio USD/MXN (para sumar en pesos las ventas en dolares).
  * "Vencida" como estado NO depende de esto: se calcula al consultar.
  * Vercel envia  Authorization: Bearer <CRON_SECRET>.
  */
@@ -133,5 +135,7 @@ export async function GET(request: NextRequest) {
   const { data: pagosAviso, error: pagosErr } = await admin.rpc("pagos_recordatorio");
   if (pagosErr) console.error("cron pagos:", pagosErr.message);
 
-  return NextResponse.json({ evaluacionesActivadas: evaluaciones ?? 0, pagosPorVencer: pagosAviso ?? 0, revisadas: reqs?.length ?? 0, avisosComprador: requestNotices.length + updNotices.length, sinResultado, creadas: created });
+  // Tipos de cambio USD/MXN del dia y ventas en USD que no lo tengan.
+  const tipoCambio = await asegurarTiposCambio(admin, s?.timezone ?? "America/Chihuahua");
+  return NextResponse.json({ tipoCambio, evaluacionesActivadas: evaluaciones ?? 0, pagosPorVencer: pagosAviso ?? 0, revisadas: reqs?.length ?? 0, avisosComprador: requestNotices.length + updNotices.length, sinResultado, creadas: created });
 }

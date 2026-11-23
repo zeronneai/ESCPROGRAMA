@@ -4,7 +4,7 @@ import Link from "next/link";
 import { quickVentaAction } from "@/actions/ventas";
 import { Chip, useRun } from "@/components/ops-ui";
 import { Alert, EmptyState } from "@/components/ui";
-import { cobroEstado, diasVencidos, money, saldo, type VentaRow } from "@/lib/ventas";
+import { cobroEstado, diasVencidos, money, saldo, sumaMxn, type VentaRow } from "@/lib/ventas";
 
 export type VentaListRow = VentaRow & {
   customers: { nombre: string } | null;
@@ -29,7 +29,7 @@ export function VentasList({ rows, today, basePath, editable, showSeller = false
       {days.map((d) => {
         const list = rows.filter((r) => r.fecha === d);
         const nVis = list.filter((r) => r.tipo === "visita").length;
-        const total = list.filter((r) => !r.cancelada_at && r.tipo !== "visita" && r.moneda === "MXN").reduce((a, r) => a + Number(r.monto ?? 0), 0);
+        const total = sumaMxn(list.filter((r) => !r.cancelada_at && r.tipo !== "visita")).total;
         return (
           <section key={d}>
             <div className="flex items-center justify-between border-y border-slate-100 bg-slate-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 first:border-t-0">
@@ -46,6 +46,7 @@ export function VentasList({ rows, today, basePath, editable, showSeller = false
                         <span className="truncate">{r.customers?.nombre ?? "Cliente"}</span>
                         {r.tipo === "visita" && <Chip cls="bg-amber-100 text-amber-900">Visita sin venta</Chip>}
                         {r.monto != null && <span className="text-sm font-semibold text-slate-700">{money(Number(r.monto), r.moneda)}</span>}
+                        {r.moneda === "USD" && r.monto != null && r.tipo_cambio ? <span className="text-xs text-slate-500">≈ {money(Number(r.monto) * r.tipo_cambio)} (TC {r.tipo_cambio.toFixed(2)})</span> : null}
                         {r.origen === "portal" && !r.factura && <Chip cls="bg-brand-100 text-brand-900">Del portal: complétala</Chip>}
                       </p>
                       {r.tipo === "visita" ? (

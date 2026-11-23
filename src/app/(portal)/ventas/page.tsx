@@ -3,6 +3,7 @@ import { DateTime } from "luxon";
 import { Card, EmptyState, FilterChip, PageHeader, StatCard } from "@/components/ui";
 import { requireSalesViewer } from "@/lib/auth/sales";
 import { getBusinessSettings } from "@/lib/quotes/server";
+import { conTipoCambio } from "@/lib/ventas-server";
 import { PERIODS, periodRange, summarizeSellers, totals, type Period, type SummaryBitacora, type SummaryVenta } from "@/lib/stats/sales-summary";
 import { createClient } from "@/lib/supabase/server";
 
@@ -31,7 +32,7 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
     supabase.from("customers").select("convertido_por").gte("convertido_at", fromIso).lte("convertido_at", toIso).limit(5000),
     supabase.from("bitacora_eventos").select("created_by, created_at").gte("created_at", fromIso).lte("created_at", toIso).limit(20000),
     supabase.from("bitacora_articulos").select("articulo_id, articulos(clave, nombre), bitacora(archived_at)").limit(10000),
-    supabase.from("ventas").select("vendedor_id, fecha, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at, request_id, created_at").eq("tipo", "venta").limit(20000),
+    supabase.from("ventas").select("id, vendedor_id, fecha, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at, request_id, created_at").eq("tipo", "venta").limit(20000),
     supabase.from("venta_lineas").select("articulo_id, descripcion, cantidad, articulos(clave), ventas(fecha, cancelada_at)").not("articulo_id", "is", null).limit(20000),
   ]);
   type Top = { nombre: string; clave: string; ventas: number; piezas: number; prospeccion: number };
@@ -56,7 +57,7 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
     requests: (requests.data ?? []) as { vendedor_id: string; submitted_at: string }[],
     issues: issues.data ?? [],
     bitacora: (bitacora.data ?? []) as unknown as SummaryBitacora[],
-    ventas: (ventas.data ?? []) as unknown as SummaryVenta[],
+    ventas: await conTipoCambio(supabase, (ventas.data ?? []) as unknown as (SummaryVenta & { id: string })[]),
     conversions: conversions.data ?? [],
     events: events.data ?? [],
     fromDate: from.toISODate()!,
@@ -187,7 +188,7 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
         </Card>
       )}
       <p className="text-xs text-slate-500">
-        Ventas y monto salen de Ventas diarias del periodo; el % junto a ventas es cuántas cotizaciones enviadas terminaron en venta. Los montos en USD no se suman. Prospectos, por cobrar y cartera vencida son al día de hoy.
+        Ventas y monto salen de Ventas diarias del periodo; el % junto a ventas es cuántas cotizaciones enviadas terminaron en venta. Los montos en USD se suman en pesos con el tipo de cambio de cada factura (o el oficial de su fecha). Prospectos, por cobrar y cartera vencida son al día de hoy.
       </p>
     </div>
   );

@@ -6,7 +6,8 @@ import { DateTime } from "luxon";
 import type { IconName } from "@/components/icons";
 import type { Rol } from "@/lib/auth/route-guard";
 import { fmtTotales, totalesPorMoneda } from "@/lib/pagos";
-import { cobroEstado, money, saldo, type VentaRow } from "@/lib/ventas";
+import { cobroEstado, money, saldoMxn, sumaMxn, type VentaRow } from "@/lib/ventas";
+import { conTipoCambio } from "@/lib/ventas-server";
 
 /**
  * Tablero de inicio por puesto: avisos urgentes arriba y tarjetas por seccion.
@@ -128,18 +129,18 @@ async function cotizacionesCompras(c: Ctx, lectura: boolean, gerente = false): P
 
 async function ventas(c: Ctx, propias: boolean): Promise<Bloque> {
   const mesIni = c.today.slice(0, 8) + "01";
-  let q = c.sb.from("ventas").select("vendedor_id, fecha, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at, entregado, tipo").is("cancelada_at", null);
+  let q = c.sb.from("ventas").select("id, vendedor_id, fecha, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at, entregado, tipo").is("cancelada_at", null);
   if (propias) q = q.eq("vendedor_id", c.uid);
   const { data } = await q.or(`fecha.gte.${mesIni},porcentaje_cobrado.lt.100`).limit(20000);
-  const all = (data ?? []) as unknown as (VentaRow & { entregado: boolean })[];
+  const all = await conTipoCambio(c.sb, (data ?? []) as unknown as (VentaRow & { entregado: boolean })[]);
   const vs = all.filter((v) => v.tipo !== "visita");
   const mes = vs.filter((v) => v.fecha >= mesIni);
   const hoy = vs.filter((v) => v.fecha === c.today);
   const visitas = all.filter((v) => v.tipo === "visita" && v.fecha >= mesIni).length;
-  const mxn = (l: VentaRow[]) => l.filter((v) => v.moneda === "MXN").reduce((a, v) => a + Number(v.monto ?? 0), 0);
+  const mxn = (l: VentaRow[]) => sumaMxn(l).total;
   const vencidas = vs.filter((v) => cobroEstado(v, c.today) === "vencida");
-  const carteraVencida = vencidas.reduce((a, v) => a + saldo(v), 0);
-  const porCobrar = vs.filter((v) => cobroEstado(v, c.today) === "por_cobrar").reduce((a, v) => a + saldo(v), 0);
+  const carteraVencida = vencidas.reduce((a, v) => a + saldoMxn(v), 0);
+  const porCobrar = vs.filter((v) => cobroEstado(v, c.today) === "por_cobrar").reduce((a, v) => a + saldoMxn(v), 0);
   const porEntregar = vs.filter((v) => !v.entregado).length;
   const href = propias ? "/vendedor/bitacora" : "/ventas";
   const alertas: Alerta[] = [];

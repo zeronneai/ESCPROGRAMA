@@ -10,7 +10,7 @@ import { leerFacturaPdf } from "@/lib/pdf-cliente";
 type Linea = { clave: string; descripcion: string; unidad: string; cantidad: string; precio?: number | null; descuentoPct?: number | null; importe?: number | null };
 const mx = (n: number) => n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 type Cliente = { nombre: string; razon: string; rfc: string; direccion: string; telefono: string };
-type Cobro = { total: string; moneda: "MXN" | "USD"; pago: "contado" | "credito"; dias: string };
+type Cobro = { total: string; moneda: "MXN" | "USD"; pago: "contado" | "credito"; dias: string; tc: string };
 /** Lo que se leyo del archivo queda fijo; solo se escribe lo que no se pudo leer. */
 type Fijo = {
   folio: boolean; fecha: boolean; nombre: boolean; razon: boolean; rfc: boolean; direccion: boolean; telefono: boolean;
@@ -62,7 +62,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
   const [match, setMatch] = useState<ClienteFactura | null>(null);
   const [elegido, setElegido] = useState<{ id: string; nombre: string } | null>(cliente);
   const [cambiar, setCambiar] = useState(false);
-  const [cobro, setCobro] = useState<Cobro>({ total: "", moneda: "MXN", pago: "contado", dias: "" });
+  const [cobro, setCobro] = useState<Cobro>({ total: "", moneda: "MXN", pago: "contado", dias: "", tc: "" });
   const [fijo, setFijo] = useState<Fijo>(SIN_FIJO);
   const [confirmado, setConfirmado] = useState(false);
   const { run, busy, notice, setNotice, router } = useRun();
@@ -126,6 +126,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
       moneda: f.moneda ?? "MXN",
       pago: f.pago ?? "contado",
       dias: f.diasCredito != null ? String(f.diasCredito) : f.pago === "credito" ? "30" : "",
+      tc: f.tipoCambio ? String(f.tipoCambio) : "",
     });
     const leidoTexto = (x: string | null | undefined) => !!(x && x.trim());
     setFijo({
@@ -174,7 +175,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
     setEntrega(null);
     setMatch(null);
     setElegido(cliente);
-    setCobro({ total: "", moneda: "MXN", pago: "contado", dias: "" });
+    setCobro({ total: "", moneda: "MXN", pago: "contado", dias: "", tc: "" });
     setFijo(SIN_FIJO);
     setConfirmado(false);
     setNotice(null);
@@ -205,7 +206,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
         pedido: v.pedido || null,
         customer_id: elegido?.id ?? null, nombre: cli.nombre, razon_social: cli.razon, rfc: cli.rfc, direccion: cli.direccion, telefono: cli.telefono,
         entrega_nombre: entrega?.usar ? entrega.nombre || null : null, entrega_direccion: entrega?.usar ? entrega.direccion || null : null,
-        total: Number(cobro.total), moneda: cobro.moneda, pago: cobro.pago, dias_credito: cobro.pago === "credito" ? Number(cobro.dias) || 30 : null,
+        total: Number(cobro.total), moneda: cobro.moneda, tipo_cambio: cobro.moneda === "USD" && Number(cobro.tc) > 0 ? Number(cobro.tc) : null, pago: cobro.pago, dias_credito: cobro.pago === "credito" ? Number(cobro.dias) || 30 : null,
         lineas: datosLineas(),
       }));
       if (por) fd.set("por", por.id);
@@ -367,6 +368,11 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
                   <Field label="Pago">
                     <Select value={cobro.pago} disabled={fijo.pago} className={fijo.pago ? FIJO_CLS : FALTA_CLS} onChange={(e) => setCobro((s) => ({ ...s, pago: e.target.value as Cobro["pago"], dias: e.target.value === "credito" ? s.dias || "30" : "" }))}><option value="contado">Contado</option><option value="credito">Crédito</option></Select>
                   </Field>
+                  {cobro.moneda === "USD" && (
+                    <Field label="Tipo de cambio">
+                      <Input value={cobro.tc} onChange={(e) => setCobro((s) => ({ ...s, tc: e.target.value.replace(/[^\d.]/g, "") }))} inputMode="decimal" placeholder="Si la factura no lo trae, déjalo vacío" className={cobro.tc ? FIJO_CLS : ""} />
+                    </Field>
+                  )}
                   {cobro.pago === "credito" && <Field label="Días de crédito"><Input value={cobro.dias} readOnly={fijo.dias} onChange={(e) => setCobro((s) => ({ ...s, dias: e.target.value.replace(/\D/g, "") }))} inputMode="numeric" className={fijo.dias ? FIJO_CLS : FALTA_CLS} /></Field>}
                 </div>
                 <p className="text-xs text-slate-500">

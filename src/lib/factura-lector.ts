@@ -40,6 +40,16 @@ export interface FacturaLeida {
   vence?: string | null;
   subtotal?: number | null;
   total?: number | null;
+  /** Pesos por dolar que trae la factura (solo si es en USD y lo imprime). */
+  tipoCambio?: number | null;
+}
+
+/** Tipo de cambio impreso en la factura: "Tipo de cambio: 18.2345", "T.C. 18.23", "TC: $18.2345". */
+export function tipoCambioDeTexto(texto: string): number | null {
+  const m = texto.match(/(?:Tipo\s+de\s+cambio|T\.?\s?C\.?)\s*(?:USD|D[OÓ]LAR(?:ES)?)?\s*[:=]?\s*\$?\s*(\d{1,2}[.,]\d{2,6})\b/i);
+  if (!m) return null;
+  const v = Number(m[1].replace(",", "."));
+  return v >= 5 && v <= 60 ? v : null;
 }
 
 /** Celda de texto con su posicion horizontal (para separar columnas). */
@@ -236,11 +246,12 @@ export function leerFacturaTexto(renglones: string[], filas?: Celda[][]): Factur
   const total = montoDe(/^Total\s+\$?\s*([\d,]+\.\d{2})$/i);
   const subtotal = montoDe(/^Subtotal\s+\$?\s*([\d,]+\.\d{2})$/i);
   const uuid = todo.match(/Folio fiscal:\s*([0-9A-F-]{36})/i)?.[1]?.toUpperCase() ?? null;
+  const tipoCambio = moneda === "USD" ? tipoCambioDeTexto(todo) : null;
   const { pago, dias } = pagoDe(metodo, condiciones, fecha, vence);
 
   return {
     folio: folio ? folio.toUpperCase() : null, fecha, cliente, vendedor, lineas, avisos,
-    uuid, rfc, razonSocial, nombreComercial: entrega ? null : nombreComercial, direccion, entrega, telefono, moneda, metodo, condiciones, pago, diasCredito: dias, vence, subtotal, total,
+    uuid, rfc, razonSocial, nombreComercial: entrega ? null : nombreComercial, direccion, entrega, telefono, moneda, metodo, condiciones, pago, diasCredito: dias, vence, subtotal, total, tipoCambio,
   };
 }
 
@@ -303,6 +314,7 @@ export function leerFacturaXml(xml: string): FacturaLeida {
     vence: null,
     subtotal: n(attr(comp, "SubTotal")),
     total: n(attr(comp, "Total")),
+    tipoCambio: mon === "USD" && (n(attr(comp, "TipoCambio")) ?? 0) >= 5 && (n(attr(comp, "TipoCambio")) ?? 0) <= 60 ? n(attr(comp, "TipoCambio")) : null,
   };
 }
 

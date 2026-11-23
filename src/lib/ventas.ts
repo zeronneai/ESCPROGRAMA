@@ -18,6 +18,8 @@ export interface VentaRow {
   factura: string | null;
   monto: number | string | null;
   moneda: "MXN" | "USD";
+  /** Pesos por dolar (solo ventas en USD; lo agrega conTipoCambio). */
+  tipo_cambio?: number | null;
   pago: "contado" | "credito";
   dias_credito: number | null;
   vence: string | null;
@@ -93,5 +95,36 @@ export const lineaSchema = z.object({
   descripcion: z.string().trim().min(1, "Escribe el artículo").max(300),
   cantidad: z.union([z.null(), z.coerce.number().positive("Cantidad inválida").max(9_999_999)]),
 });
+
+/**
+ * Monto en pesos de una venta: las de USD se multiplican por su tipo de cambio.
+ * Si una venta en USD todavia no tiene tipo de cambio, regresa null (no se puede sumar).
+ */
+export function montoMxn(v: { monto: number | string | null; moneda: string; tipo_cambio?: number | string | null }): number | null {
+  const m = Number(v.monto ?? 0);
+  if (v.moneda !== "USD") return m;
+  const tc = Number(v.tipo_cambio ?? 0);
+  return tc > 0 ? m * tc : null;
+}
+
+/** Saldo por cobrar en pesos (USD por su tipo de cambio; sin tipo de cambio se toma tal cual). */
+export function saldoMxn(v: Pick<VentaRow, "monto" | "porcentaje_cobrado" | "cancelada_at" | "moneda" | "tipo_cambio">): number {
+  const x = saldo(v);
+  return v.moneda === "USD" && v.tipo_cambio ? x * Number(v.tipo_cambio) : x;
+}
+
+/** Suma en pesos (USD convertidos) y cuantas ventas en USD se quedaron fuera por no tener tipo de cambio. */
+export function sumaMxn(l: { monto: number | string | null; moneda: string; tipo_cambio?: number | string | null }[]): { total: number; usd: number; sinTc: number } {
+  let total = 0;
+  let usd = 0;
+  let sinTc = 0;
+  for (const v of l) {
+    const x = montoMxn(v);
+    if (v.moneda === "USD") usd += 1;
+    if (x == null) sinTc += 1;
+    else total += x;
+  }
+  return { total, usd, sinTc };
+}
 
 export const money = (n: number, m = "MXN") => `$${n.toLocaleString("es-MX", { maximumFractionDigits: 0 })}${m === "USD" ? " USD" : ""}`;

@@ -168,10 +168,30 @@ describe("datos de cliente y cobranza", () => {
     expect(pagoDe(null, "Credito 30 dias", null, null)).toEqual({ pago: "credito", dias: 30 });
   });
   it("XML: receptor, total, metodo y UUID", () => {
-    const f = leerFacturaXml(`<cfdi:Comprobante Version="4.0" Serie="F" Folio="1" Fecha="2026-11-05T10:00:00" SubTotal="100" Total="116" Moneda="USD" MetodoPago="PPD" CondicionesDePago="CREDITO 30 DIAS">
+    const f = leerFacturaXml(`<cfdi:Comprobante Version="4.0" Serie="F" Folio="1" Fecha="2026-11-05T10:00:00" SubTotal="100" Total="116" Moneda="USD" TipoCambio="17.8523" MetodoPago="PPD" CondicionesDePago="CREDITO 30 DIAS">
       <cfdi:Receptor Rfc="PELJ800101AB1" Nombre="JUAN PEREZ" DomicilioFiscalReceptor="31000"/>
       <cfdi:Conceptos><cfdi:Concepto NoIdentificacion="ESC-X-1" Cantidad="1" Descripcion="X"/></cfdi:Conceptos>
       <cfdi:Complemento><tfd:TimbreFiscalDigital UUID="aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb"/></cfdi:Complemento></cfdi:Comprobante>`);
-    expect(f).toMatchObject({ rfc: "PELJ800101AB1", razonSocial: "JUAN PEREZ", total: 116, subtotal: 100, moneda: "USD", pago: "credito", diasCredito: 30, uuid: "AAAAAAAA-1111-2222-3333-BBBBBBBBBBBB", direccion: "CP 31000" });
+    expect(f).toMatchObject({ rfc: "PELJ800101AB1", razonSocial: "JUAN PEREZ", total: 116, subtotal: 100, moneda: "USD", tipoCambio: 17.8523, pago: "credito", diasCredito: 30, uuid: "AAAAAAAA-1111-2222-3333-BBBBBBBBBBBB", direccion: "CP 31000" });
+  });
+});
+
+describe("tipo de cambio impreso en la factura", () => {
+  it("lo encuentra en las formas comunes y descarta valores raros", async () => {
+    const { tipoCambioDeTexto } = await import("@/lib/factura-lector");
+    expect(tipoCambioDeTexto("Moneda: USD   Tipo de cambio: 18.2345   Forma de pago")).toBe(18.2345);
+    expect(tipoCambioDeTexto("Moneda: USD T.C. $17.95")).toBe(17.95);
+    expect(tipoCambioDeTexto("TIPO DE CAMBIO 19,1023")).toBe(19.1023);
+    expect(tipoCambioDeTexto("Tipo de cambio: 1.0000")).toBeNull();
+    expect(tipoCambioDeTexto("Moneda: MXN Forma de pago")).toBeNull();
+  });
+});
+
+describe("ventas en dolares sumadas en pesos", () => {
+  it("multiplica por su tipo de cambio y aparta las que no lo tienen", async () => {
+    const { sumaMxn, montoMxn } = await import("@/lib/ventas");
+    expect(montoMxn({ monto: 100, moneda: "USD", tipo_cambio: 18.5 })).toBe(1850);
+    expect(montoMxn({ monto: 100, moneda: "USD" })).toBeNull();
+    expect(sumaMxn([{ monto: 1000, moneda: "MXN" }, { monto: 100, moneda: "USD", tipo_cambio: 18 }, { monto: 5, moneda: "USD", tipo_cambio: null }])).toEqual({ total: 2800, usd: 2, sinTc: 1 });
   });
 });

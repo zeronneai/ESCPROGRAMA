@@ -17,6 +17,8 @@ export interface FacturaDisponible {
   monto: number;
   moneda: string;
   rechazada: boolean;
+  /** Pesos por dolar (ventas en USD). */
+  tc?: number | null;
 }
 interface Pago {
   key: number;

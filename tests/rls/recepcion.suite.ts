@@ -76,5 +76,30 @@ export function recepcionSuite() {
       expect(ent2).toBeTruthy();
       expect(await failure(q(aux, "select public.factura_revisar($1,'recibida')", [rc]))).toMatch(/ya se volvio a entregar/);
     });
+    it("tipo de cambio: la venta en USD toma el de la factura o el oficial del dia (DOF = FIX del dia habil anterior)", async () => {
+      await q("postgres", "insert into public.tipos_cambio (fecha, usd_mxn, fuente) values ('2026-11-19', 18.1000, 'banxico'), ('2026-11-20', 18.2000, 'banxico') on conflict (fecha) do update set usd_mxn = excluded.usd_mxn, fuente = excluded.fuente");
+      // Sin tipo de cambio en la factura: el del dia habil anterior a su fecha
+      const v1 = (await q(w.seller1, "insert into public.ventas (customer_id, monto, moneda, pago, fecha) values ($1, 100, 'USD', 'contado', '2026-11-21') returning id, tipo_cambio::numeric tc, tipo_cambio_fuente f", [w.customerId])).rows[0];
+      expect([Number(v1.tc), v1.f]).toEqual([18.2, "banxico"]);
+      // La factura trae el suyo: manda ese
+      await q(w.seller1, "select public.venta_tipo_cambio_factura($1, 17.95)", [v1.id]);
+      const v1b = (await q(w.seller1, "select tipo_cambio::numeric tc, tipo_cambio_fuente f from public.ventas where id=$1", [v1.id])).rows[0];
+      expect([Number(v1b.tc), v1b.f]).toEqual([17.95, "factura"]);
+      expect(await failure(q(w.seller2, "select public.venta_tipo_cambio_factura($1, 17)", [v1.id]))).toMatch(/No autorizado/);
+      // En pesos no lleva tipo de cambio
+      const v2 = (await q(w.seller1, "insert into public.ventas (customer_id, monto, moneda, pago) values ($1, 100, 'MXN', 'contado') returning tipo_cambio", [w.customerId])).rows[0];
+      expect(v2.tipo_cambio).toBeNull();
+      // Venta vieja sin tipo de cambio: se llena cuando el portal baja los tipos de cambio
+      await q("postgres", "delete from public.tipos_cambio where fecha between '2026-09-20' and '2026-10-06'");
+      const v3 = (await q(w.seller1, "insert into public.ventas (customer_id, monto, moneda, pago, fecha) values ($1, 50, 'USD', 'contado', '2026-10-06') returning id, tipo_cambio", [w.customerId])).rows[0];
+      expect(v3.tipo_cambio).toBeNull();
+      expect((await q("postgres", "select public.tipo_cambio_pendiente_desde() d")).rows[0].d).toBeTruthy();
+      await q("postgres", "insert into public.tipos_cambio (fecha, usd_mxn, fuente) values ('2026-10-05', 19.0000, 'referencia') on conflict (fecha) do update set usd_mxn = excluded.usd_mxn, fuente = excluded.fuente");
+      expect(Number((await q("postgres", "select public.ventas_rellenar_tipo_cambio() n")).rows[0].n)).toBeGreaterThanOrEqual(1);
+      const v3b = (await q(w.seller1, "select tipo_cambio::numeric tc, tipo_cambio_fuente f from public.ventas where id=$1", [v3.id])).rows[0];
+      expect([Number(v3b.tc), v3b.f]).toEqual([19, "referencia"]);
+      // Los usuarios no escriben tipos de cambio
+      expect(await failure(q(w.seller1, "insert into public.tipos_cambio (fecha, usd_mxn) values ('2026-01-02', 17)"))).toMatch(/permission denied|row-level/);
+    });
   });
 }
