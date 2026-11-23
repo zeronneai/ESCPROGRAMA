@@ -53,6 +53,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/vendedor/bitacora", label: "Bitácora", icon: "target" },
     { href: "/vendedor/solicitudes/nueva", label: "Nueva solicitud", short: "Nueva", icon: "plus", cta: true },
     { href: "/guias", label: "Guías", icon: "package" },
+    { href: "/vendedor/comisiones", label: "Mis comisiones", short: "Comisiones", icon: "dollar", secondary: true },
     { href: "/vendedor/recepcion-facturas", label: "Recepción de facturas", short: "Facturas", icon: "dollar", secondary: true },
     { href: "/vendedor/clientes", label: "Clientes", icon: "building", secondary: true },
     { href: "/articulos", label: "Catálogo de artículos", icon: "list", secondary: true },

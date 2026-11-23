@@ -9,7 +9,7 @@ import { fmtMonedas2 as fmtMonedas, money, money2, porMoneda } from "@/lib/venta
 const fecha = (d: string | null) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString("es-MX", { day: "numeric", month: "short" }) : "");
 
 /** Comisiones por vendedor (se abre cada uno) y por factura con el detalle de cada articulo. */
-export function ComisionesTabla({ vendedores }: { vendedores: ComVendedor[] }) {
+export function ComisionesTabla({ vendedores, propio = false }: { vendedores: ComVendedor[]; propio?: boolean }) {
   const [buscar, setBuscar] = useState("");
   const t = buscar.trim().toLowerCase();
   const lista = useMemo(
@@ -28,7 +28,7 @@ export function ComisionesTabla({ vendedores }: { vendedores: ComVendedor[] }) {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Comisión total" value={fmtMonedas(total)} tone="green" />
         <StatCard label="Facturas" value={todas.length} />
-        <StatCard label="Vendedores" value={lista.length} />
+        {propio ? <StatCard label="Pagadas" value={todas.filter((f) => f.pagada).length} /> : <StatCard label="Vendedores" value={lista.length} />}
         <StatCard label="Sin comisión completa" value={faltan} tone={faltan ? "amber" : "default"} hint="Falta % o importe" />
       </div>
       <Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar factura o cliente" />

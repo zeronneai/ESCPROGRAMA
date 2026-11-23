@@ -163,3 +163,14 @@ describe("recepcion de facturas", () => {
     expect(d("/comprador", "aux_finanzas")).toEqual({ type: "redirect", to: "/inicio" });
   });
 });
+
+describe("comisiones", () => {
+  const p = (rol: GuardProfile["rol"]): GuardProfile => ({ activo: true, must_change_password: false, rol });
+  const d = (pathname: string, rol: GuardProfile["rol"]) => decideRoute({ pathname, hasUser: true, profile: p(rol) });
+  it("el vendedor ve las suyas; la jefa las de todos", () => {
+    expect(d("/vendedor/comisiones", "vendedor")).toEqual({ type: "next" });
+    expect(d("/ventas/comisiones", "jefe_ventas")).toEqual({ type: "next" });
+    expect(d("/ventas/comisiones", "vendedor")).toEqual({ type: "redirect", to: "/inicio" });
+    expect(d("/vendedor/comisiones", "comprador")).toEqual({ type: "redirect", to: "/inicio" });
+  });
+});
