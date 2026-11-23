@@ -80,7 +80,8 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 63 | `0068_cliente_solo_con_factura.sql` | **Un prospecto pasa a cliente solo al subir el PDF de su factura** (se quitan "Ya es cliente" y "Venta cerrada"). Reabre los prospectos marcados a mano como cerrados sin ninguna venta. |
 | 64 | `0069_rol_aux_finanzas.sql` | **Puesto Auxiliar de administración y finanzas.** Córrelo solo, en su propia ejecución. |
 | 65 | `0070_recepcion_facturas.sql` | **Recepción de facturas pagadas**: el vendedor entrega sus facturas cobradas agrupadas por pago; finanzas las recibe, rechaza con motivo y anota. |
-| 66 | `0071_tipo_cambio_ventas.sql` | **Ventas en dólares sumadas en pesos.** Usa el tipo de cambio de la factura; si no lo trae, el oficial del día (se baja solo de internet). |
+| 66 | `0071_tipo_cambio_ventas.sql` | **Tipo de cambio de las facturas en dólares** (solo se guarda como dato; los totales van en pesos y dólares por separado). |
+| 67 | `0072_comisiones.sql` | **Comisiones por artículo**: % por artículo (obligatorio para marcar la venta pagada), y la jefa las ve por vendedor y por factura en Ventas > Comisiones. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

@@ -7,8 +7,7 @@ import { satisfaccion } from "@/lib/evaluaciones";
 import { ROL_LABEL } from "@/lib/ops/roles";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
-import { cobroEstado, money, saldoMxn, sumaMxn, type VentaRow } from "@/lib/ventas";
-import { conTipoCambio } from "@/lib/ventas-server";
+import { cobroEstado, fmtMonedas, money, montoPorMoneda, saldo, saldoPorMoneda, type VentaRow } from "@/lib/ventas";
 
 type Tone = "green" | "amber" | "red" | "default";
 interface Ind {
@@ -84,30 +83,34 @@ async function ventasGrupos(c: Ctx, sellerId: string | null): Promise<Grupo[]> {
     scope(c.supabase.from("encuestas_cliente").select("respuestas, escala, respondida_at, eval_periodos!inner(estado)").not("respondida_at", "is", null), "vendedor_id").limit(5000),
   ]);
   const { data: cart } = await scope(c.supabase.from("ventas").select("id, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at").eq("tipo", "venta").is("cancelada_at", null).lt("porcentaje_cobrado", 100), "vendedor_id").limit(20000);
-  const ventas = await conTipoCambio(c.supabase, (vs ?? []) as unknown as VentaRow[]);
+  const ventas = (vs ?? []) as unknown as VentaRow[];
   const vivas = ventas.filter((v) => !v.cancelada_at);
   const mes = vivas.filter((v) => v.fecha >= c.m0.toISODate()!);
   const ant = vivas.filter((v) => v.fecha < c.m0.toISODate()!);
-  const sum = (l: VentaRow[]) => sumaMxn(l).total;
+  // Pesos (los dolares se muestran aparte).
+  const sum = (l: VentaRow[]) => montoPorMoneda(l).mxn;
   const cot = new Set((iss ?? []).map((i) => i.request_id));
   const ganadas = new Set(mes.filter((v) => v.request_id && cot.has(v.request_id)).map((v) => v.request_id));
   const conversion = pct(ganadas.size, cot.size);
   const abiertos = (bit ?? []).filter((b) => b.resultado === "abierta");
   const alDia = abiertos.filter((b) => !b.proximo_seguimiento || b.proximo_seguimiento >= c.today).length;
   const seg = pct(alDia, abiertos.length);
-  const pend = await conTipoCambio(c.supabase, (cart ?? []) as unknown as VentaRow[]);
-  const totalPend = pend.reduce((a, v) => a + saldoMxn(v), 0);
-  const vencido = pend.filter((v) => cobroEstado(v, c.today) === "vencida").reduce((a, v) => a + saldoMxn(v), 0);
+  const pend = ((cart ?? []) as unknown as VentaRow[]).filter((v) => v.moneda !== "USD");
+  const pendUsd = ((cart ?? []) as unknown as VentaRow[]).filter((v) => v.moneda === "USD");
+  const totalPend = pend.reduce((a, v) => a + saldo(v), 0);
+  const vencido = pend.filter((v) => cobroEstado(v, c.today) === "vencida").reduce((a, v) => a + saldo(v), 0);
+  const vencidoUsd = saldoPorMoneda(pendUsd.filter((v) => cobroEstado(v, c.today) === "vencida")).usd;
+  const usdMes = montoPorMoneda(mes).usd;
   const pv = pct(Math.round(vencido), Math.round(totalPend));
   const sat = satisfaccion((enc ?? []) as { respuestas: Record<string, number>; escala: number }[]);
   return [
     {
       titulo: sellerId ? "Mis ventas" : "Ventas del equipo",
       items: [
-        { titulo: "Monto vendido en el mes (MXN, sin IVA)", valor: money(sum(mes)), detalle: delta(sum(mes), sum(ant)), tono: sum(mes) >= sum(ant) ? "green" : "amber" },
+        { titulo: "Monto vendido en el mes (MXN, sin IVA)", valor: money(sum(mes)), detalle: `${delta(sum(mes), sum(ant))}${usdMes ? ` · además ${money(usdMes)} USD` : ""}`, tono: sum(mes) >= sum(ant) ? "green" : "amber" },
         { titulo: "Ventas registradas en el mes", valor: String(mes.length), detalle: `${ant.length} el mes anterior` },
         { titulo: "Conversión de cotizaciones", valor: fmtPct(conversion), detalle: `${ganadas.size} de ${cot.size} cotizaciones enviadas este mes terminaron en venta`, tono: toneBy(conversion, 40, 20) },
-        { titulo: "Cartera vencida", valor: money(vencido), detalle: pv !== null ? `${pv}% de lo que está por cobrar` : "Nada por cobrar", tono: vencido > 0 ? (pv !== null && pv > 20 ? "red" : "amber") : "green" },
+        { titulo: "Cartera vencida", valor: vencidoUsd ? fmtMonedas({ mxn: vencido, usd: vencidoUsd }) : money(vencido), detalle: pv !== null ? `${pv}% de lo que está por cobrar` : "Nada por cobrar", tono: vencido > 0 ? (pv !== null && pv > 20 ? "red" : "amber") : "green" },
       ],
     },
     {

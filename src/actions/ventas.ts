@@ -4,10 +4,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
 import { friendlyError } from "@/lib/quotes/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { asegurarTiposCambio } from "@/lib/tipo-cambio";
-import { lineaSchema, ventaSchema, type VentaInput, type VentaLinea } from "@/lib/ventas";
+import { COMISION_FALTA_MSG, esComisionFalta, lineaSchema, ventaSchema, type VentaInput, type VentaLinea } from "@/lib/ventas";
 import type { Result } from "./requests";
 
 const uuid = z.string().uuid();
@@ -28,6 +26,7 @@ export async function saveVentaAction(id: string | null, input: VentaInput, line
   if (!visita && !id && !ls.data.length) return { ok: false, error: "Agrega el artículo principal de la venta (el de mayor costo)." };
   const supabase = await createClient();
   let ventaId = id;
+  let cobroPendiente = 0;
   const fila: Record<string, unknown> = visita
     ? { ...parsed.data, monto: null, pedido: null, factura: null, pago: "contado" as const, dias_credito: null, entregado: false, porcentaje_cobrado: 0 }
     : { ...parsed.data, motivo_no_venta: null };
@@ -36,15 +35,16 @@ export async function saveVentaAction(id: string | null, input: VentaInput, line
     const { tipo: _tipo, ...upd } = fila;
     void _tipo;
     const { data, error } = await supabase.from("ventas").update(upd).eq("id", id).select("id");
-    if (error) return { ok: false, error: friendlyError(error.message) };
+    if (error) return { ok: false, error: esComisionFalta(error.message) ? COMISION_FALTA_MSG : friendlyError(error.message) };
     if (!data?.length) return { ok: false, error: "Ya no puedes editar esta venta." };
   } else {
-    const { data, error } = await supabase.from("ventas").insert(fila).select("id").single();
+    // Se registra sin cobro y, ya con sus articulos, se marca lo cobrado (para revisar la comision al pagarla).
+    const cobro = Number(fila.porcentaje_cobrado ?? 0);
+    const { data, error } = await supabase.from("ventas").insert({ ...fila, porcentaje_cobrado: 0 }).select("id").single();
     if (error) return { ok: false, error: friendlyError(error.message) };
     ventaId = data.id;
+    cobroPendiente = cobro;
   }
-  // En dolares: si todavia no hay tipo de cambio de ese dia, se baja de internet.
-  if (!visita && parsed.data.moneda === "USD") await asegurarTiposCambio(createAdminClient());
   if (visita) {
     refresh(ventaId!);
     return { ok: true, id: ventaId! };
@@ -62,6 +62,13 @@ export async function saveVentaAction(id: string | null, input: VentaInput, line
     const { error } = await supabase.from("venta_lineas").insert(nuevas);
     if (error) return { ok: false, error: friendlyError(error.message) };
   }
+  if (cobroPendiente > 0) {
+    const { error } = await supabase.from("ventas").update({ porcentaje_cobrado: cobroPendiente }).eq("id", ventaId!);
+    if (error) {
+      refresh(ventaId!);
+      return { ok: false, error: esComisionFalta(error.message) ? `La venta se registró, pero no como pagada. ${COMISION_FALTA_MSG}` : friendlyError(error.message) };
+    }
+  }
   refresh(ventaId!);
   revalidatePath("/vendedor/bitacora/venta");
   return { ok: true, id: ventaId! };
@@ -76,7 +83,7 @@ export async function quickVentaAction(id: string, patch: { entregado?: boolean;
   if (typeof patch.porcentaje_cobrado === "number" && patch.porcentaje_cobrado >= 0 && patch.porcentaje_cobrado <= 100) p.porcentaje_cobrado = patch.porcentaje_cobrado;
   const supabase = await createClient();
   const { data, error } = await supabase.from("ventas").update(p).eq("id", id).select("id");
-  if (error) return { ok: false, error: friendlyError(error.message) };
+  if (error) return { ok: false, error: esComisionFalta(error.message) ? COMISION_FALTA_MSG : friendlyError(error.message) };
   if (!data?.length) return { ok: false, error: "No tienes permiso para editar esta venta." };
   refresh(id);
   return { ok: true };
@@ -90,5 +97,27 @@ export async function cancelarVentaAction(id: string): Promise<Result> {
   if (error) return { ok: false, error: friendlyError(error.message) };
   if (!data?.length) return { ok: false, error: "No tienes permiso para cancelar esta venta." };
   refresh(id);
+  return { ok: true };
+}
+
+const comisionSchema = z.array(
+  z.object({
+    id: z.string().uuid(),
+    importe: z.union([z.null(), z.coerce.number().min(0, "Importe inválido").max(999_999_999)]),
+    comision_pct: z.union([z.null(), z.coerce.number().min(0, "El % va de 0 a 100").max(100, "El % va de 0 a 100")]),
+  }),
+).max(200);
+
+/** Importe y % de comision de cada articulo de una venta (vendedor antes de pagarla; la jefa siempre). */
+export async function comisionesVentaAction(ventaId: string, lineas: unknown): Promise<Result> {
+  await requireUser();
+  if (!uuid.safeParse(ventaId).success) return { ok: false, error: "Venta inválida" };
+  const p = comisionSchema.safeParse(lineas);
+  if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Datos inválidos" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("venta_comisiones", { p_venta: ventaId, p_lineas: p.data });
+  if (error) return { ok: false, error: /venta_comisiones|comision_pct/.test(error.message) ? "Falta correr la actualización 0072 en la base." : friendlyError(error.message) };
+  refresh(ventaId);
+  revalidatePath("/ventas/comisiones");
   return { ok: true };
 }

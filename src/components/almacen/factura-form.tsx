@@ -7,7 +7,7 @@ import { Alert, Button, Card, Field, Input, Select, Spinner } from "@/components
 import { leerFacturaXml, type FacturaLeida } from "@/lib/factura-lector";
 import { leerFacturaPdf } from "@/lib/pdf-cliente";
 
-type Linea = { clave: string; descripcion: string; unidad: string; cantidad: string; precio?: number | null; descuentoPct?: number | null; importe?: number | null };
+type Linea = { clave: string; descripcion: string; unidad: string; cantidad: string; precio?: number | null; descuentoPct?: number | null; importe?: number | null; comision?: string };
 const mx = (n: number) => n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 type Cliente = { nombre: string; razon: string; rfc: string; direccion: string; telefono: string };
 type Cobro = { total: string; moneda: "MXN" | "USD"; pago: "contado" | "credito"; dias: string; tc: string };
@@ -188,7 +188,11 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
   const clienteFinal = elegido ?? match;
   const lineasOk = lineas.length > 0 && lineas.every((l) => Number(l.cantidad) > 0);
   const ventaOk = !venta || ((!!clienteFinal || !!(cli.nombre.trim() || cli.razon.trim())) && Number(cobro.total) > 0);
-  const datosLineas = () => lineas.map((l) => ({ clave: l.clave || null, descripcion: l.descripcion, unidad: l.unidad || null, cantidad: Number(l.cantidad) }));
+  const datosLineas = () =>
+    lineas.map((l) => ({
+      clave: l.clave || null, descripcion: l.descripcion, unidad: l.unidad || null, cantidad: Number(l.cantidad),
+      ...(venta ? { importe: l.importe ?? null, comision_pct: l.comision && l.comision.trim() !== "" ? Number(l.comision) : null } : {}),
+    }));
 
   function guardar() {
     run("s", () => {
@@ -269,7 +273,21 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
               {!venta && <Field label="Cliente"><Input value={v.cliente} readOnly={!!v.cliente && fijo.folio} onChange={(e) => setV((s) => ({ ...s, cliente: e.target.value }))} className={v.cliente && fijo.folio ? FIJO_CLS : ""} /></Field>}
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-700">Artículos</p>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium text-slate-700">Artículos</p>
+                {venta && lineas.length > 1 && (
+                  <label className="flex items-center gap-1.5 text-xs text-slate-600">
+                    Mismo % de comisión para todos
+                    <input
+                      inputMode="decimal"
+                      placeholder="%"
+                      className="w-14 rounded border border-slate-300 px-2 py-1 text-right text-sm"
+                      onChange={(e) => { const p = e.target.value.replace(/[^\d.]/g, ""); setLineas((x) => x.map((y) => ({ ...y, comision: p }))); }}
+                    />
+                  </label>
+                )}
+              </div>
+              {venta && <p className="text-xs text-slate-500">El % de comisión de cada artículo lo puedes poner ahora o después, pero es obligatorio para marcar la venta como pagada.</p>}
               <ul className="divide-y divide-slate-100 rounded-md border border-slate-200">
                 {lineas.map((l, i) => {
                   const enCat = l.clave && catalogo[l.clave.toUpperCase()];
@@ -293,6 +311,20 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
                       </div>
                       <input value={l.cantidad} readOnly={!!fijo.cant[i]} onChange={(e) => setL(i, "cantidad", e.target.value.replace(/[^\d.]/g, ""))} inputMode="decimal" placeholder="Cant." className={`w-20 rounded border border-slate-300 px-2 py-1.5 text-right text-sm ${fijo.cant[i] ? FIJO_CLS : FALTA_CLS}`} aria-label="Cantidad" />
                       <span className="w-24 truncate text-xs text-slate-500">{l.unidad}</span>
+                      {venta && (
+                        <label className="flex items-center gap-1 text-xs text-slate-600" title="% de comisión de este artículo (obligatorio al marcar la venta pagada)">
+                          % com.
+                          <input
+                            value={l.comision ?? ""}
+                            onChange={(e) => setLineas((x) => x.map((y, j) => (j === i ? { ...y, comision: e.target.value.replace(/[^\d.]/g, "") } : y)))}
+                            inputMode="decimal"
+                            placeholder="0"
+                            className="w-14 rounded border border-slate-300 px-2 py-1.5 text-right text-sm"
+                            aria-label="Porcentaje de comisión"
+                          />
+                          {l.comision && l.importe != null ? <span className="w-20 tabular-nums text-slate-700">= ${mx(Math.round(l.importe * Number(l.comision)) / 100)}</span> : null}
+                        </label>
+                      )}
                       {!fijo.lineas && <button type="button" onClick={() => setLineas((x) => x.filter((_, j) => j !== i))} className="text-xs text-red-700">Quitar</button>}
                     </li>
                   );

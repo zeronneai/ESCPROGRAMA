@@ -6,7 +6,15 @@ export interface VentaLinea {
   descripcion: string;
   cantidad: number | null;
   clave?: string | null;
+  /** Importe sin IVA del articulo y su % de comision (comision = importe x %). */
+  importe?: number | null;
+  comision_pct?: number | null;
+  comision?: number | null;
 }
+
+/** Mensaje claro cuando la base no deja marcar pagada una venta sin comisiones. */
+export const COMISION_FALTA_MSG = "Antes de marcarla pagada, pon el importe y el % de comisión de cada artículo (abre la venta, sección Comisión).";
+export const esComisionFalta = (m?: string | null) => !!m && /COMISION_FALTA/.test(m);
 
 export interface VentaRow {
   id: string;
@@ -18,7 +26,7 @@ export interface VentaRow {
   factura: string | null;
   monto: number | string | null;
   moneda: "MXN" | "USD";
-  /** Pesos por dolar (solo ventas en USD; lo agrega conTipoCambio). */
+  /** Pesos por dolar que traia la factura (solo como dato). */
   tipo_cambio?: number | null;
   pago: "contado" | "credito";
   dias_credito: number | null;
@@ -96,35 +104,20 @@ export const lineaSchema = z.object({
   cantidad: z.union([z.null(), z.coerce.number().positive("Cantidad inválida").max(9_999_999)]),
 });
 
-/**
- * Monto en pesos de una venta: las de USD se multiplican por su tipo de cambio.
- * Si una venta en USD todavia no tiene tipo de cambio, regresa null (no se puede sumar).
- */
-export function montoMxn(v: { monto: number | string | null; moneda: string; tipo_cambio?: number | string | null }): number | null {
-  const m = Number(v.monto ?? 0);
-  if (v.moneda !== "USD") return m;
-  const tc = Number(v.tipo_cambio ?? 0);
-  return tc > 0 ? m * tc : null;
+/** Totales separados por moneda (pesos y dolares no se mezclan). */
+export interface PorMoneda { mxn: number; usd: number }
+export function porMoneda<T extends { moneda: string }>(l: T[], valor: (v: T) => number): PorMoneda {
+  const t = { mxn: 0, usd: 0 };
+  for (const v of l) t[v.moneda === "USD" ? "usd" : "mxn"] += valor(v);
+  return t;
 }
+export const montoPorMoneda = (l: { monto: number | string | null; moneda: string }[]) => porMoneda(l, (v) => Number(v.monto ?? 0));
+export const saldoPorMoneda = (l: Pick<VentaRow, "monto" | "porcentaje_cobrado" | "cancelada_at" | "moneda">[]) => porMoneda(l, (v) => saldo(v));
+/** "$12,000 · $500 USD" (solo pesos si no hay dolares; solo dolares si no hay pesos). */
+export const fmtMonedas = (t: PorMoneda) => (t.usd && t.mxn ? `${money(t.mxn)} · ${money(t.usd, "USD")}` : t.usd ? money(t.usd, "USD") : money(t.mxn));
 
-/** Saldo por cobrar en pesos (USD por su tipo de cambio; sin tipo de cambio se toma tal cual). */
-export function saldoMxn(v: Pick<VentaRow, "monto" | "porcentaje_cobrado" | "cancelada_at" | "moneda" | "tipo_cambio">): number {
-  const x = saldo(v);
-  return v.moneda === "USD" && v.tipo_cambio ? x * Number(v.tipo_cambio) : x;
-}
-
-/** Suma en pesos (USD convertidos) y cuantas ventas en USD se quedaron fuera por no tener tipo de cambio. */
-export function sumaMxn(l: { monto: number | string | null; moneda: string; tipo_cambio?: number | string | null }[]): { total: number; usd: number; sinTc: number } {
-  let total = 0;
-  let usd = 0;
-  let sinTc = 0;
-  for (const v of l) {
-    const x = montoMxn(v);
-    if (v.moneda === "USD") usd += 1;
-    if (x == null) sinTc += 1;
-    else total += x;
-  }
-  return { total, usd, sinTc };
-}
+/** Con centavos (para comisiones). */
+export const money2 = (n: number, m = "MXN") => `$${n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${m === "USD" ? " USD" : ""}`;
+export const fmtMonedas2 = (t: PorMoneda) => (t.usd && t.mxn ? `${money2(t.mxn)} · ${money2(t.usd, "USD")}` : t.usd ? money2(t.usd, "USD") : money2(t.mxn));
 
 export const money = (n: number, m = "MXN") => `$${n.toLocaleString("es-MX", { maximumFractionDigits: 0 })}${m === "USD" ? " USD" : ""}`;

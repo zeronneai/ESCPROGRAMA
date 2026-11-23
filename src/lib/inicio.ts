@@ -6,8 +6,7 @@ import { DateTime } from "luxon";
 import type { IconName } from "@/components/icons";
 import type { Rol } from "@/lib/auth/route-guard";
 import { fmtTotales, totalesPorMoneda } from "@/lib/pagos";
-import { cobroEstado, money, saldoMxn, sumaMxn, type VentaRow } from "@/lib/ventas";
-import { conTipoCambio } from "@/lib/ventas-server";
+import { cobroEstado, fmtMonedas, money, montoPorMoneda, saldoPorMoneda, type VentaRow } from "@/lib/ventas";
 
 /**
  * Tablero de inicio por puesto: avisos urgentes arriba y tarjetas por seccion.
@@ -132,29 +131,30 @@ async function ventas(c: Ctx, propias: boolean): Promise<Bloque> {
   let q = c.sb.from("ventas").select("id, vendedor_id, fecha, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at, entregado, tipo").is("cancelada_at", null);
   if (propias) q = q.eq("vendedor_id", c.uid);
   const { data } = await q.or(`fecha.gte.${mesIni},porcentaje_cobrado.lt.100`).limit(20000);
-  const all = await conTipoCambio(c.sb, (data ?? []) as unknown as (VentaRow & { entregado: boolean })[]);
+  const all = (data ?? []) as unknown as (VentaRow & { entregado: boolean })[];
   const vs = all.filter((v) => v.tipo !== "visita");
   const mes = vs.filter((v) => v.fecha >= mesIni);
   const hoy = vs.filter((v) => v.fecha === c.today);
   const visitas = all.filter((v) => v.tipo === "visita" && v.fecha >= mesIni).length;
-  const mxn = (l: VentaRow[]) => sumaMxn(l).total;
+  const mxn = (l: VentaRow[]) => fmtMonedas(montoPorMoneda(l));
   const vencidas = vs.filter((v) => cobroEstado(v, c.today) === "vencida");
-  const carteraVencida = vencidas.reduce((a, v) => a + saldoMxn(v), 0);
-  const porCobrar = vs.filter((v) => cobroEstado(v, c.today) === "por_cobrar").reduce((a, v) => a + saldoMxn(v), 0);
+  const cv = saldoPorMoneda(vencidas);
+  const carteraVencida = cv.mxn + cv.usd;
+  const porCobrar = fmtMonedas(saldoPorMoneda(vs.filter((v) => cobroEstado(v, c.today) === "por_cobrar")));
   const porEntregar = vs.filter((v) => !v.entregado).length;
   const href = propias ? "/vendedor/bitacora" : "/ventas";
   const alertas: Alerta[] = [];
-  if (vencidas.length) alertas.push({ texto: `Cartera vencida: ${money(carteraVencida)} en ${vencidas.length} venta(s)`, href: propias ? "/vendedor/bitacora?ver=vencidas" : "/ventas", tono: "red" });
+  if (vencidas.length) alertas.push({ texto: `Cartera vencida: ${fmtMonedas(cv)} en ${vencidas.length} venta(s)`, href: propias ? "/vendedor/bitacora?ver=vencidas" : "/ventas", tono: "red" });
   if (propias && !hoy.length && DateTime.now().setZone(c.tz).hour >= 12) alertas.push({ texto: "Aún no registras ventas ni visitas hoy", href: "/vendedor/bitacora", tono: "amber" });
   return {
     alertas,
     seccion: {
       id: "ventas", titulo: propias ? "Mis ventas" : "Ventas del equipo", icon: "target", href,
       metricas: [
-        { label: "Vendido en el mes", valor: money(mxn(mes)), hint: `${mes.length} venta(s) · ${visitas} visita(s) sin venta` },
-        { label: "Ventas hoy", valor: hoy.length, hint: hoy.length ? money(mxn(hoy)) : undefined, tono: hoy.length ? "green" : "default" },
-        { label: "Cartera vencida", valor: money(carteraVencida), tono: carteraVencida > 0 ? "red" : "green" },
-        { label: "Por cobrar al corriente", valor: money(porCobrar) },
+        { label: "Vendido en el mes", valor: mxn(mes), hint: `${mes.length} venta(s) · ${visitas} visita(s) sin venta` },
+        { label: "Ventas hoy", valor: hoy.length, hint: hoy.length ? mxn(hoy) : undefined, tono: hoy.length ? "green" : "default" },
+        { label: "Cartera vencida", valor: fmtMonedas(cv), tono: carteraVencida > 0 ? "red" : "green" },
+        { label: "Por cobrar al corriente", valor: porCobrar },
         { label: "Por entregar", valor: porEntregar, tono: tonoSi(porEntregar) },
       ],
     },

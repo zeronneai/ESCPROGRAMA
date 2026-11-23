@@ -8,8 +8,7 @@ import { requireSalesViewer } from "@/lib/auth/sales";
 import { BITACORA_SELECT } from "@/lib/bitacora/queries";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
-import { cobroEstado, money, saldo, saldoMxn, sumaMxn, VENTA_COLS } from "@/lib/ventas";
-import { conTipoCambio } from "@/lib/ventas-server";
+import { cobroEstado, fmtMonedas, montoPorMoneda, saldoPorMoneda, VENTA_COLS } from "@/lib/ventas";
 
 type Tab = "ventas" | "prospeccion" | "solicitudes";
 
@@ -40,13 +39,13 @@ export default async function VendedorVentas({ params, searchParams }: { params:
     supabase.from("ventas").select(`${VENTA_COLS}, customers(nombre), venta_lineas(descripcion, cantidad)`).eq("vendedor_id", id).order("fecha", { ascending: false }).order("created_at", { ascending: false }).limit(500),
   ]);
   const all = (b ?? []) as unknown as BitacoraListRow[];
-  const ventas = await conTipoCambio(supabase, (vs ?? []) as unknown as VentaListRow[]);
+  const ventas = (vs ?? []) as unknown as VentaListRow[];
   const vivas = ventas.filter((v) => !v.cancelada_at && v.tipo !== "visita");
   const visitasMes = ventas.filter((v) => !v.cancelada_at && v.tipo === "visita" && v.fecha >= now.startOf("month").toISODate()!);
   const prospeccion = all;
   const rows = prospeccion.filter((r) => (ver === "todos" ? true : ver === "cerrados" ? r.resultado !== "abierta" : r.resultado === "abierta"));
   const seguimientos = all.filter((r) => r.resultado === "abierta" && r.proximo_seguimiento && r.proximo_seguimiento < today).length;
-  const cartera = vivas.filter((v) => cobroEstado(v, today) === "vencida").reduce((a, v) => a + saldoMxn(v), 0);
+  const cartera = saldoPorMoneda(vivas.filter((v) => cobroEstado(v, today) === "vencida"));
   const hoyV = vivas.filter((v) => v.fecha === today);
   const mesV = vivas.filter((v) => v.fecha >= now.startOf("month").toISODate()!);
   const ventaRows = sp.ver === "todas" ? ventas : sp.ver === "vencidas" ? vivas.filter((v) => cobroEstado(v, today) === "vencida") : ventas.filter((v) => v.fecha >= now.startOf("month").toISODate()!);
@@ -65,10 +64,10 @@ export default async function VendedorVentas({ params, searchParams }: { params:
       />
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <StatCard label="Ventas hoy" value={hoyV.length} tone={hoyV.length || movHoy ? "green" : "amber"} hint={`${movHoy ?? 0} movimiento(s) de prospección`} />
-        <StatCard label="Ventas del mes" value={mesV.length} hint={`${money(sumaMxn(mesV).total)} · ${visitasMes.length} visita(s) sin venta`} />
+        <StatCard label="Ventas del mes" value={mesV.length} hint={`${fmtMonedas(montoPorMoneda(mesV))} · ${visitasMes.length} visita(s) sin venta`} />
         <StatCard label="Prospectos activos" value={prospeccion.filter((r) => r.resultado === "abierta").length} />
         <StatCard label="Seguimientos vencidos" value={seguimientos} tone={seguimientos ? "red" : "default"} />
-        <StatCard label="Cartera vencida" value={money(cartera)} tone={cartera ? "red" : "default"} />
+        <StatCard label="Cartera vencida" value={fmtMonedas(cartera)} tone={cartera.mxn || cartera.usd ? "red" : "default"} />
       </div>
 
       <div className="flex gap-1 rounded-lg bg-slate-100 p-1 text-sm font-medium sm:inline-flex">

@@ -8,8 +8,6 @@ import { ALMACEN, SUBEN_FACTURA, type TipoRecepcion } from "@/lib/almacen";
 import { friendlyError } from "@/lib/quotes/server";
 import { almacenVentasActivo } from "@/lib/almacen-ventas";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { asegurarTiposCambio } from "@/lib/tipo-cambio";
 import type { Result } from "./requests";
 
 const uuid = z.string().uuid();
@@ -57,6 +55,9 @@ const lineaSalida = z.object({
   descripcion: z.string().trim().max(500).default(""),
   unidad: z.string().trim().max(60).nullable().default(null),
   cantidad: z.coerce.number({ message: "Cantidad inválida" }).positive("Escribe la cantidad de cada partida").max(100000),
+  // Venta: importe sin IVA del renglon y % de comision (opcional al registrar; obligatorio al marcarla pagada).
+  importe: z.coerce.number().min(0).max(999_999_999).nullable().optional(),
+  comision_pct: z.coerce.number().min(0, "El % de comisión va de 0 a 100").max(100, "El % de comisión va de 0 a 100").nullable().optional(),
 });
 const salidaSchema = z.object({
   folio: z.string().trim().min(1, "Escribe el folio de la factura").max(40),
@@ -278,11 +279,8 @@ export async function ventaDesdeFacturaAction(fd: FormData): Promise<Result<{ id
   }
   if (aNombreDe) revalidatePath(`/ventas/vendedor/${aNombreDe}`);
   const r = data as { venta_id: string };
-  // Venta en dolares: el tipo de cambio de la factura; si no lo trae, el del dia (se baja de internet).
-  if (p.data.moneda === "USD") {
-    if (p.data.tipo_cambio) await supabase.rpc("venta_tipo_cambio_factura", { p_venta: r.venta_id, p_tc: p.data.tipo_cambio });
-    else await asegurarTiposCambio(createAdminClient());
-  }
+  // Venta en dolares: se guarda el tipo de cambio que trae la factura (solo como dato; los totales no se convierten).
+  if (p.data.moneda === "USD" && p.data.tipo_cambio) await supabase.rpc("venta_tipo_cambio_factura", { p_venta: r.venta_id, p_tc: p.data.tipo_cambio });
   revalidatePath("/vendedor/bitacora");
   revalidatePath("/entregas");
   return { ok: true, id: r.venta_id };

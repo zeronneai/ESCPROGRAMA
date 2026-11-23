@@ -67,6 +67,7 @@ const NAV: Record<Rol, NavItem[]> = {
   ],
   jefe_ventas: [
     { href: "/ventas", label: "Resumen", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
+    { href: "/ventas/comisiones", label: "Comisiones", icon: "dollar" },
     { href: "/vendedor/bitacora", label: "Mi bitácora", short: "Bitácora", icon: "target" },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/ventas/clientes", label: "Clientes", icon: "building" },

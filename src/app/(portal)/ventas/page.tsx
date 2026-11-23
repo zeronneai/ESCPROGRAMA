@@ -3,9 +3,9 @@ import { DateTime } from "luxon";
 import { Card, EmptyState, FilterChip, PageHeader, StatCard } from "@/components/ui";
 import { requireSalesViewer } from "@/lib/auth/sales";
 import { getBusinessSettings } from "@/lib/quotes/server";
-import { conTipoCambio } from "@/lib/ventas-server";
 import { PERIODS, periodRange, summarizeSellers, totals, type Period, type SummaryBitacora, type SummaryVenta } from "@/lib/stats/sales-summary";
 import { createClient } from "@/lib/supabase/server";
+import { fmtMonedas } from "@/lib/ventas";
 
 const money = (n: number) => `$${Math.round(n).toLocaleString("es-MX")}`;
 
@@ -57,7 +57,7 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
     requests: (requests.data ?? []) as { vendedor_id: string; submitted_at: string }[],
     issues: issues.data ?? [],
     bitacora: (bitacora.data ?? []) as unknown as SummaryBitacora[],
-    ventas: await conTipoCambio(supabase, (ventas.data ?? []) as unknown as (SummaryVenta & { id: string })[]),
+    ventas: (ventas.data ?? []) as unknown as SummaryVenta[],
     conversions: conversions.data ?? [],
     events: events.data ?? [],
     fromDate: from.toISODate()!,
@@ -82,10 +82,10 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="Solicitudes a compras" value={t.solicitudes} />
         <StatCard label="Cotizaciones enviadas" value={t.cotizacionesEnviadas} />
-        <StatCard label="Ventas" value={t.ventas} tone={t.ventas ? "green" : "default"} hint={t.montoVentas ? `${money(t.montoVentas)} MXN` : undefined} />
+        <StatCard label="Ventas" value={t.ventas} tone={t.ventas ? "green" : "default"} hint={t.montoVentas || t.montoVentasUsd ? fmtMonedas({ mxn: t.montoVentas, usd: t.montoVentasUsd }) : undefined} />
         <StatCard label="Prospectos activos" value={t.prospectosActivos} hint={`${t.prospectosNuevos} nuevos`} />
         <StatCard label="Prospectos que se volvieron clientes" value={t.convertidos} tone={t.convertidos ? "green" : "default"} />
-        <StatCard label="Cartera vencida" value={money(t.carteraVencida)} tone={t.carteraVencida > 0 ? "red" : "default"} hint={t.porCobrar ? `${money(t.porCobrar)} por cobrar al corriente` : undefined} />
+        <StatCard label="Cartera vencida" value={fmtMonedas({ mxn: t.carteraVencida, usd: t.carteraVencidaUsd })} tone={t.carteraVencida > 0 || t.carteraVencidaUsd > 0 ? "red" : "default"} hint={t.porCobrar || t.porCobrarUsd ? `${fmtMonedas({ mxn: t.porCobrar, usd: t.porCobrarUsd })} por cobrar al corriente` : undefined} />
       </div>
 
       {periodo !== "mes_anterior" && sinBitacoraHoy.length > 0 && (
@@ -127,11 +127,11 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
                     <td className="px-3 py-2.5 text-right tabular-nums">{r.solicitudes}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{r.cotizacionesEnviadas}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{r.ventas}{r.conversion !== null && <span className="ml-1 text-xs text-slate-400" title="Cotizaciones que terminaron en venta">{r.conversion}%</span>}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{r.montoVentas ? money(r.montoVentas) : "-"}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{r.porCobrar ? money(r.porCobrar) : "-"}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">{r.montoVentas || r.montoVentasUsd ? fmtMonedas({ mxn: r.montoVentas, usd: r.montoVentasUsd }) : "-"}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">{r.porCobrar || r.porCobrarUsd ? fmtMonedas({ mxn: r.porCobrar, usd: r.porCobrarUsd }) : "-"}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{r.prospectosActivos}{r.prospectosNuevos > 0 && <span className="ml-1 text-xs text-green-700">+{r.prospectosNuevos}</span>}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{r.convertidos}</td>
-                    <td className={`px-3 py-2.5 text-right tabular-nums ${r.carteraVencida ? "text-red-700" : ""}`}>{r.carteraVencida ? money(r.carteraVencida) : "-"}</td>
+                    <td className={`px-3 py-2.5 text-right tabular-nums ${r.carteraVencida ? "text-red-700" : ""}`}>{r.carteraVencida || r.carteraVencidaUsd ? fmtMonedas({ mxn: r.carteraVencida, usd: r.carteraVencidaUsd }) : "-"}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{r.movimientos}</td>
                     <td className="px-4 py-2.5 text-xs text-slate-500">{r.ultimaActividad ? DateTime.fromISO(r.ultimaActividad).setZone(cfg.timezone).setLocale("es-MX").toRelative() : "Nunca"}</td>
                   </tr>
@@ -162,10 +162,10 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
                     </div>
                   ))}
                 </dl>
-                {(r.montoVentas > 0 || r.carteraVencida > 0 || r.seguimientosVencidos > 0) && (
+                {(r.montoVentas > 0 || r.montoVentasUsd > 0 || r.carteraVencida > 0 || r.carteraVencidaUsd > 0 || r.seguimientosVencidos > 0) && (
                   <p className="mt-2 text-xs text-slate-600">
-                    {r.montoVentas > 0 && <>Vendido {money(r.montoVentas)} MXN </>}
-                    {r.carteraVencida > 0 && <span className="text-red-700">· Cartera {money(r.carteraVencida)} </span>}
+                    {(r.montoVentas > 0 || r.montoVentasUsd > 0) && <>Vendido {fmtMonedas({ mxn: r.montoVentas, usd: r.montoVentasUsd })} </>}
+                    {(r.carteraVencida > 0 || r.carteraVencidaUsd > 0) && <span className="text-red-700">· Cartera {fmtMonedas({ mxn: r.carteraVencida, usd: r.carteraVencidaUsd })} </span>}
                     {r.seguimientosVencidos > 0 && <span className="text-red-700">· {r.seguimientosVencidos} seguimiento(s) vencido(s)</span>}
                   </p>
                 )}
@@ -188,7 +188,7 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
         </Card>
       )}
       <p className="text-xs text-slate-500">
-        Ventas y monto salen de Ventas diarias del periodo; el % junto a ventas es cuántas cotizaciones enviadas terminaron en venta. Los montos en USD se suman en pesos con el tipo de cambio de cada factura (o el oficial de su fecha). Prospectos, por cobrar y cartera vencida son al día de hoy.
+        Ventas y monto salen de Ventas diarias del periodo; el % junto a ventas es cuántas cotizaciones enviadas terminaron en venta. Pesos y dólares se muestran por separado (no se convierten). Prospectos, por cobrar y cartera vencida son al día de hoy.
       </p>
     </div>
   );

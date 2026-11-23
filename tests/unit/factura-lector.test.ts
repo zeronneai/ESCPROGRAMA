@@ -187,11 +187,13 @@ describe("tipo de cambio impreso en la factura", () => {
   });
 });
 
-describe("ventas en dolares sumadas en pesos", () => {
-  it("multiplica por su tipo de cambio y aparta las que no lo tienen", async () => {
-    const { sumaMxn, montoMxn } = await import("@/lib/ventas");
-    expect(montoMxn({ monto: 100, moneda: "USD", tipo_cambio: 18.5 })).toBe(1850);
-    expect(montoMxn({ monto: 100, moneda: "USD" })).toBeNull();
-    expect(sumaMxn([{ monto: 1000, moneda: "MXN" }, { monto: 100, moneda: "USD", tipo_cambio: 18 }, { monto: 5, moneda: "USD", tipo_cambio: null }])).toEqual({ total: 2800, usd: 2, sinTc: 1 });
+describe("ventas en pesos y dolares por separado", () => {
+  it("no mezcla monedas", async () => {
+    const { montoPorMoneda, fmtMonedas } = await import("@/lib/ventas");
+    const t = montoPorMoneda([{ monto: 1000, moneda: "MXN" }, { monto: 100, moneda: "USD" }, { monto: 50, moneda: "USD" }]);
+    expect(t).toEqual({ mxn: 1000, usd: 150 });
+    expect(fmtMonedas(t)).toBe("$1,000 · $150 USD");
+    expect(fmtMonedas({ mxn: 0, usd: 20 })).toBe("$20 USD");
+    expect(fmtMonedas({ mxn: 5, usd: 0 })).toBe("$5");
   });
 });

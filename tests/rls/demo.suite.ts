@@ -82,6 +82,9 @@ export function ventasSuite() {
       expect((await q(w.seller2, "select id from public.ventas where id=$1", [v.id])).rowCount).toBe(0);
       expect(await failure(q(w.seller2, "insert into public.venta_lineas (venta_id, descripcion) values ($1,'x')", [v.id]))).toMatch(/row-level security/);
       expect((await q(w.buyer1, "select id from public.ventas where id=$1", [v.id])).rowCount).toBe(1);
+      // Para marcarla pagada lleva su comision por articulo
+      const lin = (await q(w.seller1, "select id from public.venta_lineas where venta_id=$1", [v.id])).rows[0].id;
+      await q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v.id, JSON.stringify([{ id: lin, importe: 862.07, comision_pct: 3 }])]);
       await q(w.seller1, "update public.ventas set entregado=true, porcentaje_cobrado=100 where id=$1", [v.id]);
       expect((await q(w.seller1, "select fecha_entrega is not null as e, fecha_cobro is not null as c from public.ventas where id=$1", [v.id])).rows[0]).toEqual({ e: true, c: true });
       await q(w.seller1, "update public.ventas set cancelada_at=now() where id=$1", [v.id]);

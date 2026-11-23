@@ -1,11 +1,9 @@
 -- =============================================================================
 -- 0071_tipo_cambio_ventas.sql   (requiere 0070 ya aplicado)
--- Las ventas en dolares cuentan en los totales en pesos.
---   * Cada venta en USD guarda su tipo de cambio.
---   * Si la factura trae el tipo de cambio (PDF "Tipo de cambio: 18.2345" o el XML), se usa ese.
---   * Si no, se usa el tipo de cambio oficial del dia de la factura: el que publica el DOF ese dia
---     (FIX de Banxico del dia habil anterior). El portal lo baja solo de internet cada dia.
---   * Las ventas en USD que ya estan subidas se llenan solas en cuanto el portal baja los tipos de cambio.
+-- Tipo de cambio de las ventas en dolares (solo como dato: los totales del portal muestran
+-- pesos y dolares por separado, sin convertir).
+--   * Si la factura trae el tipo de cambio (PDF o XML), se guarda ese.
+--   * Si no, queda el oficial de la fecha de la factura (tabla de tipos de cambio diarios).
 -- Como aplicarlo: pega este archivo COMPLETO en SQL Editor y presiona Run.
 -- =============================================================================
 begin;

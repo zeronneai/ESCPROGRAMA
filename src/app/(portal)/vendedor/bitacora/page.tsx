@@ -9,8 +9,7 @@ import { PROSPECT_GROUPS, prospectGroup } from "@/lib/bitacora/stages";
 import { BITACORA_SELECT } from "@/lib/bitacora/queries";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
-import { cobroEstado, money, saldo, saldoMxn, sumaMxn, VENTA_COLS } from "@/lib/ventas";
-import { conTipoCambio } from "@/lib/ventas-server";
+import { cobroEstado, fmtMonedas, montoPorMoneda, saldoPorMoneda, VENTA_COLS } from "@/lib/ventas";
 
 const VENTA_VIEWS = { hoy: "Hoy", semana: "Esta semana", mes: "Este mes", por_cobrar: "Por cobrar", vencidas: "Vencidas", por_entregar: "Por entregar", visitas: "Visitas sin venta", todas: "Todas" } as const;
 type VentaView = keyof typeof VENTA_VIEWS;
@@ -33,7 +32,7 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
     supabase.from("customers").select("id", { count: "exact", head: true }).eq("convertido_por", user.id).gte("convertido_at", now.startOf("month").toUTC().toISO()!),
   ]);
   const error = ventasQ.error ?? bitQ.error;
-  const ventas = await conTipoCambio(supabase, (ventasQ.data ?? []) as unknown as VentaListRow[]);
+  const ventas = (ventasQ.data ?? []) as unknown as VentaListRow[];
   const vivas = ventas.filter((v) => !v.cancelada_at && v.tipo !== "visita");
   const visitas = ventas.filter((v) => !v.cancelada_at && v.tipo === "visita");
   const allBit = ((bitQ.data ?? []) as unknown as BitacoraListRow[]).filter((r) => !r.archived_at);
@@ -42,8 +41,8 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
 
   const hoy = vivas.filter((v) => v.fecha === today);
   const mes = vivas.filter((v) => v.fecha >= monthStart);
-  // Las ventas en USD se suman en pesos con su tipo de cambio.
-  const sum = (l: VentaListRow[]) => sumaMxn(l).total;
+  // Pesos y dolares en cuentas separadas.
+  const sum = (l: VentaListRow[]) => fmtMonedas(montoPorMoneda(l));
   const porCobrar = vivas.filter((v) => cobroEstado(v, today) === "por_cobrar");
   const vencidas = vivas.filter((v) => cobroEstado(v, today) === "vencida");
   const porEntregar = vivas.filter((v) => !v.entregado);
@@ -123,10 +122,10 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
       {tab === "ventas" ? (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            <StatCard label="Ventas hoy" value={hoy.length} tone={ventasHoyMov ? "green" : "amber"} hint={hoy.length ? money(sum(hoy)) : "Aún no registras ventas hoy"} />
-            <StatCard label="Ventas del mes" value={mes.length} hint={`${money(sum(mes))} · ${visitas.filter((v) => v.fecha >= monthStart).length} visita(s) sin venta`} />
-            <StatCard label="Por cobrar" value={money(porCobrar.reduce((a, v) => a + saldoMxn(v), 0))} hint={`${porCobrar.length} venta(s)`} />
-            <StatCard label="Cartera vencida" value={money(vencidas.reduce((a, v) => a + saldoMxn(v), 0))} tone={vencidas.length ? "red" : "default"} hint={`${vencidas.length} venta(s)`} />
+            <StatCard label="Ventas hoy" value={hoy.length} tone={ventasHoyMov ? "green" : "amber"} hint={hoy.length ? sum(hoy) : "Aún no registras ventas hoy"} />
+            <StatCard label="Ventas del mes" value={mes.length} hint={`${sum(mes)} · ${visitas.filter((v) => v.fecha >= monthStart).length} visita(s) sin venta`} />
+            <StatCard label="Por cobrar" value={fmtMonedas(saldoPorMoneda(porCobrar))} hint={`${porCobrar.length} venta(s)`} />
+            <StatCard label="Cartera vencida" value={fmtMonedas(saldoPorMoneda(vencidas))} tone={vencidas.length ? "red" : "default"} hint={`${vencidas.length} venta(s)`} />
             <StatCard label="Por entregar" value={porEntregar.length} tone={porEntregar.length ? "amber" : "default"} />
           </div>
           <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0">

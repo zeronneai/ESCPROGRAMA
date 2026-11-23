@@ -4,7 +4,7 @@ import Link from "next/link";
 import { quickVentaAction } from "@/actions/ventas";
 import { Chip, useRun } from "@/components/ops-ui";
 import { Alert, EmptyState } from "@/components/ui";
-import { cobroEstado, diasVencidos, money, saldo, sumaMxn, type VentaRow } from "@/lib/ventas";
+import { cobroEstado, COMISION_FALTA_MSG, diasVencidos, fmtMonedas, money, montoPorMoneda, saldo, type VentaRow } from "@/lib/ventas";
 
 export type VentaListRow = VentaRow & {
   customers: { nombre: string } | null;
@@ -20,7 +20,7 @@ const dayLabel = (d: string, today: string) => {
 };
 
 export function VentasList({ rows, today, basePath, editable, showSeller = false }: { rows: VentaListRow[]; today: string; basePath: string; editable: boolean; showSeller?: boolean }) {
-  const { run, busy, notice } = useRun();
+  const { run, busy, notice, router } = useRun();
   if (rows.length === 0) return <EmptyState title="Sin ventas en esta vista" />;
   const days = [...new Set(rows.map((r) => r.fecha))];
   return (
@@ -29,12 +29,13 @@ export function VentasList({ rows, today, basePath, editable, showSeller = false
       {days.map((d) => {
         const list = rows.filter((r) => r.fecha === d);
         const nVis = list.filter((r) => r.tipo === "visita").length;
-        const total = sumaMxn(list.filter((r) => !r.cancelada_at && r.tipo !== "visita")).total;
+        const tot = montoPorMoneda(list.filter((r) => !r.cancelada_at && r.tipo !== "visita"));
+        const total = tot.mxn || tot.usd ? fmtMonedas(tot) : "";
         return (
           <section key={d}>
             <div className="flex items-center justify-between border-y border-slate-100 bg-slate-50 px-4 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500 first:border-t-0">
               <span>{dayLabel(d, today)}</span>
-              <span className="normal-case tracking-normal">{list.length - nVis} venta(s){nVis ? ` · ${nVis} visita(s)` : ""}{total ? ` · ${money(total)}` : ""}</span>
+              <span className="normal-case tracking-normal">{list.length - nVis} venta(s){nVis ? ` · ${nVis} visita(s)` : ""}{total ? ` · ${total}` : ""}</span>
             </div>
             <ul className="divide-y divide-slate-100">
               {list.map((r) => {
@@ -46,7 +47,6 @@ export function VentasList({ rows, today, basePath, editable, showSeller = false
                         <span className="truncate">{r.customers?.nombre ?? "Cliente"}</span>
                         {r.tipo === "visita" && <Chip cls="bg-amber-100 text-amber-900">Visita sin venta</Chip>}
                         {r.monto != null && <span className="text-sm font-semibold text-slate-700">{money(Number(r.monto), r.moneda)}</span>}
-                        {r.moneda === "USD" && r.monto != null && r.tipo_cambio ? <span className="text-xs text-slate-500">≈ {money(Number(r.monto) * r.tipo_cambio)} (TC {r.tipo_cambio.toFixed(2)})</span> : null}
                         {r.origen === "portal" && !r.factura && <Chip cls="bg-brand-100 text-brand-900">Del portal: complétala</Chip>}
                       </p>
                       {r.tipo === "visita" ? (
@@ -80,7 +80,12 @@ export function VentasList({ rows, today, basePath, editable, showSeller = false
                                 {st === "vencida" ? `Vencida ${diasVencidos(r, today)} d · ${money(saldo(r), r.moneda)}` : `Por cobrar ${money(saldo(r), r.moneda)}`}
                               </Chip>
                               {editable && (
-                                <button type="button" disabled={!!busy} onClick={() => run(`c${r.id}`, () => quickVentaAction(r.id, { porcentaje_cobrado: 100 }))} className="rounded-full border border-slate-300 px-2.5 py-1 text-slate-700 hover:bg-slate-100">
+                                <button type="button" disabled={!!busy} onClick={() => run(`c${r.id}`, async () => {
+                                  const res = await quickVentaAction(r.id, { porcentaje_cobrado: 100 });
+                                  // Sin comision: se abre la venta en la seccion de comision.
+                                  if (!res.ok && res.error === COMISION_FALTA_MSG) router.push(`${basePath}/${r.id}?comision=1#comision`);
+                                  return res;
+                                })} className="rounded-full border border-slate-300 px-2.5 py-1 text-slate-700 hover:bg-slate-100">
                                   {busy === `c${r.id}` ? "..." : "Cobrada"}
                                 </button>
                               )}
