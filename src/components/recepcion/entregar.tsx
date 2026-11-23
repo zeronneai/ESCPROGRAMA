@@ -29,7 +29,13 @@ interface Pago {
 const hoy = () => new Date(Date.now() - 6 * 3600_000).toISOString().slice(0, 10);
 
 /** El vendedor palomea las facturas cobradas que trae y dice con que pago se cobro cada una. */
-export function EntregarFacturas({ facturas }: { facturas: FacturaDisponible[] }) {
+export interface EntregaPayload {
+  notas: string;
+  pagos: { fecha: string; monto: number; moneda: "MXN" | "USD"; forma: FormaPago; referencia: string; ventas: string[] }[];
+}
+
+/** demo: en la demostracion no se guarda en la base; se pasa la entrega a quien la simula. */
+export function EntregarFacturas({ facturas, demo }: { facturas: FacturaDisponible[]; demo?: (p: EntregaPayload) => void }) {
   const router = useRouter();
   const [pend, start] = useTransition();
   const [buscar, setBuscar] = useState("");
@@ -95,7 +101,7 @@ export function EntregarFacturas({ facturas }: { facturas: FacturaDisponible[] }
 
   const enviar = () =>
     start(async () => {
-      const r = await entregarFacturasAction({
+      const payload: EntregaPayload = {
         notas,
         pagos: pagos.map((p) => ({
           fecha: p.fecha,
@@ -105,14 +111,18 @@ export function EntregarFacturas({ facturas }: { facturas: FacturaDisponible[] }
           referencia: p.referencia,
           ventas: elegidas.filter((f) => asig[f.id] === p.key).map((f) => f.id),
         })),
-      });
-      if (!r.ok) return toast(r.error, "error");
+      };
+      if (demo) demo(payload);
+      else {
+        const r = await entregarFacturasAction(payload);
+        if (!r.ok) return toast(r.error, "error");
+      }
       toast(`Listo: entregaste ${elegidas.length} factura(s) a finanzas.`, "success");
       setSel([]);
       setPagos([]);
       setAsig({});
       setNotas("");
-      router.refresh();
+      if (!demo) router.refresh();
     });
 
   if (facturas.length === 0)

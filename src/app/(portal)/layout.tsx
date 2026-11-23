@@ -40,6 +40,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/indicadores", label: "Indicadores", icon: "chart", secondary: true },
     { href: "/comprador/usuarios", label: "Usuarios", icon: "users", secondary: true },
     { href: "/comprador/configuracion", label: "Configuración", icon: "settings", secondary: true },
+    { href: "/comprador/demo-recepcion", label: "Demo: Recepción de facturas", icon: "inbox", secondary: true },
     { href: "/comprador/auditoria", label: "Auditoría", icon: "shield", secondary: true },
     { href: "/minutas", label: "Minutas", icon: "clipboard", secondary: true },
     { href: "/documentos", label: "Documentos", icon: "list", secondary: true },

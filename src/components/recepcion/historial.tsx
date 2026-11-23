@@ -22,7 +22,12 @@ const MOTIVOS = ["No vino la factura física", "La factura física no coincide (
  * - finanzas: busca por folio, palomea Recibida o Rechaza con motivo, y anota.
  * - lectura: solo ve (jefa de ventas).
  */
-export function EntregasHistorial({ entregas, modo }: { entregas: EntregaRec[]; modo: "vendedor" | "finanzas" | "lectura" }) {
+export interface DemoHandlers {
+  revisar: (id: string, estado: "por_revisar" | "recibida" | "rechazada", motivo?: string) => void;
+  nota: (entregaId: string, texto: string) => void;
+}
+
+export function EntregasHistorial({ entregas, modo, demo }: { entregas: EntregaRec[]; modo: "vendedor" | "finanzas" | "lectura"; demo?: DemoHandlers }) {
   const router = useRouter();
   const [pend, start] = useTransition();
   const [buscar, setBuscar] = useState("");
@@ -49,22 +54,31 @@ export function EntregasHistorial({ entregas, modo }: { entregas: EntregaRec[]; 
   const revisar = (f: FacturaRec, estado: "por_revisar" | "recibida" | "rechazada", motivo?: string) => {
     setOcupado(f.id);
     start(async () => {
-      const r = await revisarFacturaAction(f.id, estado, motivo);
+      if (demo) demo.revisar(f.id, estado, motivo);
+      else {
+        const r = await revisarFacturaAction(f.id, estado, motivo);
+        if (!r.ok) {
+          setOcupado(null);
+          return toast(r.error, "error");
+        }
+      }
       setOcupado(null);
-      if (!r.ok) return toast(r.error, "error");
       if (estado === "recibida") toast(`${f.factura} recibida`, "success");
       if (estado === "rechazada") toast(`${f.factura} rechazada: le avisamos al vendedor`, "success");
       setRechazo(null);
-      router.refresh();
+      if (!demo) router.refresh();
     });
   };
   const anotar = (entregaId: string) =>
     start(async () => {
-      const r = await notaEntregaAction(entregaId, nota[entregaId] ?? "");
-      if (!r.ok) return toast(r.error, "error");
+      if (demo) demo.nota(entregaId, nota[entregaId] ?? "");
+      else {
+        const r = await notaEntregaAction(entregaId, nota[entregaId] ?? "");
+        if (!r.ok) return toast(r.error, "error");
+      }
       setNota((n) => ({ ...n, [entregaId]: "" }));
       toast("Anotación guardada", "success");
-      router.refresh();
+      if (!demo) router.refresh();
     });
   // Enter en el buscador: si solo hay una factura por revisar con ese folio, se marca recibida.
   const enter = () => {
@@ -134,7 +148,7 @@ export function EntregasHistorial({ entregas, modo }: { entregas: EntregaRec[]; 
                           <span className="shrink-0 tabular-nums text-sm text-slate-700">{money(f.monto, f.moneda)}</span>
                           {finanzas && f.estado === "por_revisar" ? (
                             <span className="flex shrink-0 gap-1.5">
-                              <Button type="button" className="bg-green-600! px-3 text-xs hover:bg-green-700!" loading={pend && ocupado === f.id} onClick={() => revisar(f, "recibida")}>✓ Recibida</Button>
+                              <button type="button" disabled={pend && ocupado === f.id} onClick={() => revisar(f, "recibida")} className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50">✓ Recibida</button>
                               <Button type="button" variant="secondary" className="px-3 text-xs text-red-700" onClick={() => setRechazo({ id: f.id, motivo: "" })}>Rechazar</Button>
                             </span>
                           ) : (
