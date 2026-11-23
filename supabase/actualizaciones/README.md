@@ -76,6 +76,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 59 | `0064_pegatron_linea_sobrepedido.sql` | Pedidos Pegatron en dos secciones: **de línea** (importación, entra a planeación de compras) y **sobrepedido** (locales o no comunes), con recuento por artículo. |
 | 60 | `0065_prospeccion_pausa_jefa_factura.sql` | **Pausa en la prospección** (no cuenta como atrasado) y **la jefa sube facturas a nombre de un vendedor** (vacaciones, etc.). |
 | 61 | `0066_prospecto_a_cliente.sql` | **El prospecto que compra sale de Prospección** (aunque la venta quede en una sucursal o lo marquen cliente a mano) y queda en el historial "Se volvieron clientes". Corrige los que ya estaban así. |
+| 62 | `0067_unir_prospecto_cliente.sql` | **Unir un prospecto con el cliente de su factura** cuando la factura salió con otro nombre (razón social) y se subió en Ventas diarias. Se queda con su nombre popular y toma RFC y razón social. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

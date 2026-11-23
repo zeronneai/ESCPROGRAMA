@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { DateTime } from "luxon";
 import { BitacoraEditor } from "@/components/bitacora-editor";
 import { PausaProspecto } from "@/components/bitacora-pausa";
+import { UnirProspecto } from "@/components/bitacora-unir";
+import { ventasCandidatas } from "@/lib/bitacora/unir";
 import { PageHeader } from "@/components/ui";
 import { requireSalesViewer } from "@/lib/auth/sales";
 import { loadBitacoraDetail } from "@/lib/bitacora/detail";
@@ -15,6 +17,8 @@ export default async function RegistroVentas({ params }: { params: Promise<{ id:
   const supabase = await createClient();
   const [d, cfg] = await Promise.all([loadBitacoraDetail(supabase, id), getBusinessSettings(supabase)]);
   if (!d) notFound();
+  const puedeUnir = user.rol === "jefe_ventas" && d.entry.resultado === "abierta" && !d.entry.archived_at && !!d.entry.vendedor_id;
+  const candidatas = puedeUnir ? await ventasCandidatas(supabase, d.entry.vendedor_id!, [d.entry.customer_id, d.customer?.id], cfg.timezone) : [];
   return (
     <div className="space-y-4">
       <Link href={d.entry.vendedor_id ? `/ventas/vendedor/${d.entry.vendedor_id}?tab=prospeccion` : "/ventas"} className="text-sm text-slate-500 hover:text-slate-800">
@@ -27,6 +31,7 @@ export default async function RegistroVentas({ params }: { params: Promise<{ id:
       {d.entry.resultado === "abierta" && !d.entry.archived_at && d.entry.vendedor_id && (
         <PausaProspecto id={d.entry.id} pausadaAt={d.entry.pausada_at ?? null} motivo={d.entry.pausa_motivo ?? null} puede={user.rol === "jefe_ventas"} />
       )}
+      {puedeUnir && <UnirProspecto bitacoraId={d.entry.id} prospecto={d.customer?.nombre ?? "el prospecto"} ventas={candidatas} />}
       <BitacoraEditor
         mode="readonly"
         entry={d.entry}

@@ -120,6 +120,31 @@ export function bitacoraSuite() {
       expect((await rpc(w.seller1, "select resultado from public.bitacora where id=$1", [id])).rows[0].resultado).toBe("ganada");
     });
 
+    it("prospecto con nombre popular: la factura salio con otro nombre y se une con esa venta", async () => {
+      const c = await newCustomer(w.seller1, w.ids.s1);
+      const id = await newEntry(w.seller1, w.ids.s1, c);
+      const folio = "U" + Math.floor(Math.random() * 1e8);
+      const datos = JSON.stringify({ folio, uuid: randomUUID(), nombre: "RAZON SOCIAL " + folio + " SA DE CV", razon_social: "RAZON SOCIAL " + folio + " SA DE CV", rfc: "EKU9003173C9", pago: "contado", total: 900, moneda: "MXN", lineas: [{ clave: null, descripcion: "Guante", cantidad: 1 }] });
+      const r = (await rpc(w.seller1, "select public.venta_desde_factura($1::jsonb) as r", [datos])).rows[0].r;
+      expect(r.cliente_nuevo).toBe(true);
+      expect((await rpc(w.seller1, "select resultado from public.bitacora where id=$1", [id])).rows[0].resultado).toBe("abierta");
+      // Otro vendedor no puede
+      expect(await failure(rpc(w.seller2, "select public.prospecto_unir_cliente($1,$2)", [id, r.customer_id]))).toMatch(/Solo el vendedor/);
+      await rpc(w.seller1, "select public.prospecto_unir_cliente($1,$2)", [id, r.customer_id]);
+      const b = (await rpc(w.seller1, "select resultado, fecha_pedido is not null as ped from public.bitacora where id=$1", [id])).rows[0];
+      expect(b).toEqual({ resultado: "ganada", ped: true });
+      const venta = (await rpc(w.seller1, "select customer_id from public.ventas where id=$1", [r.venta_id])).rows[0];
+      expect(venta.customer_id).toBe(c);
+      const cli = (await rpc("postgres", "select tipo, razon_social, rfc from public.customers where id=$1", [c])).rows[0];
+      expect(cli).toMatchObject({ tipo: "cliente", razon_social: "RAZON SOCIAL " + folio + " SA DE CV", rfc: "EKU9003173C9" });
+      const dup = (await rpc("postgres", "select activo, unido_a from public.customers where id=$1", [r.customer_id])).rows[0];
+      expect(dup).toEqual({ activo: false, unido_a: c });
+      const ev = await rpc(w.seller1, "select nota from public.bitacora_eventos where bitacora_id=$1 and tipo='estatus_cliente'", [id]);
+      expect(ev.rows.map((x) => x.nota).join("|")).toMatch(/se unió con "RAZON SOCIAL/);
+      // La siguiente factura con ese RFC ya cae en el prospecto
+      expect((await rpc("postgres", "select public.cliente_de_factura('EKU9003173C9', null, null) as id")).rows[0].id).toBe(c);
+    });
+
     it("prospecto en pausa: no corre el seguimiento; al reanudar regresa la fecha", async () => {
       const c = await newCustomer(w.seller1, w.ids.s1);
       const id = await newEntry(w.seller1, w.ids.s1, c);

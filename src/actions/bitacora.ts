@@ -107,3 +107,15 @@ export async function pausaBitacoraAction(id: string, pausar: boolean, motivo?: 
   revalidatePath("/ventas", "layout");
   return { ok: true };
 }
+
+/** Une el prospecto con el cliente de su factura (cuando la factura salio con otro nombre). */
+export async function unirProspectoAction(bitacoraId: string, clienteId: string): Promise<Result> {
+  await requireUser();
+  if (!/^[0-9a-f-]{36}$/i.test(bitacoraId) || !/^[0-9a-f-]{36}$/i.test(clienteId)) return { ok: false, error: "Datos inválidos" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("prospecto_unir_cliente", { p_bitacora: bitacoraId, p_cliente: clienteId });
+  if (error) return { ok: false, error: /prospecto_unir_cliente/.test(error.message) ? "Falta correr la actualización 0067 en la base." : friendlyError(error.message) };
+  revalidatePath("/vendedor/bitacora", "layout");
+  revalidatePath("/ventas", "layout");
+  return { ok: true };
+}

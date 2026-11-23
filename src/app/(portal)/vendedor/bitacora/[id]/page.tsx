@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { DateTime } from "luxon";
 import { BitacoraEditor } from "@/components/bitacora-editor";
 import { PausaProspecto } from "@/components/bitacora-pausa";
+import { UnirProspecto } from "@/components/bitacora-unir";
+import { ventasCandidatas } from "@/lib/bitacora/unir";
 import { PageHeader } from "@/components/ui";
 import { requireUser } from "@/lib/auth/guards";
 import { loadBitacoraDetail } from "@/lib/bitacora/detail";
@@ -16,6 +18,9 @@ export default async function RegistroBitacora({ params }: { params: Promise<{ i
   const [d, cfg] = await Promise.all([loadBitacoraDetail(supabase, id), getBusinessSettings(supabase)]);
   if (!d) notFound();
   const mode = !d.entry.vendedor_id ? "claim" : d.entry.vendedor_id === user.id ? "edit" : "readonly";
+  const abierta = d.entry.resultado === "abierta" && !d.entry.archived_at && !!d.entry.vendedor_id;
+  const puedeUnir = abierta && (mode === "edit" || user.rol === "jefe_ventas");
+  const candidatas = puedeUnir ? await ventasCandidatas(supabase, d.entry.vendedor_id!, [d.entry.customer_id, d.customer?.id], cfg.timezone) : [];
   return (
     <div className="space-y-4">
       <Link href="/vendedor/bitacora?tab=prospeccion" className="text-sm text-slate-500 hover:text-slate-800">← Prospección</Link>
@@ -26,6 +31,7 @@ export default async function RegistroBitacora({ params }: { params: Promise<{ i
       {d.entry.resultado === "abierta" && !d.entry.archived_at && d.entry.vendedor_id && (
         <PausaProspecto id={d.entry.id} pausadaAt={d.entry.pausada_at ?? null} motivo={d.entry.pausa_motivo ?? null} puede={mode === "edit" || user.rol === "jefe_ventas"} />
       )}
+      {puedeUnir && <UnirProspecto bitacoraId={d.entry.id} prospecto={d.customer?.nombre ?? "el prospecto"} ventas={candidatas} />}
       <BitacoraEditor
         jefa={user.rol === "jefe_ventas"}
         key={d.entry.updated_at}
