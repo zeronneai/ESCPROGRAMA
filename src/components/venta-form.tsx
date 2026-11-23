@@ -43,6 +43,7 @@ export function VentaForm({
     dias_credito: venta?.dias_credito != null ? String(venta.dias_credito) : "30",
     entregado: venta?.entregado ?? false,
     porcentaje_cobrado: venta ? String(Number(venta.porcentaje_cobrado)) : "0",
+    fecha_cobro: venta?.fecha_cobro ?? "",
     comentarios: venta?.comentarios ?? "",
   });
   const { run, busy, notice, router } = useRun();
@@ -219,6 +220,21 @@ export function VentaForm({
               <input value={v.porcentaje_cobrado} onChange={set("porcentaje_cobrado")} disabled={ro} inputMode="decimal" className="w-16 rounded border border-slate-300 px-2 py-1 text-sm" />
               <span className="text-xs text-slate-500">%</span>
             </div>
+            {Number(v.porcentaje_cobrado) >= 100 && (
+              <label className="mt-1 flex flex-wrap items-center gap-2 text-xs font-medium text-slate-700">
+                Fecha de pago *
+                <input
+                  type="date"
+                  value={v.fecha_cobro}
+                  max={today}
+                  min={v.fecha}
+                  disabled={ro}
+                  onChange={(e) => setV((s) => ({ ...s, fecha_cobro: e.target.value }))}
+                  className={`rounded border px-2 py-1 text-sm ${v.fecha_cobro ? "border-slate-300" : "border-amber-400 bg-amber-50"}`}
+                />
+                {!v.fecha_cobro && <span className="font-normal text-amber-800">Obligatoria para marcarla pagada</span>}
+              </label>
+            )}
           </div>
         </div>
 

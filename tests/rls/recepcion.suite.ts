@@ -11,7 +11,7 @@ const q = (actor: Actor, sql: string, params: unknown[] = []) => as(actor, (x) =
 
 async function venta(seller: Actor, customer: string, factura: string, monto: number, cobrada = true): Promise<string> {
   const id = (await q(seller, "insert into public.ventas (customer_id, monto, pago, factura) values ($1,$2,'contado',$3) returning id", [customer, monto, factura])).rows[0].id;
-  if (cobrada) await q(seller, "update public.ventas set porcentaje_cobrado=100 where id=$1", [id]);
+  if (cobrada) await q(seller, "update public.ventas set porcentaje_cobrado=100, fecha_cobro=public.local_today() where id=$1", [id]);
   return id;
 }
 
@@ -111,15 +111,15 @@ export function recepcionSuite() {
       const l1 = (await q(w.seller1, "insert into public.venta_lineas (venta_id, descripcion, cantidad) values ($1, 'Guante', 10) returning id", [v])).rows[0].id;
       const l2 = (await q(w.seller1, "insert into public.venta_lineas (venta_id, descripcion, cantidad) values ($1, 'Bata', 2) returning id", [v])).rows[0].id;
       // Sin comision no se marca pagada
-      expect(await failure(q(w.seller1, "update public.ventas set porcentaje_cobrado=100 where id=$1", [v]))).toMatch(/COMISION_FALTA/);
+      expect(await failure(q(w.seller1, "update public.ventas set porcentaje_cobrado=100, fecha_cobro=public.local_today() where id=$1", [v]))).toMatch(/COMISION_FALTA/);
       // Parcial si se puede
       await q(w.seller1, "update public.ventas set porcentaje_cobrado=50 where id=$1", [v]);
       expect(await failure(q(w.seller2, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l1, importe: 1, comision_pct: 1 }])]))).toMatch(/No autorizado/);
       expect(await failure(q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l1, importe: 600, comision_pct: 120 }])]))).toMatch(/0 a 100/);
       await q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l1, importe: 600, comision_pct: 3 }])]);
-      expect(await failure(q(w.seller1, "update public.ventas set porcentaje_cobrado=100 where id=$1", [v]))).toMatch(/COMISION_FALTA/);
+      expect(await failure(q(w.seller1, "update public.ventas set porcentaje_cobrado=100, fecha_cobro=public.local_today() where id=$1", [v]))).toMatch(/COMISION_FALTA/);
       await q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l2, importe: 400, comision_pct: 5 }])]);
-      await q(w.seller1, "update public.ventas set porcentaje_cobrado=100 where id=$1", [v]);
+      await q(w.seller1, "update public.ventas set porcentaje_cobrado=100, fecha_cobro=public.local_today() where id=$1", [v]);
       const ls = await q(w.seller1, "select comision::numeric c from public.venta_lineas where venta_id=$1 order by comision", [v]);
       expect(ls.rows.map((r) => Number(r.c))).toEqual([18, 20]);
       // Pagada: el vendedor ya no la cambia; la jefa si

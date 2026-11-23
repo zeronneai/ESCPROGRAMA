@@ -8,19 +8,27 @@ import { getBusinessSettings } from "@/lib/quotes/server";
 import { PERIODS, periodRange, type Period } from "@/lib/stats/sales-summary";
 import { createClient } from "@/lib/supabase/server";
 
-type Ver = "pagadas" | "por_cobrar";
+type Ver = "pagadas" | "por_cobrar" | "todas";
+type Campo = "pago" | "factura";
+const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+
+const fechaTxt = (d: string) => (d.startsWith("2000") || d.startsWith("2100") ? (d.startsWith("2000") ? "inicio" : "hoy") : new Date(`${d}T12:00:00`).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }));
 
 /** Comisiones por vendedor y por factura (jefa de ventas). */
-export default async function Comisiones({ searchParams }: { searchParams: Promise<{ p?: string; ver?: string }> }) {
+export default async function Comisiones({ searchParams }: { searchParams: Promise<{ p?: string; ver?: string; campo?: string; desde?: string; hasta?: string }> }) {
   await requireRoles(["jefe_ventas", "ceo", "gerente"]);
   const sp = await searchParams;
   const periodo = (PERIODS.some((x) => x.id === sp.p) ? sp.p : "mes") as Period;
-  const ver: Ver = sp.ver === "por_cobrar" ? "por_cobrar" : "pagadas";
+  const ver: Ver = sp.ver === "por_cobrar" || sp.ver === "todas" ? sp.ver : "pagadas";
+  // Por cobrar no tiene fecha de pago: se filtra por la fecha de la factura.
+  const campo: Campo = ver === "por_cobrar" || sp.campo === "factura" ? "factura" : "pago";
+  const propio = !!(sp.desde && FECHA.test(sp.desde)) || !!(sp.hasta && FECHA.test(sp.hasta));
   const supabase = await createClient();
   const cfg = await getBusinessSettings(supabase);
   const { from, to } = periodRange(periodo, DateTime.now().setZone(cfg.timezone));
-  const d0 = from.toISODate()!;
-  const d1 = to.toISODate()!;
+  const d0 = propio ? (sp.desde && FECHA.test(sp.desde) ? sp.desde : "2000-01-01") : from.toISODate()!;
+  const d1 = propio ? (sp.hasta && FECHA.test(sp.hasta) ? sp.hasta : "2100-12-31") : to.toISODate()!;
+  const col = campo === "pago" ? "fecha_cobro" : "fecha";
 
   let q = supabase
     .from("ventas")
@@ -29,7 +37,9 @@ export default async function Comisiones({ searchParams }: { searchParams: Promi
     .is("cancelada_at", null)
     .order("fecha", { ascending: false })
     .limit(5000);
-  q = ver === "pagadas" ? q.gte("porcentaje_cobrado", 100).gte("fecha_cobro", d0).lte("fecha_cobro", d1) : q.lt("porcentaje_cobrado", 100);
+  if (ver === "pagadas") q = q.gte("porcentaje_cobrado", 100);
+  if (ver === "por_cobrar") q = q.lt("porcentaje_cobrado", 100);
+  q = q.gte(col, d0).lte(col, d1);
   const [{ data, error }, { data: vends }] = await Promise.all([q, supabase.from("profiles").select("id, nombre").in("rol", ["vendedor", "jefe_ventas"])]);
   const nombres = new Map((vends ?? []).map((p) => [p.id as string, p.nombre as string]));
 
@@ -51,23 +61,45 @@ export default async function Comisiones({ searchParams }: { searchParams: Promi
     porVend.set(v.vendedor_id, g);
   }
   const vendedores = [...porVend.values()].sort((a, b) => a.nombre.localeCompare(b.nombre));
-  const qs = (x: Record<string, string>) => `/ventas/comisiones?${new URLSearchParams({ p: periodo, ver, ...x }).toString()}`;
+  const base: Record<string, string> = { p: periodo, ver, campo, ...(propio ? { desde: sp.desde ?? "", hasta: sp.hasta ?? "" } : {}) };
+  const qs = (x: Record<string, string>) => {
+    const o = { ...base, ...x };
+    // Al elegir un periodo rapido se quita el rango propio.
+    if ("p" in x) { delete o.desde; delete o.hasta; }
+    return `/ventas/comisiones?${new URLSearchParams(o).toString()}`;
+  };
 
   return (
     <div className="space-y-5">
       <Link href="/ventas" className="text-sm text-slate-500 hover:text-slate-800">← Resumen de ventas</Link>
       <PageHeader title="Comisiones" subtitle="Comisión por artículo de cada factura: importe sin IVA × %. Pesos y dólares por separado." />
       {error && <Card className="border-amber-200 bg-amber-50 text-sm text-amber-900">{/comision/.test(error.message) ? "Falta correr la actualización 0072 en la base." : error.message}</Card>}
-      <div className="flex flex-wrap gap-2">
-        <FilterChip href={qs({ ver: "pagadas" })} active={ver === "pagadas"}>Pagadas</FilterChip>
-        <FilterChip href={qs({ ver: "por_cobrar" })} active={ver === "por_cobrar"}>Por cobrar (todavía no pagadas)</FilterChip>
-        {ver === "pagadas" && (
-          <span className="ml-auto flex flex-wrap gap-2">
-            {PERIODS.map((p) => <FilterChip key={p.id} href={qs({ p: p.id })} active={periodo === p.id}>{p.label}</FilterChip>)}
-          </span>
-        )}
-      </div>
-      <p className="text-xs text-slate-500">{ver === "pagadas" ? "Ventas cobradas al 100% en el periodo (por fecha de cobro)." : "Ventas registradas que todavía no se cobran al 100%: su comisión puede cambiar."}</p>
+      <Card className="space-y-3 p-4">
+        <div className="flex flex-wrap gap-2">
+          <FilterChip href={qs({ ver: "pagadas" })} active={ver === "pagadas"}>Pagadas</FilterChip>
+          <FilterChip href={qs({ ver: "por_cobrar" })} active={ver === "por_cobrar"}>Por cobrar</FilterChip>
+          <FilterChip href={qs({ ver: "todas" })} active={ver === "todas"}>Todas</FilterChip>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="text-slate-600">Filtrar por:</span>
+          {ver !== "por_cobrar" && <FilterChip href={qs({ campo: "pago" })} active={campo === "pago"}>Fecha de pago</FilterChip>}
+          <FilterChip href={qs({ campo: "factura" })} active={campo === "factura"}>Fecha de la factura</FilterChip>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {PERIODS.map((p) => <FilterChip key={p.id} href={qs({ p: p.id })} active={!propio && periodo === p.id}>{p.label}</FilterChip>)}
+        </div>
+        <form method="get" className="flex flex-wrap items-end gap-2 text-sm">
+          <input type="hidden" name="ver" value={ver} />
+          <input type="hidden" name="campo" value={campo} />
+          <label className="text-xs font-medium text-slate-600">Desde<input type="date" name="desde" defaultValue={propio ? sp.desde : d0} className="block rounded border border-slate-300 px-2 py-1.5 text-sm" /></label>
+          <label className="text-xs font-medium text-slate-600">Hasta<input type="date" name="hasta" defaultValue={propio ? sp.hasta : d1} className="block rounded border border-slate-300 px-2 py-1.5 text-sm" /></label>
+          <button type="submit" className="rounded-md bg-slate-800 px-3 py-1.5 font-medium text-white">Filtrar</button>
+        </form>
+        <p className="text-xs text-slate-500">
+          {ver === "pagadas" ? "Ventas cobradas al 100%" : ver === "por_cobrar" ? "Ventas que todavía no se cobran al 100% (su comisión puede cambiar)" : "Todas las ventas"}
+          {` con ${campo === "pago" ? "fecha de pago" : "fecha de factura"} del ${fechaTxt(d0)} al ${fechaTxt(d1)}.`}
+        </p>
+      </Card>
       <ComisionesTabla vendedores={vendedores} />
     </div>
   );

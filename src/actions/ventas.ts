@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
 import { friendlyError } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
-import { COMISION_FALTA_MSG, esComisionFalta, lineaSchema, ventaSchema, type VentaInput, type VentaLinea } from "@/lib/ventas";
+import { errorCobro, lineaSchema, ventaSchema, type VentaInput, type VentaLinea } from "@/lib/ventas";
 import type { Result } from "./requests";
 
 const uuid = z.string().uuid();
@@ -27,6 +27,7 @@ export async function saveVentaAction(id: string | null, input: VentaInput, line
   const supabase = await createClient();
   let ventaId = id;
   let cobroPendiente = 0;
+  let fechaCobro: string | null = null;
   const fila: Record<string, unknown> = visita
     ? { ...parsed.data, monto: null, pedido: null, factura: null, pago: "contado" as const, dias_credito: null, entregado: false, porcentaje_cobrado: 0 }
     : { ...parsed.data, motivo_no_venta: null };
@@ -35,12 +36,13 @@ export async function saveVentaAction(id: string | null, input: VentaInput, line
     const { tipo: _tipo, ...upd } = fila;
     void _tipo;
     const { data, error } = await supabase.from("ventas").update(upd).eq("id", id).select("id");
-    if (error) return { ok: false, error: esComisionFalta(error.message) ? COMISION_FALTA_MSG : friendlyError(error.message) };
+    if (error) return { ok: false, error: errorCobro(error.message) ?? friendlyError(error.message) };
     if (!data?.length) return { ok: false, error: "Ya no puedes editar esta venta." };
   } else {
     // Se registra sin cobro y, ya con sus articulos, se marca lo cobrado (para revisar la comision al pagarla).
     const cobro = Number(fila.porcentaje_cobrado ?? 0);
-    const { data, error } = await supabase.from("ventas").insert({ ...fila, porcentaje_cobrado: 0 }).select("id").single();
+    fechaCobro = (fila.fecha_cobro as string | null) ?? null;
+    const { data, error } = await supabase.from("ventas").insert({ ...fila, porcentaje_cobrado: 0, fecha_cobro: null }).select("id").single();
     if (error) return { ok: false, error: friendlyError(error.message) };
     ventaId = data.id;
     cobroPendiente = cobro;
@@ -63,10 +65,10 @@ export async function saveVentaAction(id: string | null, input: VentaInput, line
     if (error) return { ok: false, error: friendlyError(error.message) };
   }
   if (cobroPendiente > 0) {
-    const { error } = await supabase.from("ventas").update({ porcentaje_cobrado: cobroPendiente }).eq("id", ventaId!);
+    const { error } = await supabase.from("ventas").update({ porcentaje_cobrado: cobroPendiente, fecha_cobro: cobroPendiente >= 100 ? fechaCobro : null }).eq("id", ventaId!);
     if (error) {
       refresh(ventaId!);
-      return { ok: false, error: esComisionFalta(error.message) ? `La venta se registró, pero no como pagada. ${COMISION_FALTA_MSG}` : friendlyError(error.message) };
+      return { ok: false, error: `La venta se registró, pero no como pagada. ${errorCobro(error.message) ?? friendlyError(error.message)}` };
     }
   }
   refresh(ventaId!);
@@ -75,15 +77,19 @@ export async function saveVentaAction(id: string | null, input: VentaInput, line
 }
 
 /** Marcar rapido desde la lista: entregada o cobrada. */
-export async function quickVentaAction(id: string, patch: { entregado?: boolean; porcentaje_cobrado?: number }): Promise<Result> {
+export async function quickVentaAction(id: string, patch: { entregado?: boolean; porcentaje_cobrado?: number; fecha_cobro?: string }): Promise<Result> {
   await requireUser();
   if (!uuid.safeParse(id).success) return { ok: false, error: "Venta inválida" };
   const p: Record<string, unknown> = {};
   if (typeof patch.entregado === "boolean") p.entregado = patch.entregado;
   if (typeof patch.porcentaje_cobrado === "number" && patch.porcentaje_cobrado >= 0 && patch.porcentaje_cobrado <= 100) p.porcentaje_cobrado = patch.porcentaje_cobrado;
+  if (p.porcentaje_cobrado === 100) {
+    if (!patch.fecha_cobro || !/^\d{4}-\d{2}-\d{2}$/.test(patch.fecha_cobro)) return { ok: false, error: "Escribe la fecha en que te pagaron." };
+    p.fecha_cobro = patch.fecha_cobro;
+  }
   const supabase = await createClient();
   const { data, error } = await supabase.from("ventas").update(p).eq("id", id).select("id");
-  if (error) return { ok: false, error: esComisionFalta(error.message) ? COMISION_FALTA_MSG : friendlyError(error.message) };
+  if (error) return { ok: false, error: errorCobro(error.message) ?? friendlyError(error.message) };
   if (!data?.length) return { ok: false, error: "No tienes permiso para editar esta venta." };
   refresh(id);
   return { ok: true };

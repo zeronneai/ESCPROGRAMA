@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { quickVentaAction } from "@/actions/ventas";
 import { Chip, useRun } from "@/components/ops-ui";
 import { Alert, EmptyState } from "@/components/ui";
@@ -21,6 +22,7 @@ const dayLabel = (d: string, today: string) => {
 
 export function VentasList({ rows, today, basePath, editable, showSeller = false }: { rows: VentaListRow[]; today: string; basePath: string; editable: boolean; showSeller?: boolean }) {
   const { run, busy, notice, router } = useRun();
+  const [pagando, setPagando] = useState<{ id: string; fecha: string } | null>(null);
   if (rows.length === 0) return <EmptyState title="Sin ventas en esta vista" />;
   const days = [...new Set(rows.map((r) => r.fecha))];
   return (
@@ -79,16 +81,31 @@ export function VentasList({ rows, today, basePath, editable, showSeller = false
                               <Chip cls={st === "vencida" ? "bg-red-100 text-red-800" : "bg-amber-100 text-amber-900"}>
                                 {st === "vencida" ? `Vencida ${diasVencidos(r, today)} d · ${money(saldo(r), r.moneda)}` : `Por cobrar ${money(saldo(r), r.moneda)}`}
                               </Chip>
-                              {editable && (
-                                <button type="button" disabled={!!busy} onClick={() => run(`c${r.id}`, async () => {
-                                  const res = await quickVentaAction(r.id, { porcentaje_cobrado: 100 });
-                                  // Sin comision: se abre la venta en la seccion de comision.
-                                  if (!res.ok && res.error === COMISION_FALTA_MSG) router.push(`${basePath}/${r.id}?comision=1#comision`);
-                                  return res;
-                                })} className="rounded-full border border-slate-300 px-2.5 py-1 text-slate-700 hover:bg-slate-100">
-                                  {busy === `c${r.id}` ? "..." : "Cobrada"}
+                              {editable && (pagando?.id === r.id ? (
+                                <span className="flex flex-wrap items-center gap-1.5 rounded-full border border-green-600 bg-green-50 px-2 py-0.5">
+                                  <span className="text-green-900">¿Cuándo te pagaron?</span>
+                                  <input type="date" value={pagando.fecha} max={today} min={r.fecha} onChange={(e) => setPagando({ id: r.id, fecha: e.target.value })} className="rounded border border-slate-300 px-1.5 py-0.5 text-xs" aria-label="Fecha de pago" />
+                                  <button
+                                    type="button"
+                                    disabled={!!busy || !pagando.fecha}
+                                    onClick={() => run(`c${r.id}`, async () => {
+                                      const res = await quickVentaAction(r.id, { porcentaje_cobrado: 100, fecha_cobro: pagando.fecha });
+                                      // Sin comision: se abre la venta en la seccion de comision.
+                                      if (!res.ok && res.error === COMISION_FALTA_MSG) router.push(`${basePath}/${r.id}?comision=1#comision`);
+                                      if (res.ok) setPagando(null);
+                                      return res;
+                                    })}
+                                    className="rounded-full bg-green-600 px-2.5 py-0.5 font-semibold text-white disabled:opacity-50"
+                                  >
+                                    {busy === `c${r.id}` ? "..." : "Marcar pagada"}
+                                  </button>
+                                  <button type="button" onClick={() => setPagando(null)} className="text-slate-500">✕</button>
+                                </span>
+                              ) : (
+                                <button type="button" disabled={!!busy} onClick={() => setPagando({ id: r.id, fecha: "" })} className="rounded-full border border-slate-300 px-2.5 py-1 text-slate-700 hover:bg-slate-100">
+                                  Cobrada
                                 </button>
-                              )}
+                              ))}
                             </>
                           )}
                         </>

@@ -15,6 +15,13 @@ export interface VentaLinea {
 /** Mensaje claro cuando la base no deja marcar pagada una venta sin comisiones. */
 export const COMISION_FALTA_MSG = "Antes de marcarla pagada, pon el importe y el % de comisión de cada artículo (abre la venta, sección Comisión).";
 export const esComisionFalta = (m?: string | null) => !!m && /COMISION_FALTA/.test(m);
+/** Errores de la base al marcar pagada, en palabras claras. */
+export function errorCobro(m: string): string | null {
+  if (/COMISION_FALTA/.test(m)) return COMISION_FALTA_MSG;
+  if (/FECHA_PAGO_FALTA/.test(m)) return "Escribe la fecha en que te pagaron.";
+  const x = m.match(/FECHA_PAGO_MAL:\s*(.*)/);
+  return x ? x[1] : null;
+}
 
 export interface VentaRow {
   id: string;
@@ -91,8 +98,11 @@ export const ventaSchema = z.object({
   dias_credito: z.union([z.literal(""), z.null(), z.coerce.number().int().min(1).max(365)]).optional().transform((v) => (v === "" || v === undefined ? null : v)),
   entregado: z.boolean(),
   porcentaje_cobrado: z.coerce.number({ message: "Cobranza inválida" }).min(0).max(100),
+  /** Fecha en que pagaron: obligatoria al marcarla pagada (100%). */
+  fecha_cobro: z.union([z.literal(""), z.null(), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha de pago inválida")]).optional().transform((v) => v || null),
   comentarios: txt(2000),
 }).superRefine((v, ctx) => {
+  if (v.tipo !== "visita" && v.porcentaje_cobrado >= 100 && !v.fecha_cobro) ctx.addIssue({ code: "custom", path: ["fecha_cobro"], message: "Escribe la fecha en que te pagaron" });
   if (v.tipo === "visita" && !v.motivo_no_venta) ctx.addIssue({ code: "custom", path: ["motivo_no_venta"], message: "Elige por qué no se concretó la venta" });
 });
 export type VentaInput = z.input<typeof ventaSchema>;
