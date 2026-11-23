@@ -191,3 +191,41 @@ export async function guardarImportesAction(ventaId: string, importes: { id: str
   if (u.rol !== "jefe_ventas" && u.rol !== "vendedor") return { ok: false, error: "No autorizado." };
   return comisionesVentaAction(ventaId, importes);
 }
+
+export interface LineaCobro { id: string; clave: string | null; descripcion: string; cantidad: number | null; importe: number | null; comision_pct: number | null }
+
+/** Articulos de una venta con su importe y % (para pedir la comision al marcarla cobrada). */
+export async function lineasCobroAction(ventaId: string): Promise<Result<{ lineas: LineaCobro[] }>> {
+  await requireUser();
+  if (!uuid.safeParse(ventaId).success) return { ok: false, error: "Venta inválida" };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("venta_lineas").select("id, descripcion, cantidad, importe, comision_pct, created_at, articulos(clave)").eq("venta_id", ventaId).order("created_at");
+  if (error) return { ok: false, error: /importe|comision/.test(error.message) ? "Falta correr la actualización 0072 en la base." : friendlyError(error.message) };
+  type L = { id: string; descripcion: string; cantidad: string | null; importe: string | null; comision_pct: string | null; articulos: { clave: string } | null };
+  return {
+    ok: true,
+    lineas: ((data ?? []) as unknown as L[]).map((l) => ({
+      id: l.id, clave: l.articulos?.clave ?? null, descripcion: l.descripcion, cantidad: l.cantidad == null ? null : Number(l.cantidad),
+      importe: l.importe == null ? null : Number(l.importe), comision_pct: l.comision_pct == null ? null : Number(l.comision_pct),
+    })),
+  };
+}
+
+/** Marcar cobrada en un solo paso: guarda la comision de cada articulo y luego la fecha de pago. */
+export async function cobrarConComisionAction(ventaId: string, fechaCobro: string, lineas: unknown): Promise<Result> {
+  await requireUser();
+  if (!uuid.safeParse(ventaId).success) return { ok: false, error: "Venta inválida" };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaCobro)) return { ok: false, error: "Escribe la fecha en que te pagaron." };
+  const p = comisionSchema.safeParse(lineas);
+  if (!p.success) return { ok: false, error: p.error.issues[0]?.message ?? "Datos inválidos" };
+  if (p.data.some((l) => l.importe == null || l.comision_pct == null)) return { ok: false, error: "Pon el importe y el % de cada artículo." };
+  const supabase = await createClient();
+  if (p.data.length) {
+    const { error } = await supabase.rpc("venta_comisiones", { p_venta: ventaId, p_lineas: p.data });
+    if (error) return { ok: false, error: /venta_comisiones|comision_pct/.test(error.message) ? "Falta correr la actualización 0072 en la base." : friendlyError(error.message) };
+  }
+  const r = await quickVentaAction(ventaId, { porcentaje_cobrado: 100, fecha_cobro: fechaCobro });
+  revalidatePath("/vendedor/comisiones");
+  revalidatePath("/ventas/comisiones");
+  return r;
+}

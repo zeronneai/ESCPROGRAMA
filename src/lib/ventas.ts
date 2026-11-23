@@ -13,7 +13,7 @@ export interface VentaLinea {
 }
 
 /** Mensaje claro cuando la base no deja marcar pagada una venta sin comisiones. */
-export const COMISION_FALTA_MSG = "Antes de marcarla pagada, pon el importe y el % de comisión de cada artículo (abre la venta, sección Comisión).";
+export const COMISION_FALTA_MSG = "Antes de marcarla pagada, pon el importe y el % de comisión de cada artículo (arriba, en Comisión por artículo).";
 export const esComisionFalta = (m?: string | null) => !!m && /COMISION_FALTA/.test(m);
 /** Errores de la base al marcar pagada, en palabras claras. */
 export function errorCobro(m: string): string | null {
