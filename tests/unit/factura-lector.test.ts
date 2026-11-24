@@ -223,3 +223,51 @@ describe("envio incluido en la comision", () => {
     expect(comisionDe({ id: "a", clave: null, descripcion: "x", cantidad: 1, imp: "1000", env: "", pct: "5" })).toBe(50);
   });
 });
+
+describe("estado de cuenta (conciliacion)", () => {
+  const fila = (...c: [number, string][]) => c.map(([x, s]) => ({ x, s }));
+  it("BBVA: solo abonos, fecha sin año, descripcion arriba y abajo, cuenta en dolares", async () => {
+    const { leerEstadoCuenta } = await import("@/lib/estado-cuenta");
+    const r = leerEstadoCuenta([[
+      fila([24, "24/11/26, 8:07"], [276, "BBVANet - Cuenta de cheques y ahorro"]),
+      fila([78, "24/11/2026 - 8:07:58 AM"]),
+      fila([225, "Número de cuenta:"], [318, "0123456157"]),
+      fila([78, "Fecha"], [161, "Concepto / Referencia"], [329, "Cargo"], [397, "Abono"], [478, "Saldo"]),
+      fila([131, "SPEI RECIBIDOBAJIO/0112019763 030"]),
+      fila([80, "24-11"], [388, "$ 13,363.20"], [465, "$ 724,490.45"]),
+      fila([166, "0241126ESC Factura F11466"]),
+      fila([130, "IVA TASA DE DESC DEBITO/174598428"]),
+      fila([80, "24-11"], [330, "$ 8.29"], [466, "$ 711,127.25"]),
+      fila([142, "TERMINALES PUNTO DE VENTA"]),
+      fila([80, "23-12"], [122, "DEPOSITO EN EFECTIVO/0053642"], [390, "$ 9,483.00"], [465, "$ 711,135.54"]),
+    ]]);
+    expect(r).toMatchObject({ banco: "BBVA", cuenta: "0123456157", moneda: "USD", cargosIgnorados: 1, cuadran: 2, noCuadran: 0 });
+    expect(r.abonos).toEqual([
+      { fecha: "2026-11-24", descripcion: "SPEI RECIBIDOBAJIO/0112019763 030 0241126ESC Factura F11466", referencia: null, monto: 13363.2, saldo: 724490.45 },
+      { fecha: "2025-12-23", descripcion: "DEPOSITO EN EFECTIVO/0053642", referencia: null, monto: 9483, saldo: 711135.54 },
+    ]);
+  });
+  it("Banregio: descripcion de varios renglones debajo y referencia", async () => {
+    const { leerEstadoCuenta } = await import("@/lib/estado-cuenta");
+    const r = leerEstadoCuenta([[
+      fila([340, "Detalle de Movimientos Cuenta de Cheques"]),
+      fila([240, "CUENTA: 061022470018"]),
+      fila([228, "CLABE: 058150610224700180"]),
+      fila([25, "Fecha"], [82, "Descripción"], [249, "Referencia"], [421, "Cargos"], [485, "Abonos"], [548, "Saldo"]),
+      fila([82, "AMSIU93 SPEI, HSBC, 021060040273206542,"]),
+      fila([22, "09/11/2026"], [249, "_HSB6046610"], [475, "$ 41,993.95"], [531, "$ 156,476.05"]),
+      fila([82, "AISLANTES TERMOACUSTICOS DEL NORTE , S.,"]),
+      fila([82, "HSB6046610, 0000001, FAC 2395"]),
+      fila([22, "13/11/2026"], [82, "NÓMINA - PAGO DE NÓMINA"], [249, "_061022470018"], [414, "$ 6,794.20"], [531, "$ 149,681.85"]),
+      fila([251, "Total Cargos: $6794.20"]),
+    ]]);
+    expect(r).toMatchObject({ banco: "Banregio", cuenta: "061022470018", moneda: "MXN", cargosIgnorados: 1, totalAbonos: 41993.95, noCuadran: 0 });
+    expect(r.abonos[0]).toMatchObject({ fecha: "2026-11-09", referencia: "HSB6046610", descripcion: "AMSIU93 SPEI, HSBC, 021060040273206542, AISLANTES TERMOACUSTICOS DEL NORTE , S., HSB6046610, 0000001, FAC 2395" });
+  });
+  it("sugiere folios de la descripcion", async () => {
+    const { foliosSugeridos } = await import("@/lib/conciliaciones");
+    expect(foliosSugeridos("PAGO CUENTA DE TERCERO BNET 0123160645 F11488")).toEqual(["F11488"]);
+    expect(foliosSugeridos("0231126Pago Factura PMC146 ESC")).toEqual(["PMC146"]);
+    expect(foliosSugeridos("BNET 1585530792 pago fact 10872 ES")).toEqual(["10872"]);
+  });
+});

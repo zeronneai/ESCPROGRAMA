@@ -280,6 +280,8 @@ export async function ventaDesdeFacturaAction(fd: FormData): Promise<Result<{ id
   }
   if (aNombreDe) revalidatePath(`/ventas/vendedor/${aNombreDe}`);
   const r = data as { venta_id: string };
+  // Si ya habia un pago apartado en Conciliaciones con este folio, se liga y queda pagada con la fecha del abono.
+  await supabase.rpc("conciliacion_ligar_venta", { p_venta: r.venta_id });
   // Venta en dolares: se guarda el tipo de cambio que trae la factura (solo como dato; los totales no se convierten).
   if (p.data.moneda === "USD" && p.data.tipo_cambio) await supabase.rpc("venta_tipo_cambio_factura", { p_venta: r.venta_id, p_tc: p.data.tipo_cambio });
   revalidatePath("/vendedor/bitacora");

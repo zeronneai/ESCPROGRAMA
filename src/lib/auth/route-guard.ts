@@ -80,7 +80,7 @@ export function decideRoute(input: {
       : { type: "redirect", to: homeFor(profile.rol) };
   }
   // La jefa de ventas tambien lleva su propia bitacora (prospeccion y ventas diarias).
-  const bitacoraJefa = profile.rol === "jefe_ventas" && (pathname === "/vendedor/bitacora" || pathname.startsWith("/vendedor/bitacora/") || pathname === "/vendedor/recepcion-facturas");
+  const bitacoraJefa = profile.rol === "jefe_ventas" && (pathname === "/vendedor/bitacora" || pathname.startsWith("/vendedor/bitacora/") || pathname === "/vendedor/recepcion-facturas" || pathname === "/vendedor/conciliaciones");
   if (pathname.startsWith("/vendedor") && profile.rol !== "vendedor" && !bitacoraJefa) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }

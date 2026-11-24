@@ -172,5 +172,10 @@ describe("comisiones", () => {
     expect(d("/ventas/comisiones", "jefe_ventas")).toEqual({ type: "next" });
     expect(d("/ventas/comisiones", "vendedor")).toEqual({ type: "redirect", to: "/inicio" });
     expect(d("/vendedor/comisiones", "comprador")).toEqual({ type: "redirect", to: "/inicio" });
+    // Conciliaciones: finanzas sube, vendedores y jefa identifican
+    expect(d("/finanzas/conciliaciones", "aux_finanzas")).toEqual({ type: "next" });
+    expect(d("/vendedor/conciliaciones", "vendedor")).toEqual({ type: "next" });
+    expect(d("/vendedor/conciliaciones", "jefe_ventas")).toEqual({ type: "next" });
+    expect(d("/finanzas/conciliaciones", "vendedor")).toEqual({ type: "redirect", to: "/inicio" });
   });
 });
