@@ -106,6 +106,8 @@ describe("decideRoute", () => {
     for (const r of ["vendedor", "marketplaces", "almacen", "coordinador_iso"] as const) expect(d("/pedidos-pegatron", p(r))).toEqual({ type: "redirect", to: "/inicio" });
     for (const r of ["vendedor", "jefe_ventas", "gerente", "ceo"] as const) expect(d("/pedidos-compras", p(r))).toEqual({ type: "next" });
     for (const r of ["comprador", "almacen", "aux_finanzas"] as const) expect(d("/pedidos-compras", p(r))).toEqual({ type: "redirect", to: "/inicio" });
+    for (const r of ["vendedor", "jefe_ventas", "gerente", "ceo"] as const) expect(d("/metas", p(r))).toEqual({ type: "next" });
+    for (const r of ["comprador", "almacen"] as const) expect(d("/metas", p(r))).toEqual({ type: "redirect", to: "/inicio" });
   });
 
   it("almacen va a evaluacion de proveedores; la encuesta del cliente se abre sin sesion", () => {

@@ -1,4 +1,6 @@
 import { Card, EmptyState, PageHeader, StatCard } from "@/components/ui";
+import Link from "next/link";
+import { ConfigMetasVenta, type MetaFila } from "@/components/metas/config-metas-venta";
 import { ConfigMeta, TipoVendedor } from "@/components/prospeccion/config-meta";
 import { requireRoles } from "@/lib/auth/sales";
 import { TIPOS_PROSPECCION, type AvanceProspeccion, type TipoProspeccion } from "@/lib/meta-prospeccion";
@@ -13,9 +15,11 @@ export default async function MetaProspeccion() {
   const u = await requireRoles(["jefe_ventas", "gerente", "ceo"]);
   const edita = u.rol === "jefe_ventas";
   const supabase = await createClient();
-  const [{ data: cfg, error }, { data: av }] = await Promise.all([
+  const [{ data: cfg, error }, { data: av }, { data: metasV, error: errMetas }, { data: usuarios }] = await Promise.all([
     supabase.from("prospeccion_config").select("meta_telemarketing, meta_campo, inicio").eq("id", 1).maybeSingle(),
     supabase.rpc("prospeccion_avance"),
+    supabase.from("metas_venta").select("id, nombre, vendedor_id, meta, estado").order("orden").order("nombre"),
+    supabase.from("profiles").select("id, nombre").in("rol", ["vendedor", "jefe_ventas"]).eq("activo", true).order("nombre"),
   ]);
   if (error || !cfg)
     return (
@@ -30,11 +34,24 @@ export default async function MetaProspeccion() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Meta de prospección"
-        subtitle={`Prospectos nuevos que cada vendedor debe registrar por día, de lunes a viernes, contando desde el ${fecha(cfg.inicio)}. Es acumulativa: lo que no registraron en días pasados se queda pendiente.`}
+        title="Metas"
+        subtitle={`Metas mensuales de venta y meta diaria de prospección. Prospectos nuevos que cada vendedor debe registrar por día, de lunes a viernes, contando desde el ${fecha(cfg.inicio)}. Es acumulativa: lo que no registraron en días pasados se queda pendiente.`}
       />
       <Card className="space-y-3 p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Meta diaria</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Metas mensuales de venta</h2>
+          <Link href="/metas" className="text-sm font-medium text-brand-700 underline">Ver gráficas en vivo →</Link>
+        </div>
+        {errMetas ? (
+          <p className="text-sm text-amber-800">Falta correr <code>0080_metas_ventas.sql</code> en Supabase.</p>
+        ) : (
+          <ConfigMetasVenta metas={((metasV ?? []) as MetaFila[]).map((m) => ({ ...m, meta: Number(m.meta) }))} usuarios={(usuarios ?? []) as { id: string; nombre: string }[]} edita={edita} />
+        )}
+        <p className="text-xs text-slate-500">El avance es lo registrado en Ventas diarias del mes por ese usuario. Una meta en pausa no sale en las gráficas.</p>
+      </Card>
+
+      <Card className="space-y-3 p-4">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Meta diaria de prospección</h2>
         {edita ? (
           <ConfigMeta tele={cfg.meta_telemarketing} campo={cfg.meta_campo} inicio={cfg.inicio} />
         ) : (

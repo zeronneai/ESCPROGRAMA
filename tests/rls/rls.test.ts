@@ -18,6 +18,7 @@ import { DATABASE_URL, as, failure, pool, type Actor } from "./helpers";
 import { recepcionSuite } from "./recepcion.suite";
 import { pedidosSuite } from "./pedidos.suite";
 import { metaProspeccionSuite } from "./meta-prospeccion.suite";
+import { metasSuite } from "./metas.suite";
 import { conciliacionSuite } from "./conciliacion.suite";
 
 const seller1 = randomUUID();
@@ -574,6 +575,7 @@ planeacionSuite();
 recepcionSuite();
 pedidosSuite();
 metaProspeccionSuite();
+metasSuite();
 conciliacionSuite();
 
 afterAll(async () => {

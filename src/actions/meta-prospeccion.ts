@@ -37,3 +37,39 @@ export async function tipoProspeccionAction(vendedorId: string, tipo: string): P
   revalidatePath("/ventas/meta-prospeccion");
   return { ok: true };
 }
+
+const metaVenta = z.object({
+  id: z.string().uuid().nullable(),
+  nombre: z.string().trim().min(1, "Pon el nombre.").max(120),
+  vendedor_id: z.string().uuid().nullable(),
+  meta: z.number({ error: "Pon la meta." }).positive("La meta debe ser mayor a 0.").max(1e10),
+  estado: z.enum(["activa", "pausada"]),
+});
+
+/** La jefa de ventas crea o cambia una meta mensual de venta. */
+export async function guardarMetaVentaAction(input: z.input<typeof metaVenta>): Promise<Result> {
+  const u = await requireUser();
+  if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas cambia las metas." };
+  const p = metaVenta.safeParse(input);
+  if (!p.success) return { ok: false, error: p.error.issues[0].message };
+  const supabase = await createClient();
+  const { id, ...datos } = p.data;
+  const fila = { ...datos, updated_by: u.id, updated_at: new Date().toISOString() };
+  const { error } = id ? await supabase.from("metas_venta").update(fila).eq("id", id) : await supabase.from("metas_venta").insert(fila);
+  if (error) return { ok: false, error: /metas_venta_vendedor_id_key|duplicate/.test(error.message) ? "Ese usuario ya tiene una meta." : friendlyError(error.message) };
+  revalidatePath("/ventas/meta-prospeccion");
+  revalidatePath("/metas");
+  return { ok: true };
+}
+
+export async function borrarMetaVentaAction(id: string): Promise<Result> {
+  const u = await requireUser();
+  if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas." };
+  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "Meta inválida" };
+  const supabase = await createClient();
+  const { error } = await supabase.from("metas_venta").delete().eq("id", id);
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/ventas/meta-prospeccion");
+  revalidatePath("/metas");
+  return { ok: true };
+}
