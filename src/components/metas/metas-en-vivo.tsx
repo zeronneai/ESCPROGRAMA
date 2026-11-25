@@ -47,7 +47,7 @@ function Anillo({ pct, ritmo, tam = 150, grosor = 14, children }: { pct: number;
   );
 }
 
-export function MetasEnVivo({ inicial }: { inicial: AvanceMeta[] }) {
+export function MetasEnVivo({ inicial, token }: { inicial: AvanceMeta[]; /** Pantalla publica: link sin usuario. */ token?: string }) {
   const [filas, setFilas] = useState(inicial);
   const [act, setAct] = useState(() => Date.now());
   const [ahora, setAhora] = useState(() => Date.now());
@@ -57,7 +57,7 @@ export function MetasEnVivo({ inicial }: { inicial: AvanceMeta[] }) {
   const caja = useRef<HTMLDivElement>(null);
 
   const cargar = useCallback(async () => {
-    const { data, error } = await createClient().rpc("metas_ventas_avance");
+    const { data, error } = token ? await createClient().rpc("metas_ventas_publico", { p_token: token }) : await createClient().rpc("metas_ventas_avance");
     if (error || !data) return;
     const nuevas = normalizarAvance(data as Record<string, unknown>[]);
     const subieron = nuevas.filter((f) => f.pct > (previo.current.get(f.id) ?? f.pct));
@@ -71,7 +71,7 @@ export function MetasEnVivo({ inicial }: { inicial: AvanceMeta[] }) {
     previo.current = new Map(nuevas.map((f) => [f.id, f.pct]));
     setFilas(nuevas);
     setAct(Date.now());
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     const sb = createClient();
@@ -88,19 +88,25 @@ export function MetasEnVivo({ inicial }: { inicial: AvanceMeta[] }) {
     window.addEventListener(EVENTO_CAMBIO, on);
     const respaldo = window.setInterval(() => document.visibilityState === "visible" && void cargar(), 30_000);
     const reloj = window.setInterval(() => setAhora(Date.now()), 15_000);
+    // En las teles: recarga la pagina cada 6 horas para tomar cambios del portal.
+    const recarga = token ? window.setTimeout(() => window.location.reload(), 6 * 3600_000) : undefined;
     return () => {
       window.clearTimeout(t);
       window.clearInterval(respaldo);
       window.clearInterval(reloj);
+      window.clearTimeout(recarga);
       window.removeEventListener(EVENTO_CAMBIO, on);
       void sb.removeChannel(canal);
     };
-  }, [cargar]);
+  }, [cargar, token]);
 
   if (!filas.length) return <p className="rounded-xl bg-white p-6 text-center text-slate-500 shadow-sm">No hay metas activas este mes.</p>;
   const f0 = filas[0];
   const ritmo = ritmoDe(f0.dia, f0.dias_mes);
   const mes = MESES[Number(f0.mes.slice(5, 7)) - 1];
+  const diaDe = (d?: string | null) => (d ? Number(d.slice(8, 10)) : 0);
+  const fin = f0.hasta ?? null;
+  const rango = f0.desde && fin && (diaDe(f0.desde) !== 1 || diaDe(fin) < 28) ? `del ${diaDe(f0.desde)} al ${diaDe(fin)} de ${mes}` : null;
   const equipo = f0.equipo_pct ?? 0;
   const conMontos = filas.some((f) => f.meta != null && !f.es_mio);
   const totVend = filas.reduce((s, f) => s + (f.vendido ?? 0), 0);
@@ -114,6 +120,7 @@ export function MetasEnVivo({ inicial }: { inicial: AvanceMeta[] }) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Metas de venta · <span className="capitalize">{mes}</span></h1>
+          {rango && <p className="text-sm font-medium text-slate-700">Periodo {rango} · la meta es proporcional a esos días</p>}
           <p className="mt-1 flex items-center gap-2 text-sm text-slate-600">
             <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-500 opacity-60" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-600" /></span>
             En vivo · actualizado {seg < 20 ? "hace un momento" : `hace ${seg < 60 ? `${seg} s` : `${Math.round(seg / 60)} min`}`}
@@ -134,11 +141,11 @@ export function MetasEnVivo({ inicial }: { inicial: AvanceMeta[] }) {
         </Anillo>
         <div className="w-full flex-1 space-y-3">
           <div>
-            <p className="text-sm text-slate-600">Avance del mes</p>
+            <p className="text-sm text-slate-600">{rango ? "Avance del periodo" : "Avance del mes"}</p>
             <div className="relative mt-1 h-4 overflow-hidden rounded-full bg-slate-200">
               <div className="h-4 rounded-full bg-slate-400" style={{ width: `${ritmo}%` }} />
             </div>
-            <p className="mt-1 text-xs text-slate-500">Día {f0.dia} de {f0.dias_mes}: para ir al ritmo deberían llevar <b>{pctTxt(ritmo)}</b> (el punto negro en cada gráfica).</p>
+            <p className="mt-1 text-xs text-slate-500">Día {f0.dia} de {f0.dias_mes}{rango ? " del periodo" : ""}: para ir al ritmo deberían llevar <b>{pctTxt(ritmo)}</b> (el punto negro en cada gráfica).</p>
           </div>
           {conMontos && (
             <p className="text-lg font-semibold tabular-nums text-slate-800">
@@ -154,7 +161,7 @@ export function MetasEnVivo({ inicial }: { inicial: AvanceMeta[] }) {
       </div>
 
       {/* Por vendedor */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 ${token ? "2xl:grid-cols-8" : ""}`}>
         {orden.map((f, i) => {
           const c = COLORES[colorAvance(f.pct, ritmo)];
           return (
@@ -170,8 +177,8 @@ export function MetasEnVivo({ inicial }: { inicial: AvanceMeta[] }) {
                 <span className={`text-2xl font-extrabold tabular-nums ${c.texto}`}>{pctTxt(f.pct)}</span>
               </Anillo>
               <p className="text-center text-sm font-semibold leading-tight text-slate-900">{f.nombre}{f.es_mio && <span className="block text-[11px] font-normal text-brand-700">Tú</span>}</p>
-              {f.meta != null && f.vendido != null && <p className="text-center text-[11px] tabular-nums text-slate-500">{pesos(f.vendido)} de {pesos(f.meta)}</p>}
-              {!f.vendedor_id && <p className="text-center text-[11px] text-slate-400">Ventas capturadas a mano</p>}
+              {f.meta != null && f.vendido != null && <p className="text-center text-[11px] tabular-nums text-slate-500">{pesos(f.vendido)} de {pesos(f.meta)}{f.meta_mes && Math.abs(f.meta_mes - f.meta) > 1 ? ` (del mes ${pesos(f.meta_mes)})` : ""}</p>}
+              {!token && !f.vendedor_id && <p className="text-center text-[11px] text-slate-400">Ventas capturadas a mano</p>}
             </div>
           );
         })}

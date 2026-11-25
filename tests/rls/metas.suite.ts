@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { DATABASE_URL, as, failure, type Actor } from "./helpers";
 import { createWorld } from "./fixtures";
 
+const anon: Actor = { id: "", role: "anon" };
 const q = (actor: Actor, sql: string, params: unknown[] = []) => as(actor, (x) => x(sql, params));
 
 async function persona(rol: string, nombre: string): Promise<Actor> {
@@ -22,6 +23,7 @@ export function metasSuite() {
       const s2 = (w.seller2 as { id: string }).id;
       const tag = randomUUID().slice(0, 5);
       expect(await failure(q(w.seller1, "insert into public.metas_venta (nombre, meta) values ('x', 10)"))).toMatch(/row-level/);
+      await q(jefa, "update public.metas_config set desde=null, hasta=null where id=1");
       await q(jefa, "insert into public.metas_venta (nombre, vendedor_id, meta) values ($1,$2,1000000),($3,$4,500000)", [`M1 ${tag}`, s1, `M2 ${tag}`, s2]);
       const pulso0 = (await q("postgres", "select at from public.ventas_pulso")).rows[0].at;
       const mxn = (await q(w.seller1, "insert into public.ventas (customer_id, monto, moneda, pago) values ($1,348000,'MXN','contado') returning id, subtotal, subtotal_estimado", [w.customerId])).rows[0];
@@ -53,6 +55,22 @@ export function metasSuite() {
       expect(Number(c2.pct)).toBe(25);
       expect(Number(c2.vendido)).toBe(25000);
       expect(c2.capturo).toBe(true);
+      // Periodo proporcional: si la jefa recorta el mes, la meta baja en proporcion a los dias.
+      await q(jefa, "update public.metas_config set desde=date_trunc('month', public.local_today())::date, hasta=date_trunc('month', public.local_today())::date + 9 where id=1");
+      const dm = (await q("postgres", "select extract(day from date_trunc('month', public.local_today()) + interval '1 month - 1 day')::int d")).rows[0].d as number;
+      const gp = (await q(ger, "select * from public.metas_ventas_avance()")).rows.find((r) => r.nombre === `M2 ${tag}`)!;
+      expect(Number(gp.meta)).toBeCloseTo((500000 * 10) / dm, 1);
+      expect(Number(gp.meta_mes)).toBe(500000);
+      expect(gp.dias_mes).toBe(10);
+      // Pantalla publica: con el link, sin montos; sin link no abre
+      const tok = (await q("postgres", "select token from public.metas_config")).rows[0].token as string;
+      const pub = (await q(anon, "select * from public.metas_ventas_publico($1)", [tok])).rows.find((r) => r.nombre === `M2 ${tag}`)!;
+      expect(pub.meta).toBeNull();
+      expect(pub.vendido).toBeNull();
+      expect(pub.vendedor_id).toBeNull();
+      expect(await failure(q(anon, "select * from public.metas_ventas_publico($1)", ["x".repeat(64)]))).toMatch(/Link no valido/);
+      expect(await failure(q(anon, "select * from public.metas_ventas_avance()"))).toMatch(/permission denied/);
+      await q(jefa, "update public.metas_config set desde='2026-11-16', hasta=null where id=1");
       await q(jefa, "update public.metas_venta set estado='pausada' where nombre=$1", [`M2 ${tag}`]);
       expect((await q(ger, "select * from public.metas_ventas_avance()")).rows.some((r) => r.nombre === `M2 ${tag}`)).toBe(false);
       expect((await q(ger, "select count(*)::int n from public.metas_venta where nombre like 'Casa Local'")).rows[0].n).toBe(1);

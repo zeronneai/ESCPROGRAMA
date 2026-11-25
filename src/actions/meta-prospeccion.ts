@@ -113,3 +113,35 @@ export async function cancelarCapturaAction(id: string): Promise<Result> {
   revalidatePath("/metas");
   return { ok: true };
 }
+
+const periodo = z.object({
+  desde: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  hasta: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+});
+
+/** La jefa elige desde/hasta que dia cuenta el mes (la meta se ajusta en proporcion). */
+export async function guardarPeriodoMetasAction(input: z.input<typeof periodo>): Promise<Result> {
+  const u = await requireUser();
+  if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas." };
+  const p = periodo.safeParse(input);
+  if (!p.success) return { ok: false, error: "Fechas inválidas" };
+  if (p.data.desde && p.data.hasta && p.data.hasta < p.data.desde) return { ok: false, error: "La fecha final va después de la inicial." };
+  const supabase = await createClient();
+  const { error } = await supabase.from("metas_config").update({ ...p.data, updated_by: u.id, updated_at: new Date().toISOString() }).eq("id", 1);
+  if (error) return { ok: false, error: /metas_config/.test(error.message) ? "Falta correr la actualización 0081 en la base." : friendlyError(error.message) };
+  revalidatePath("/ventas/meta-prospeccion");
+  revalidatePath("/metas");
+  return { ok: true };
+}
+
+/** Link nuevo para las pantallas (el anterior deja de abrir). */
+export async function nuevoLinkMetasAction(): Promise<Result> {
+  const u = await requireUser();
+  if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas." };
+  const { randomBytes } = await import("node:crypto");
+  const supabase = await createClient();
+  const { error } = await supabase.from("metas_config").update({ token: randomBytes(24).toString("hex"), updated_by: u.id, updated_at: new Date().toISOString() }).eq("id", 1);
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/ventas/meta-prospeccion");
+  return { ok: true };
+}
