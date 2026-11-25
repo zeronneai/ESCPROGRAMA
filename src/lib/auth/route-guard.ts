@@ -118,6 +118,10 @@ export function decideRoute(input: {
   if (under("/captura-ventas") && !["vendedor", "jefe_ventas", "marketplaces"].includes(profile.rol)) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
+  // Periodo de las metas: jefa, comprador y marketplaces.
+  if (under("/periodo-metas") && !["jefe_ventas", "comprador", "marketplaces"].includes(profile.rol)) {
+    return { type: "redirect", to: homeFor(profile.rol) };
+  }
   // Pedidos al comprador: ventas, gerente y CEO.
   if (under("/pedidos-compras") && !["vendedor", "jefe_ventas", "gerente", "ceo"].includes(profile.rol)) {
     return { type: "redirect", to: homeFor(profile.rol) };

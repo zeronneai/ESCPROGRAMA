@@ -93,6 +93,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 76 | `0081_metas_periodo_publico.sql` | **Metas: periodo proporcional y pantalla pública**: la jefa elige desde/hasta qué día cuenta el mes (la meta se ajusta a esos días; empieza el 16 de noviembre); al cambiar de mes se toma completo solo; link sin usuario para las teles, solo porcentajes, en tiempo real. |
 | 77 | `0082_tipo_cambio_pago.sql` | **Tipo de cambio del pago**: al marcar pagada una venta en dólares se pide el tipo de cambio del día del pago (propone el de Banxico); si la marca Conciliaciones se pone el de Banxico. |
 | 78 | `0083_metas_periodo_comprador.sql` | **Periodo de metas también para el comprador**: puede cambiar desde/hasta qué día cuentan las metas. |
+| 79 | `0084_metas_periodo_marketplaces.sql` | **Periodo de metas también para marketplaces**. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 
