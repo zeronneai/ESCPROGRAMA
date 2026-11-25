@@ -34,6 +34,9 @@ export interface VentaRow {
   pedido: string | null;
   factura: string | null;
   monto: number | string | null;
+  /** Subtotal sin IVA (de la factura, o estimado con el total si subtotal_estimado). */
+  subtotal?: number | string | null;
+  subtotal_estimado?: boolean | null;
   moneda: "MXN" | "USD";
   /** Pesos por dolar que traia la factura (solo como dato). */
   tipo_cambio?: number | null;
@@ -62,6 +65,15 @@ export const MOTIVOS_NO_VENTA = [
   "No estaba el comprador",
   "Otro",
 ] as const;
+
+/** Columnas de venta con el subtotal sin IVA (0080). */
+export const COLS_SIN_IVA = ", subtotal, subtotal_estimado";
+
+/** Consulta con el subtotal; si falta la actualizacion 0080, la repite sin el. */
+export async function conSubtotal<T extends { error: { message: string } | null }>(q: (extra: string) => PromiseLike<T>): Promise<T> {
+  const r = await q(COLS_SIN_IVA);
+  return r.error && /subtotal/.test(r.error.message) ? q("") : r;
+}
 
 export const VENTA_COLS =
   "id, vendedor_id, customer_id, fecha, request_id, pedido, factura, monto, moneda, pago, dias_credito, vence, entregado, fecha_entrega, porcentaje_cobrado, fecha_cobro, comentarios, origen, cancelada_at, created_at, tipo, motivo_no_venta";
@@ -123,7 +135,10 @@ export function porMoneda<T extends { moneda: string }>(l: T[], valor: (v: T) =>
   for (const v of l) t[v.moneda === "USD" ? "usd" : "mxn"] += valor(v);
   return t;
 }
-export const montoPorMoneda = (l: { monto: number | string | null; moneda: string }[]) => porMoneda(l, (v) => Number(v.monto ?? 0));
+/** Importe de la venta SIN IVA (subtotal; si todavia no existe la columna, el total). */
+export const sinIva = (v: { monto: number | string | null; subtotal?: number | string | null }) => Number(v.subtotal ?? v.monto ?? 0);
+/** Total vendido por moneda, sin IVA. */
+export const montoPorMoneda = (l: { monto: number | string | null; subtotal?: number | string | null; moneda: string }[]) => porMoneda(l, sinIva);
 export const saldoPorMoneda = (l: Pick<VentaRow, "monto" | "porcentaje_cobrado" | "cancelada_at" | "moneda">[]) => porMoneda(l, (v) => saldo(v));
 /** "$12,000 · $500 USD" (solo pesos si no hay dolares; solo dolares si no hay pesos). */
 export const fmtMonedas = (t: PorMoneda) => (t.usd && t.mxn ? `${money(t.mxn)} · ${money(t.usd, "USD")}` : t.usd ? money(t.usd, "USD") : money(t.mxn));

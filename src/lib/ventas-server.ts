@@ -1,12 +1,12 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { VENTA_COLS, type VentaLinea, type VentaRow } from "@/lib/ventas";
+import { conSubtotal, VENTA_COLS, type VentaLinea, type VentaRow } from "@/lib/ventas";
 
 export const CUST_MIN = "id, nombre, tipo, contacto_nombre, contacto_telefono, giro, estado_geo";
 
 export async function loadVenta(supabase: SupabaseClient, id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
-  const { data: v } = await supabase.from("ventas").select(VENTA_COLS).eq("id", id).maybeSingle();
+  const { data: v } = await conSubtotal((x) => supabase.from("ventas").select(`${VENTA_COLS}${x}`).eq("id", id).maybeSingle());
   if (!v) return null;
   const venta = v as unknown as VentaRow;
   const [{ data: c }, { data: ls }, { data: r }, { data: p }] = await Promise.all([

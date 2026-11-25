@@ -8,7 +8,7 @@ import { requireSalesViewer } from "@/lib/auth/sales";
 import { BITACORA_SELECT } from "@/lib/bitacora/queries";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
-import { cobroEstado, fmtMonedas, montoPorMoneda, saldoPorMoneda, VENTA_COLS } from "@/lib/ventas";
+import { cobroEstado, conSubtotal, fmtMonedas, montoPorMoneda, saldoPorMoneda, VENTA_COLS } from "@/lib/ventas";
 
 type Tab = "ventas" | "prospeccion" | "solicitudes";
 
@@ -36,7 +36,7 @@ export default async function VendedorVentas({ params, searchParams }: { params:
       .order("submitted_at", { ascending: false })
       .limit(100),
     supabase.from("bitacora_eventos").select("id", { count: "exact", head: true }).eq("created_by", id).gte("created_at", now.startOf("day").toUTC().toISO()!),
-    supabase.from("ventas").select(`${VENTA_COLS}, customers(nombre), venta_lineas(descripcion, cantidad)`).eq("vendedor_id", id).order("fecha", { ascending: false }).order("created_at", { ascending: false }).limit(500),
+    conSubtotal((x) => supabase.from("ventas").select(`${VENTA_COLS}${x}, customers(nombre), venta_lineas(descripcion, cantidad)`).eq("vendedor_id", id).order("fecha", { ascending: false }).order("created_at", { ascending: false }).limit(500)),
   ]);
   const all = (b ?? []) as unknown as BitacoraListRow[];
   const ventas = (vs ?? []) as unknown as VentaListRow[];

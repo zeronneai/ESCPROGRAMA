@@ -6,7 +6,7 @@ import { borrarMetaVentaAction, guardarMetaVentaAction } from "@/actions/meta-pr
 import { toast } from "@/components/feedback-global";
 import { Button } from "@/components/ui";
 
-export type MetaFila = { id: string | null; nombre: string; vendedor_id: string | null; meta: number; estado: "activa" | "pausada" };
+export type MetaFila = { id: string | null; nombre: string; vendedor_id: string | null; capturista_id: string | null; meta: number; estado: "activa" | "pausada" };
 type Usuario = { id: string; nombre: string };
 
 function Fila({ m, usuarios, edita, nueva, alTerminar }: { m: MetaFila; usuarios: Usuario[]; edita: boolean; nueva?: boolean; alTerminar?: () => void }) {
@@ -14,13 +14,14 @@ function Fila({ m, usuarios, edita, nueva, alTerminar }: { m: MetaFila; usuarios
   const [pend, start] = useTransition();
   const [nombre, setNombre] = useState(m.nombre);
   const [vend, setVend] = useState(m.vendedor_id ?? "");
+  const [capt, setCapt] = useState(m.capturista_id ?? "");
   const [meta, setMeta] = useState(m.meta ? String(m.meta) : "");
   const [estado, setEstado] = useState(m.estado);
-  const cambio = nueva || nombre !== m.nombre || vend !== (m.vendedor_id ?? "") || Number(meta) !== m.meta || estado !== m.estado;
+  const cambio = nueva || nombre !== m.nombre || vend !== (m.vendedor_id ?? "") || capt !== (m.capturista_id ?? "") || Number(meta) !== m.meta || estado !== m.estado;
   const inp = "w-full rounded-md border border-slate-300 px-2 py-1 text-sm disabled:bg-slate-50";
   const guardar = () =>
     start(async () => {
-      const r = await guardarMetaVentaAction({ id: m.id, nombre, vendedor_id: vend || null, meta: Number(String(meta).replace(/[,$\s]/g, "")), estado });
+      const r = await guardarMetaVentaAction({ id: m.id, nombre, vendedor_id: vend || null, capturista_id: vend ? null : capt || null, meta: Number(String(meta).replace(/[,$\s]/g, "")), estado });
       if (!r.ok) return toast(r.error, "error");
       toast("Meta guardada", "success");
       alTerminar?.();
@@ -34,6 +35,16 @@ function Fila({ m, usuarios, edita, nueva, alTerminar }: { m: MetaFila; usuarios
           <option value="">Sin usuario</option>
           {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nombre}</option>)}
         </select>
+      </td>
+      <td className="px-3 py-2">
+        {vend ? (
+          <span className="text-xs text-slate-400">Las registra en Ventas diarias</span>
+        ) : (
+          <select className={inp} value={capt} onChange={(e) => setCapt(e.target.value)} disabled={!edita} aria-label="Quién captura sus ventas">
+            <option value="">Nadie (solo la jefa)</option>
+            {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+          </select>
+        )}
       </td>
       <td className="px-3 py-2"><input className={`${inp} text-right tabular-nums`} inputMode="decimal" value={meta} onChange={(e) => setMeta(e.target.value)} disabled={!edita} placeholder="0" aria-label="Meta mensual" /></td>
       <td className="px-3 py-2">
@@ -70,15 +81,15 @@ export function ConfigMetasVenta({ metas, usuarios, edita }: { metas: MetaFila[]
   return (
     <div className="space-y-3">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-sm">
+        <table className="w-full min-w-[820px] text-sm">
           <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-            <tr><th className="px-3 py-2">Nombre</th><th className="px-3 py-2">Usuario del portal</th><th className="px-3 py-2 text-right">Meta mensual (MXN)</th><th className="px-3 py-2">Estado</th>{edita && <th className="px-3 py-2" />}</tr>
+            <tr><th className="px-3 py-2">Nombre</th><th className="px-3 py-2">Usuario del portal</th><th className="px-3 py-2" title="Para metas sin usuario: quién sube sus ventas a mano">Quién captura sus ventas</th><th className="px-3 py-2 text-right">Meta mensual (MXN sin IVA)</th><th className="px-3 py-2">Estado</th>{edita && <th className="px-3 py-2" />}</tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {metas.map((m) => <Fila key={m.id} m={m} usuarios={usuarios} edita={edita} />)}
-            {nueva && <Fila m={{ id: null, nombre: "", vendedor_id: null, meta: 0, estado: "activa" }} usuarios={usuarios} edita nueva alTerminar={() => setNueva(false)} />}
+            {nueva && <Fila m={{ id: null, nombre: "", vendedor_id: null, capturista_id: null, meta: 0, estado: "activa" }} usuarios={usuarios} edita nueva alTerminar={() => setNueva(false)} />}
           </tbody>
-          <tfoot><tr className="border-t border-slate-200 font-semibold"><td className="px-3 py-2" colSpan={2}>Total de metas activas</td><td className="px-3 py-2 text-right tabular-nums">${Math.round(total).toLocaleString("es-MX")}</td><td colSpan={edita ? 2 : 1} /></tr></tfoot>
+          <tfoot><tr className="border-t border-slate-200 font-semibold"><td className="px-3 py-2" colSpan={3}>Total de metas activas (sin IVA)</td><td className="px-3 py-2 text-right tabular-nums">${Math.round(total).toLocaleString("es-MX")}</td><td colSpan={edita ? 2 : 1} /></tr></tfoot>
         </table>
       </div>
       {edita && !nueva && <Button type="button" variant="secondary" onClick={() => setNueva(true)}>Agregar meta</Button>}

@@ -1,6 +1,6 @@
 import { DateTime } from "luxon";
 import type { BitacoraRow } from "@/lib/bitacora/stages";
-import { cobroEstado, saldo, type VentaRow } from "@/lib/ventas";
+import { cobroEstado, saldo, sinIva, type VentaRow } from "@/lib/ventas";
 
 /** Resumen por vendedor para la jefa de ventas (cotizaciones + bitacora de ventas y prospeccion). */
 export type Period = "7d" | "mes" | "mes_anterior" | "anio";
@@ -28,7 +28,7 @@ export function periodRange(p: Period, now: DateTime): { from: DateTime; to: Dat
 
 export type SummaryBitacora = Pick<BitacoraRow, "vendedor_id" | "resultado" | "proximo_seguimiento" | "created_at" | "updated_at" | "archived_at">;
 
-export type SummaryVenta = Pick<VentaRow, "vendedor_id" | "fecha" | "monto" | "moneda" | "pago" | "vence" | "porcentaje_cobrado" | "cancelada_at" | "request_id" | "created_at">;
+export type SummaryVenta = Pick<VentaRow, "vendedor_id" | "fecha" | "monto" | "subtotal" | "moneda" | "pago" | "vence" | "porcentaje_cobrado" | "cancelada_at" | "request_id" | "created_at">;
 
 export interface SummaryInput {
   sellers: { id: string; nombre: string; activo: boolean }[];
@@ -99,8 +99,9 @@ export function summarizeSellers(i: SummaryInput): SellerSummary[] {
         solicitudes: i.requests.filter((r) => r.vendedor_id === s.id).length,
         cotizacionesEnviadas: cotizaciones,
         ventas: vp.length,
-        montoVentas: vp.reduce((a, x) => a + (x.moneda === "USD" ? 0 : Number(x.monto ?? 0)), 0),
-        montoVentasUsd: vp.reduce((a, x) => a + (x.moneda === "USD" ? Number(x.monto ?? 0) : 0), 0),
+        // Ventas sin IVA (subtotal); lo por cobrar y la cartera si van con IVA (es lo que paga el cliente).
+        montoVentas: vp.reduce((a, x) => a + (x.moneda === "USD" ? 0 : sinIva(x)), 0),
+        montoVentasUsd: vp.reduce((a, x) => a + (x.moneda === "USD" ? sinIva(x) : 0), 0),
         conversion: cotizaciones ? Math.round((Math.min(ganadas, cotizaciones) / cotizaciones) * 100) : null,
         porCobrar: st.filter((y) => y.e === "por_cobrar" && y.x.moneda !== "USD").reduce((a, y) => a + saldo(y.x), 0),
         porCobrarUsd: st.filter((y) => y.e === "por_cobrar" && y.x.moneda === "USD").reduce((a, y) => a + saldo(y.x), 0),

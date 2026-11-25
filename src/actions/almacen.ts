@@ -237,6 +237,7 @@ const ventaFacturaSchema = z.object({
   entrega_nombre: z.string().trim().max(80).nullable().optional(),
   entrega_direccion: z.string().trim().max(300).nullable().optional(),
   total: z.coerce.number({ message: "Escribe el total de la factura" }).positive("Escribe el total de la factura").max(999_999_999),
+  subtotal: z.coerce.number().positive().max(999_999_999).nullable().optional(),
   moneda: z.enum(["MXN", "USD"]),
   tipo_cambio: z.coerce.number().min(5, "Revisa el tipo de cambio").max(60, "Revisa el tipo de cambio").nullable().optional(),
   pago: z.enum(["contado", "credito"]),
@@ -284,6 +285,8 @@ export async function ventaDesdeFacturaAction(fd: FormData): Promise<Result<{ id
   await supabase.rpc("conciliacion_ligar_venta", { p_venta: r.venta_id });
   // Venta en dolares: se guarda el tipo de cambio que trae la factura (solo como dato; los totales no se convierten).
   if (p.data.moneda === "USD" && p.data.tipo_cambio) await supabase.rpc("venta_tipo_cambio_factura", { p_venta: r.venta_id, p_tc: p.data.tipo_cambio });
+  // Subtotal sin IVA de la factura (metas y resumen de ventas van sin IVA). Sin el, la base lo estima.
+  if (p.data.subtotal && p.data.subtotal <= p.data.total) await supabase.rpc("venta_subtotal_factura", { p_venta: r.venta_id, p_subtotal: p.data.subtotal });
   revalidatePath("/vendedor/bitacora");
   revalidatePath("/entregas");
   return { ok: true, id: r.venta_id };

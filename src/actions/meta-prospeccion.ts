@@ -42,6 +42,7 @@ const metaVenta = z.object({
   id: z.string().uuid().nullable(),
   nombre: z.string().trim().min(1, "Pon el nombre.").max(120),
   vendedor_id: z.string().uuid().nullable(),
+  capturista_id: z.string().uuid().nullable().optional(),
   meta: z.number({ error: "Pon la meta." }).positive("La meta debe ser mayor a 0.").max(1e10),
   estado: z.enum(["activa", "pausada"]),
 });
@@ -71,5 +72,42 @@ export async function borrarMetaVentaAction(id: string): Promise<Result> {
   if (error) return { ok: false, error: friendlyError(error.message) };
   revalidatePath("/ventas/meta-prospeccion");
   revalidatePath("/metas");
+  return { ok: true };
+}
+
+const captura = z.object({
+  meta_id: z.string().uuid(),
+  fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida"),
+  folio: z.string().trim().max(60).nullable().optional(),
+  cliente: z.string().trim().max(200).nullable().optional(),
+  subtotal: z.number({ error: "Pon el importe sin IVA." }).positive("El importe debe ser mayor a 0.").max(1e10),
+  moneda: z.enum(["MXN", "USD"]),
+  tipo_cambio: z.number().min(5, "Revisa el tipo de cambio").max(60, "Revisa el tipo de cambio").nullable().optional(),
+  nota: z.string().trim().max(500).nullable().optional(),
+});
+
+/** Capturar a mano una venta (sin IVA) para una meta sin usuario, como la de Jose Ortiz. */
+export async function capturarVentaMetaAction(input: z.input<typeof captura>): Promise<Result> {
+  await requireUser();
+  const p = captura.safeParse(input);
+  if (!p.success) return { ok: false, error: p.error.issues[0].message };
+  const supabase = await createClient();
+  const d = p.data;
+  const { error } = await supabase.from("metas_venta_capturas").insert({
+    ...d, folio: d.folio || null, cliente: d.cliente || null, nota: d.nota || null, tipo_cambio: d.moneda === "USD" ? (d.tipo_cambio ?? null) : null,
+  });
+  if (error) return { ok: false, error: /row-level/.test(error.message) ? "No tienes permiso para capturar ventas de esta meta." : friendlyError(error.message) };
+  revalidatePath("/metas/capturar");
+  return { ok: true };
+}
+
+export async function cancelarCapturaAction(id: string): Promise<Result> {
+  await requireUser();
+  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "Captura inválida" };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("metas_venta_capturas").update({ cancelada_at: new Date().toISOString() }).eq("id", id).select("id");
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  if (!data?.length) return { ok: false, error: "No se pudo cancelar." };
+  revalidatePath("/metas/capturar");
   return { ok: true };
 }

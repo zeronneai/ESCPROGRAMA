@@ -5,7 +5,7 @@ import { requireSalesViewer } from "@/lib/auth/sales";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { PERIODS, periodRange, summarizeSellers, totals, type Period, type SummaryBitacora, type SummaryVenta } from "@/lib/stats/sales-summary";
 import { createClient } from "@/lib/supabase/server";
-import { fmtMonedas } from "@/lib/ventas";
+import { conSubtotal, fmtMonedas } from "@/lib/ventas";
 
 const money = (n: number) => `$${Math.round(n).toLocaleString("es-MX")}`;
 
@@ -32,7 +32,7 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
     supabase.from("customers").select("convertido_por").gte("convertido_at", fromIso).lte("convertido_at", toIso).limit(5000),
     supabase.from("bitacora_eventos").select("created_by, created_at").gte("created_at", fromIso).lte("created_at", toIso).limit(20000),
     supabase.from("bitacora_articulos").select("articulo_id, articulos(clave, nombre), bitacora(archived_at)").limit(10000),
-    supabase.from("ventas").select("id, vendedor_id, fecha, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at, request_id, created_at").eq("tipo", "venta").limit(20000),
+    conSubtotal((x) => supabase.from("ventas").select(`id, vendedor_id, fecha, monto, moneda, pago, vence, porcentaje_cobrado, cancelada_at, request_id, created_at${x}`).eq("tipo", "venta").limit(20000)),
     supabase.from("venta_lineas").select("articulo_id, descripcion, cantidad, articulos(clave), ventas(fecha, cancelada_at)").not("articulo_id", "is", null).limit(20000),
   ]);
   type Top = { nombre: string; clave: string; ventas: number; piezas: number; prospeccion: number };
@@ -107,7 +107,7 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
                   <th className="px-3 py-2.5 text-right">Solicitudes</th>
                   <th className="px-3 py-2.5 text-right">Cotiz. enviadas</th>
                   <th className="px-3 py-2.5 text-right">Ventas</th>
-                  <th className="px-3 py-2.5 text-right">Monto</th>
+                  <th className="px-3 py-2.5 text-right">Monto sin IVA</th>
                   <th className="px-3 py-2.5 text-right">Por cobrar</th>
                   <th className="px-3 py-2.5 text-right" title="Prospectos dados de alta en el periodo">Prosp. nuevos</th>
                   <th className="px-3 py-2.5 text-right" title="De los prospectos nuevos, cuántos ya compraron (subieron factura)">De esos, compraron</th>
@@ -192,7 +192,7 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
         </Card>
       )}
       <p className="text-xs text-slate-500">
-        Ventas y monto salen de Ventas diarias del periodo; el % junto a ventas es cuántas cotizaciones enviadas terminaron en venta. Pesos y dólares se muestran por separado (no se convierten). Prospectos nuevos y "de esos, compraron" son del periodo (compraron = ya subieron factura); abiertos hoy, por cobrar y cartera vencida son al día de hoy.
+        Ventas y monto salen de Ventas diarias del periodo, sin IVA (lo por cobrar y la cartera sí van con IVA, porque es lo que paga el cliente); el % junto a ventas es cuántas cotizaciones enviadas terminaron en venta. Pesos y dólares se muestran por separado (no se convierten). Prospectos nuevos y "de esos, compraron" son del periodo (compraron = ya subieron factura); abiertos hoy, por cobrar y cartera vencida son al día de hoy.
       </p>
     </div>
   );

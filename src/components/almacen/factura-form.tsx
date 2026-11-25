@@ -11,7 +11,7 @@ import { leerFacturaPdf } from "@/lib/pdf-cliente";
 type Linea = { clave: string; descripcion: string; unidad: string; cantidad: string; precio?: number | null; descuentoPct?: number | null; importe?: number | null; comision?: string; envio?: string };
 const mx = (n: number) => n.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 type Cliente = { nombre: string; razon: string; rfc: string; direccion: string; telefono: string };
-type Cobro = { total: string; moneda: "MXN" | "USD"; pago: "contado" | "credito"; dias: string; tc: string };
+type Cobro = { total: string; moneda: "MXN" | "USD"; pago: "contado" | "credito"; dias: string; tc: string; sub: string; subLeido?: boolean };
 /** Lo que se leyo del archivo queda fijo; solo se escribe lo que no se pudo leer. */
 type Fijo = {
   folio: boolean; fecha: boolean; nombre: boolean; razon: boolean; rfc: boolean; direccion: boolean; telefono: boolean;
@@ -74,7 +74,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
       return x.map((y, i) => ({ ...y, envio: rep[i] ? String(rep[i]) : "" }));
     });
   };
-  const [cobro, setCobro] = useState<Cobro>({ total: "", moneda: "MXN", pago: "contado", dias: "", tc: "" });
+  const [cobro, setCobro] = useState<Cobro>({ total: "", moneda: "MXN", pago: "contado", dias: "", tc: "", sub: "" });
   const [fijo, setFijo] = useState<Fijo>(SIN_FIJO);
   const [confirmado, setConfirmado] = useState(false);
   const { run, busy, notice, setNotice, router } = useRun();
@@ -139,6 +139,8 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
       pago: f.pago ?? "contado",
       dias: f.diasCredito != null ? String(f.diasCredito) : f.pago === "credito" ? "30" : "",
       tc: f.tipoCambio ? String(f.tipoCambio) : "",
+      sub: f.subtotal != null ? String(f.subtotal) : "",
+      subLeido: f.subtotal != null,
     });
     const leidoTexto = (x: string | null | undefined) => !!(x && x.trim());
     setFijo({
@@ -187,7 +189,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
     setEntrega(null);
     setMatch(null);
     setElegido(cliente);
-    setCobro({ total: "", moneda: "MXN", pago: "contado", dias: "", tc: "" });
+    setCobro({ total: "", moneda: "MXN", pago: "contado", dias: "", tc: "", sub: "" });
     setFijo(SIN_FIJO);
     setConfirmado(false);
     setNotice(null);
@@ -222,7 +224,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
         pedido: v.pedido || null,
         customer_id: elegido?.id ?? null, nombre: cli.nombre, razon_social: cli.razon, rfc: cli.rfc, direccion: cli.direccion, telefono: cli.telefono,
         entrega_nombre: entrega?.usar ? entrega.nombre || null : null, entrega_direccion: entrega?.usar ? entrega.direccion || null : null,
-        total: Number(cobro.total), moneda: cobro.moneda, tipo_cambio: cobro.moneda === "USD" && Number(cobro.tc) > 0 ? Number(cobro.tc) : null, pago: cobro.pago, dias_credito: cobro.pago === "credito" ? Number(cobro.dias) || 30 : null,
+        total: Number(cobro.total), subtotal: Number(cobro.sub) > 0 ? Number(cobro.sub) : null, moneda: cobro.moneda, tipo_cambio: cobro.moneda === "USD" && Number(cobro.tc) > 0 ? Number(cobro.tc) : null, pago: cobro.pago, dias_credito: cobro.pago === "credito" ? Number(cobro.dias) || 30 : null,
         lineas: datosLineas(),
       }));
       if (por) fd.set("por", por.id);
@@ -439,6 +441,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
                 <p className="font-semibold text-slate-900">4. Cobranza</p>
                 <div className="grid gap-3 sm:grid-cols-4">
                   <Field label="Total de la factura *"><Input value={cobro.total} readOnly={fijo.total} onChange={(e) => setCobro((s) => ({ ...s, total: e.target.value.replace(/[^\d.]/g, "") }))} inputMode="decimal" className={fijo.total ? FIJO_CLS : FALTA_CLS} /></Field>
+                  <Field label="Subtotal sin IVA"><Input value={cobro.sub} readOnly={!!cobro.subLeido} onChange={(e) => setCobro((s) => ({ ...s, sub: e.target.value.replace(/[^\d.]/g, "") }))} inputMode="decimal" placeholder="Si lo dejas vacío se calcula" className={cobro.subLeido ? FIJO_CLS : ""} /></Field>
                   <Field label="Moneda">
                     <Select value={cobro.moneda} disabled={fijo.moneda} className={fijo.moneda ? FIJO_CLS : ""} onChange={(e) => setCobro((s) => ({ ...s, moneda: e.target.value as Cobro["moneda"] }))}><option value="MXN">MXN</option><option value="USD">USD</option></Select>
                   </Field>

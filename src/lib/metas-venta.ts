@@ -13,6 +13,8 @@ export interface AvanceMeta {
   dias_mes: number;
   es_mio: boolean;
   equipo_pct: number | null;
+  /** Este usuario captura a mano las ventas de esta meta. */
+  capturo?: boolean;
 }
 
 /** Que tanto del mes ya paso (para comparar el avance contra el ritmo esperado). */

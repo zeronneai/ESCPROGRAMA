@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EVENTO_CAMBIO } from "@/components/realtime-sync";
 import { colorAvance, normalizarAvance, ritmoDe, type AvanceMeta } from "@/lib/metas-venta";
@@ -119,9 +120,16 @@ export function MetasEnVivo({ inicial }: { inicial: AvanceMeta[] }) {
             En vivo · actualizado {seg < 20 ? "hace un momento" : `hace ${seg < 60 ? `${seg} s` : `${Math.round(seg / 60)} min`}`}
           </p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        {filas.some((f) => f.capturo) && (
+          <Link href="/metas/capturar" className="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-800">
+            Capturar ventas de {filas.filter((f) => f.capturo).map((f) => f.nombre).join(", ")}
+          </Link>
+        )}
         <button type="button" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : caja.current?.requestFullscreen())} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-50">
           Pantalla completa
         </button>
+        </div>
       </div>
 
       {/* Equipo */}
@@ -169,7 +177,7 @@ export function MetasEnVivo({ inicial }: { inicial: AvanceMeta[] }) {
               </Anillo>
               <p className="text-center text-sm font-semibold leading-tight text-slate-900">{f.nombre}{f.es_mio && <span className="block text-[11px] font-normal text-brand-700">Tú</span>}</p>
               {f.meta != null && f.vendido != null && <p className="text-center text-[11px] tabular-nums text-slate-500">{pesos(f.vendido)} de {pesos(f.meta)}</p>}
-              {!f.vendedor_id && <p className="text-center text-[11px] text-slate-400">Sin usuario en el portal</p>}
+              {!f.vendedor_id && <p className="text-center text-[11px] text-slate-400">Ventas capturadas a mano</p>}
             </div>
           );
         })}
@@ -195,7 +203,7 @@ export function MetasEnVivo({ inicial }: { inicial: AvanceMeta[] }) {
         </div>
       </div>
       {filas.some((f) => f.usd_sin_tc) && <p className="text-xs text-amber-700">Hay ventas en dólares sin tipo de cambio: todavía no suman.</p>}
-      <p className="text-xs text-slate-500">Cuenta lo registrado en Ventas diarias del mes (sin canceladas). Las ventas en dólares se pasan a pesos con su tipo de cambio.</p>
+      <p className="text-xs text-slate-500">Todo es sin IVA. Cuenta lo registrado en Ventas diarias del mes (sin canceladas) y lo capturado a mano para quien no tiene usuario. Las ventas en dólares se pasan a pesos con el tipo de cambio de su factura (o el de Banxico de ese día).</p>
 
       {festejo && (
         <div className="toast-in fixed bottom-24 left-1/2 z-[70] -translate-x-1/2 rounded-2xl bg-green-600 px-5 py-3 text-center text-white shadow-2xl sm:bottom-8">

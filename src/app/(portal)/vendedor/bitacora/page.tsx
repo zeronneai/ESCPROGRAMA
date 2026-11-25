@@ -9,7 +9,7 @@ import { PROSPECT_GROUPS, prospectGroup } from "@/lib/bitacora/stages";
 import { BITACORA_SELECT } from "@/lib/bitacora/queries";
 import { getBusinessSettings } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
-import { cobroEstado, fmtMonedas, montoPorMoneda, saldoPorMoneda, VENTA_COLS } from "@/lib/ventas";
+import { cobroEstado, conSubtotal, fmtMonedas, montoPorMoneda, saldoPorMoneda, VENTA_COLS } from "@/lib/ventas";
 
 const VENTA_VIEWS = { hoy: "Hoy", semana: "Esta semana", mes: "Este mes", por_cobrar: "Por cobrar", vencidas: "Vencidas", por_entregar: "Por entregar", visitas: "Visitas sin venta", todas: "Todas" } as const;
 type VentaView = keyof typeof VENTA_VIEWS;
@@ -26,7 +26,7 @@ export default async function Bitacora({ searchParams }: { searchParams: Promise
   const weekStart = now.startOf("week").toISODate()!;
 
   const [ventasQ, bitQ, { count: movHoy }, { count: convertidos }] = await Promise.all([
-    supabase.from("ventas").select(`${VENTA_COLS}, customers(nombre), venta_lineas(descripcion, cantidad)`).eq("vendedor_id", user.id).order("fecha", { ascending: false }).order("created_at", { ascending: false }).limit(1000),
+    conSubtotal((x) => supabase.from("ventas").select(`${VENTA_COLS}${x}, customers(nombre), venta_lineas(descripcion, cantidad)`).eq("vendedor_id", user.id).order("fecha", { ascending: false }).order("created_at", { ascending: false }).limit(1000)),
     supabase.from("bitacora").select(BITACORA_SELECT).or(`vendedor_id.eq.${user.id},vendedor_id.is.null`).order("updated_at", { ascending: false }).limit(1500),
     supabase.from("bitacora_eventos").select("id", { count: "exact", head: true }).eq("created_by", user.id).gte("created_at", now.startOf("day").toUTC().toISO()!),
     supabase.from("customers").select("id", { count: "exact", head: true }).eq("convertido_por", user.id).gte("convertido_at", now.startOf("month").toUTC().toISO()!),

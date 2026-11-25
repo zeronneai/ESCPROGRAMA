@@ -6,7 +6,7 @@ import { quickVentaAction } from "@/actions/ventas";
 import { Chip, useRun } from "@/components/ops-ui";
 import { Alert, EmptyState } from "@/components/ui";
 import { CobrarVenta } from "@/components/ventas/cobrar-venta";
-import { cobroEstado, diasVencidos, fmtMonedas, money, montoPorMoneda, saldo, type VentaRow } from "@/lib/ventas";
+import { cobroEstado, diasVencidos, fmtMonedas, money, montoPorMoneda, saldo, sinIva, type VentaRow } from "@/lib/ventas";
 
 export type VentaListRow = VentaRow & {
   customers: { nombre: string } | null;
@@ -49,7 +49,7 @@ export function VentasList({ rows, today, basePath, editable, showSeller = false
                       <p className="flex flex-wrap items-center gap-2 font-medium text-slate-900">
                         <span className="truncate">{r.customers?.nombre ?? "Cliente"}</span>
                         {r.tipo === "visita" && <Chip cls="bg-amber-100 text-amber-900">Visita sin venta</Chip>}
-                        {r.monto != null && <span className="text-sm font-semibold text-slate-700">{money(Number(r.monto), r.moneda)}</span>}
+                        {r.monto != null && <span className="text-sm font-semibold text-slate-700" title={r.subtotal != null ? `Total con IVA: ${money(Number(r.monto), r.moneda)}` : undefined}>{money(sinIva(r), r.moneda)}{r.subtotal != null && <span className="ml-1 text-[11px] font-normal text-slate-500">sin IVA</span>}</span>}
                         {r.origen === "portal" && !r.factura && <Chip cls="bg-brand-100 text-brand-900">Del portal: complétala</Chip>}
                       </p>
                       {r.tipo === "visita" ? (

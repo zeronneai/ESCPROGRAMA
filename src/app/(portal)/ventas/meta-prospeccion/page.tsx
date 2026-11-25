@@ -18,7 +18,7 @@ export default async function MetaProspeccion() {
   const [{ data: cfg, error }, { data: av }, { data: metasV, error: errMetas }, { data: usuarios }] = await Promise.all([
     supabase.from("prospeccion_config").select("meta_telemarketing, meta_campo, inicio").eq("id", 1).maybeSingle(),
     supabase.rpc("prospeccion_avance"),
-    supabase.from("metas_venta").select("id, nombre, vendedor_id, meta, estado").order("orden").order("nombre"),
+    supabase.from("metas_venta").select("id, nombre, vendedor_id, capturista_id, meta, estado").order("orden").order("nombre"),
     supabase.from("profiles").select("id, nombre").in("rol", ["vendedor", "jefe_ventas"]).eq("activo", true).order("nombre"),
   ]);
   if (error || !cfg)
@@ -47,7 +47,7 @@ export default async function MetaProspeccion() {
         ) : (
           <ConfigMetasVenta metas={((metasV ?? []) as MetaFila[]).map((m) => ({ ...m, meta: Number(m.meta) }))} usuarios={(usuarios ?? []) as { id: string; nombre: string }[]} edita={edita} />
         )}
-        <p className="text-xs text-slate-500">El avance es lo registrado en Ventas diarias del mes por ese usuario. Una meta en pausa no sale en las gráficas.</p>
+        <p className="text-xs text-slate-500">El avance es lo registrado en Ventas diarias del mes por ese usuario, sin IVA. Para una meta sin usuario (como José Ortiz), elige quién captura sus ventas: esa persona las sube a mano en Metas, Capturar ventas. Una meta en pausa no sale en las gráficas.</p>
       </Card>
 
       <Card className="space-y-3 p-4">
