@@ -88,6 +88,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 71 | `0076_conciliaciones.sql` | **Conciliaciones bancarias**: finanzas sube el estado de cuenta (solo abonos); los vendedores identifican sus pagos y su factura queda pagada con la fecha del abono. |
 | 72 | `0077_conciliacion_plazo.sql` | **Conciliaciones: 7 días para identificar** (después en rojo, comisión −10% y siguiente quincena); la gerente y el CEO ven e identifican a nombre de un vendedor; aviso en tiempo real. |
 | 73 | `0078_pedidos_vendedores.sql` | **Pedidos de vendedores y asistente de compras**: los vendedores piden artículos del kárdex u "otro" (única, semanal, mensual, anual); las únicas se cierran solas al entrar en una OC; reglas y uso del asistente (Claude). |
+| 74 | `0079_meta_prospeccion.sql` | **Meta diaria de prospección**: telemarketing 8 y campo 2 prospectos por día (lunes a viernes, acumulativa desde el 16 de noviembre); la jefa cambia metas y tipo de cada vendedor; aviso rojo y ventana diaria para el vendedor. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

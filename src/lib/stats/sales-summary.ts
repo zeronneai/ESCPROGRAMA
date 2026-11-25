@@ -67,6 +67,10 @@ export interface SellerSummary {
   carteraVencidaUsd: number;
   prospectosActivos: number;
   prospectosNuevos: number;
+  /** De los prospectos nuevos del periodo, cuantos ya compraron (factura). */
+  nuevosCompraron: number;
+  /** nuevosCompraron / prospectosNuevos en %. */
+  conversionProspectos: number | null;
   convertidos: number;
   seguimientosVencidos: number;
   movimientos: number;
@@ -86,6 +90,8 @@ export function summarizeSellers(i: SummaryInput): SellerSummary[] {
       const ev = i.events.filter((e) => e.created_by === s.id).map((e) => e.created_at);
       const last = [...ev, ...b.map((r) => r.updated_at), ...v.map((x) => x.created_at)].sort().at(-1) ?? null;
       const st = v.map((x) => ({ x, e: cobroEstado(x, i.today) }));
+      const nuevos = b.filter((r) => inDate(dayOf(r.created_at)));
+      const compraron = nuevos.filter((r) => r.resultado === "ganada").length;
       return {
         id: s.id,
         nombre: s.nombre,
@@ -101,7 +107,9 @@ export function summarizeSellers(i: SummaryInput): SellerSummary[] {
         carteraVencida: st.filter((y) => y.e === "vencida" && y.x.moneda !== "USD").reduce((a, y) => a + saldo(y.x), 0),
         carteraVencidaUsd: st.filter((y) => y.e === "vencida" && y.x.moneda === "USD").reduce((a, y) => a + saldo(y.x), 0),
         prospectosActivos: b.filter((r) => r.resultado === "abierta").length,
-        prospectosNuevos: b.filter((r) => inDate(dayOf(r.created_at))).length,
+        prospectosNuevos: nuevos.length,
+        nuevosCompraron: compraron,
+        conversionProspectos: nuevos.length ? Math.round((compraron / nuevos.length) * 100) : null,
         convertidos: i.conversions.filter((c) => c.convertido_por === s.id).length,
         seguimientosVencidos: b.filter((r) => r.resultado === "abierta" && !!r.proximo_seguimiento && r.proximo_seguimiento < i.today).length,
         movimientos: ev.length + v.filter((x) => inDate(dayOf(x.created_at))).length,
@@ -125,6 +133,7 @@ export function totals(rows: SellerSummary[]) {
     carteraVencidaUsd: sum("carteraVencidaUsd"),
     prospectosActivos: sum("prospectosActivos"),
     prospectosNuevos: sum("prospectosNuevos"),
+    nuevosCompraron: sum("nuevosCompraron"),
     convertidos: sum("convertidos"),
     movimientos: sum("movimientos"),
   };

@@ -83,8 +83,8 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
         <StatCard label="Solicitudes a compras" value={t.solicitudes} />
         <StatCard label="Cotizaciones enviadas" value={t.cotizacionesEnviadas} />
         <StatCard label="Ventas" value={t.ventas} tone={t.ventas ? "green" : "default"} hint={t.montoVentas || t.montoVentasUsd ? fmtMonedas({ mxn: t.montoVentas, usd: t.montoVentasUsd }) : undefined} />
-        <StatCard label="Prospectos activos" value={t.prospectosActivos} hint={`${t.prospectosNuevos} nuevos`} />
-        <StatCard label="Prospectos que se volvieron clientes" value={t.convertidos} tone={t.convertidos ? "green" : "default"} />
+        <StatCard label="Prospectos nuevos" value={t.prospectosNuevos} hint={`${t.prospectosActivos} abiertos hoy`} />
+        <StatCard label="De esos, ya compraron" value={t.nuevosCompraron} tone={t.nuevosCompraron ? "green" : "default"} hint={t.prospectosNuevos ? `${Math.round((t.nuevosCompraron / t.prospectosNuevos) * 100)}% de conversión` : undefined} />
         <StatCard label="Cartera vencida" value={fmtMonedas({ mxn: t.carteraVencida, usd: t.carteraVencidaUsd })} tone={t.carteraVencida > 0 || t.carteraVencidaUsd > 0 ? "red" : "default"} hint={t.porCobrar || t.porCobrarUsd ? `${fmtMonedas({ mxn: t.porCobrar, usd: t.porCobrarUsd })} por cobrar al corriente` : undefined} />
       </div>
 
@@ -109,8 +109,10 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
                   <th className="px-3 py-2.5 text-right">Ventas</th>
                   <th className="px-3 py-2.5 text-right">Monto</th>
                   <th className="px-3 py-2.5 text-right">Por cobrar</th>
-                  <th className="px-3 py-2.5 text-right">Prospectos</th>
-                  <th className="px-3 py-2.5 text-right">Convertidos</th>
+                  <th className="px-3 py-2.5 text-right" title="Prospectos dados de alta en el periodo">Prosp. nuevos</th>
+                  <th className="px-3 py-2.5 text-right" title="De los prospectos nuevos, cuántos ya compraron (subieron factura)">De esos, compraron</th>
+                  <th className="px-3 py-2.5 text-right">% conversión</th>
+                  <th className="px-3 py-2.5 text-right" title="Prospectos abiertos al día de hoy (de cualquier fecha)">Abiertos hoy</th>
                   <th className="px-3 py-2.5 text-right">Cartera vencida</th>
                   <th className="px-3 py-2.5 text-right">Movimientos</th>
                   <th className="px-4 py-2.5">Última actividad</th>
@@ -129,8 +131,10 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
                     <td className="px-3 py-2.5 text-right tabular-nums">{r.ventas}{r.conversion !== null && <span className="ml-1 text-xs text-slate-400" title="Cotizaciones que terminaron en venta">{r.conversion}%</span>}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{r.montoVentas || r.montoVentasUsd ? fmtMonedas({ mxn: r.montoVentas, usd: r.montoVentasUsd }) : "-"}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{r.porCobrar || r.porCobrarUsd ? fmtMonedas({ mxn: r.porCobrar, usd: r.porCobrarUsd }) : "-"}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{r.prospectosActivos}{r.prospectosNuevos > 0 && <span className="ml-1 text-xs text-green-700">+{r.prospectosNuevos}</span>}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{r.convertidos}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">{r.prospectosNuevos}</td>
+                    <td className={`px-3 py-2.5 text-right tabular-nums ${r.nuevosCompraron ? "font-semibold text-green-700" : ""}`}>{r.nuevosCompraron}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">{r.conversionProspectos === null ? "-" : `${r.conversionProspectos}%`}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-500">{r.prospectosActivos}</td>
                     <td className={`px-3 py-2.5 text-right tabular-nums ${r.carteraVencida ? "text-red-700" : ""}`}>{r.carteraVencida || r.carteraVencidaUsd ? fmtMonedas({ mxn: r.carteraVencida, usd: r.carteraVencidaUsd }) : "-"}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{r.movimientos}</td>
                     <td className="px-4 py-2.5 text-xs text-slate-500">{r.ultimaActividad ? DateTime.fromISO(r.ultimaActividad).setZone(cfg.timezone).setLocale("es-MX").toRelative() : "Nunca"}</td>
@@ -152,9 +156,9 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
                     ["Solicitudes", r.solicitudes],
                     ["Cotizaciones", r.cotizacionesEnviadas],
                     ["Ventas", r.ventas],
-                    ["Prospectos", r.prospectosActivos],
-                    ["Convertidos", r.convertidos],
-                    ["Movimientos", r.movimientos],
+                    ["Prosp. nuevos", r.prospectosNuevos],
+                    ["Compraron", r.conversionProspectos === null ? r.nuevosCompraron : `${r.nuevosCompraron} (${r.conversionProspectos}%)`],
+                    ["Abiertos hoy", r.prospectosActivos],
                   ].map(([l, n]) => (
                     <div key={l} className="rounded-md bg-slate-50 py-2">
                       <dd className="text-lg font-semibold tabular-nums text-slate-900">{n}</dd>
@@ -188,7 +192,7 @@ export default async function ResumenVentas({ searchParams }: { searchParams: Pr
         </Card>
       )}
       <p className="text-xs text-slate-500">
-        Ventas y monto salen de Ventas diarias del periodo; el % junto a ventas es cuántas cotizaciones enviadas terminaron en venta. Pesos y dólares se muestran por separado (no se convierten). Prospectos, por cobrar y cartera vencida son al día de hoy.
+        Ventas y monto salen de Ventas diarias del periodo; el % junto a ventas es cuántas cotizaciones enviadas terminaron en venta. Pesos y dólares se muestran por separado (no se convierten). Prospectos nuevos y "de esos, compraron" son del periodo (compraron = ya subieron factura); abiertos hoy, por cobrar y cartera vencida son al día de hoy.
       </p>
     </div>
   );

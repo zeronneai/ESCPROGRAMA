@@ -9,6 +9,7 @@ import { CatalogoAviso } from "@/components/catalogo-aviso";
 import { NotificationBell } from "@/components/notification-bell";
 import { RealtimeSync } from "@/components/realtime-sync";
 import { AvisoConciliacion } from "@/components/finanzas/aviso-conciliacion";
+import { AvisoMetaProspeccion } from "@/components/prospeccion/aviso-meta";
 import { RIESGO_ROLES } from "@/lib/riesgos";
 import { CATALOGO, CATALOGO_VISIBLE } from "@/lib/marca";
 import { AddCustomerButton } from "@/components/customers";
@@ -74,6 +75,7 @@ const NAV: Record<Rol, NavItem[]> = {
   jefe_ventas: [
     { href: "/ventas", label: "Resumen", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
     { href: "/ventas/comisiones", label: "Comisiones", icon: "dollar" },
+    { href: "/ventas/meta-prospeccion", label: "Meta de prospección", short: "Meta", icon: "target", secondary: true },
     { href: "/vendedor/bitacora", label: "Mi bitácora", short: "Bitácora", icon: "target" },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/ventas/clientes", label: "Clientes", icon: "building" },
@@ -97,6 +99,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/ventas", label: "Ventas", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
     { href: "/cotizaciones", label: "Cotizaciones", short: "Cotiz.", icon: "inbox" },
     { href: "/ventas/comisiones", label: "Comisiones", short: "Comisión", icon: "dollar" },
+    { href: "/ventas/meta-prospeccion", label: "Meta de prospección", short: "Meta", icon: "target", secondary: true },
     { href: "/pedidos-compras", label: "Pedir al comprador", short: "Pedir", icon: "cart", secondary: true },
     { href: "/finanzas/conciliaciones", label: "Conciliaciones", short: "Bancos", icon: "inbox", secondary: true },
     { href: "/calidad", label: "Calidad", icon: "alert" },
@@ -164,6 +167,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/pagos", label: "Pagos a proveedores", short: "Pagos", icon: "dollar" },
     { href: "/ventas", label: "Ventas", icon: "chart", match: ["/ventas/vendedor", "/ventas/bitacora"] },
     { href: "/ventas/comisiones", label: "Comisiones", icon: "dollar", secondary: true },
+    { href: "/ventas/meta-prospeccion", label: "Meta de prospección", short: "Meta", icon: "target", secondary: true },
     { href: "/pedidos-compras", label: "Pedir al comprador", short: "Pedir", icon: "cart", secondary: true },
     { href: "/finanzas/conciliaciones", label: "Conciliaciones", icon: "inbox", secondary: true },
     { href: "/calidad", label: "Calidad", icon: "alert" },
@@ -220,6 +224,7 @@ export default async function PortalLayout({ children }: { children: React.React
       <RealtimeSync />
       {(user.rol === "vendedor" || user.rol === "jefe_ventas") && <AvisoConciliacion destino="/vendedor/conciliaciones" />}
       {(user.rol === "gerente" || user.rol === "ceo") && <AvisoConciliacion destino="/finanzas/conciliaciones" />}
+      {user.rol === "vendedor" && <AvisoMetaProspeccion />}
       <main className="pb-safe-nav mx-auto max-w-6xl px-4 pt-5 sm:pt-6">{children}</main>
       <HelpChat rol={user.rol} nombre={user.nombre} />
       <Suspense fallback={null}>

@@ -309,7 +309,7 @@ export const FAQ: Faq[] = [
   {
     id: "resumen", q: "¿Qué muestra el resumen de ventas?", roles: [...J, "gerente", ...ISO, ...C], paths: ["/ventas"],
     keys: ["resumen", "vendedores", "reporte", "desempeño", "ventas", "periodo", "mes"],
-    a: ["Por vendedor: solicitudes, cotizaciones enviadas, ventas y monto, por cobrar, cartera vencida, prospectos, convertidos y movimientos.", "Cambia el periodo arriba (7 días, mes, mes anterior, año).", "Toca a un vendedor para ver sus ventas diarias, prospección y cotizaciones."],
+    a: ["Por vendedor: solicitudes, cotizaciones enviadas, ventas y monto, por cobrar, cartera vencida, prospectos nuevos del periodo, cuántos de esos ya compraron (% de conversión), abiertos hoy y movimientos.", "Cambia el periodo arriba (7 días, mes, mes anterior, año).", "Toca a un vendedor para ver sus ventas diarias, prospección y cotizaciones."],
     links: [{ label: "Resumen", href: "/ventas" }],
   },
 
