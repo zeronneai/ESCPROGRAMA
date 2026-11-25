@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from "react";
 import { cobrarConComisionAction, lineasCobroAction } from "@/actions/ventas";
 import { toast } from "@/components/feedback-global";
 import { Button } from "@/components/ui";
+import { TcPago } from "@/components/ventas/tc-pago";
 import { ComisionEditor, completa, filaDe, payloadDe, type FilaCom } from "@/components/ventas/comision-editor";
 
 /**
@@ -15,6 +16,9 @@ export function CobrarVenta({ ventaId, fechaVenta, today, moneda, onClose }: { v
   const router = useRouter();
   const [pend, start] = useTransition();
   const [fecha, setFecha] = useState("");
+  const [tc, setTc] = useState("");
+  const usd = moneda === "USD";
+  const tcOk = !usd || (Number(tc) >= 5 && Number(tc) <= 60);
   const [filas, setFilas] = useState<FilaCom[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,7 +35,7 @@ export function CobrarVenta({ ventaId, fechaVenta, today, moneda, onClose }: { v
   const completos = !!filas && filas.every(completa);
   const guardar = () =>
     start(async () => {
-      const r = await cobrarConComisionAction(ventaId, fecha, (filas ?? []).map(payloadDe));
+      const r = await cobrarConComisionAction(ventaId, fecha, (filas ?? []).map(payloadDe), usd ? Number(tc) : null);
       if (!r.ok) return toast(r.error, "error");
       toast("Venta marcada como pagada con su comisión", "success");
       onClose();
@@ -48,6 +52,7 @@ export function CobrarVenta({ ventaId, fechaVenta, today, moneda, onClose }: { v
         ¿Cuándo te pagaron? *
         <input type="date" value={fecha} max={today} min={fechaVenta} onChange={(e) => setFecha(e.target.value)} className={`rounded border px-2 py-1 text-sm ${fecha ? "border-slate-300" : "border-amber-400 bg-amber-50"}`} />
       </label>
+      {usd && <TcPago fecha={fecha} valor={tc} setValor={setTc} />}
       {error && <p className="text-red-700">{error}</p>}
       {!filas && !error && (
         <p className="flex items-center gap-2 text-slate-600">
@@ -62,9 +67,10 @@ export function CobrarVenta({ ventaId, fechaVenta, today, moneda, onClose }: { v
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" onClick={guardar} loading={pend} disabled={!fecha || !filas || !completos}>Marcar pagada</Button>
+        <Button type="button" onClick={guardar} loading={pend} disabled={!fecha || !filas || !completos || !tcOk}>Marcar pagada</Button>
         {filas && !completos && <span className="text-xs text-amber-800">Falta el importe o el % de algún artículo.</span>}
         {!fecha && <span className="text-xs text-amber-800">Falta la fecha de pago.</span>}
+        {fecha && !tcOk && <span className="text-xs text-amber-800">Falta el tipo de cambio del pago.</span>}
       </div>
     </div>
   );

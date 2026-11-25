@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { TcPago } from "@/components/ventas/tc-pago";
 import { useState } from "react";
 import { cancelarVentaAction, saveVentaAction } from "@/actions/ventas";
 import { ArticuloSearch } from "@/components/articulos-picker";
@@ -44,6 +45,7 @@ export function VentaForm({
     entregado: venta?.entregado ?? false,
     porcentaje_cobrado: venta ? String(Number(venta.porcentaje_cobrado)) : "0",
     fecha_cobro: venta?.fecha_cobro ?? "",
+    tipo_cambio_pago: venta?.tipo_cambio_pago != null ? String(Number(venta.tipo_cambio_pago)) : "",
     comentarios: venta?.comentarios ?? "",
   });
   const { run, busy, notice, router } = useRun();
@@ -234,6 +236,11 @@ export function VentaForm({
                 />
                 {!v.fecha_cobro && <span className="font-normal text-amber-800">Obligatoria para marcarla pagada</span>}
               </label>
+            )}
+            {Number(v.porcentaje_cobrado) >= 100 && v.moneda === "USD" && (
+              <div className="mt-1">
+                <TcPago fecha={v.fecha_cobro} valor={v.tipo_cambio_pago} setValor={(x) => setV((s) => ({ ...s, tipo_cambio_pago: x }))} monto={v.monto ? Number(v.monto) : null} disabled={ro} />
+              </div>
             )}
           </div>
         </div>

@@ -38,6 +38,8 @@ export interface VentaRow {
   subtotal?: number | string | null;
   subtotal_estimado?: boolean | null;
   moneda: "MXN" | "USD";
+  /** Tipo de cambio del dia en que pagaron (ventas en USD). */
+  tipo_cambio_pago?: number | string | null;
   /** Pesos por dolar que traia la factura (solo como dato). */
   tipo_cambio?: number | null;
   pago: "contado" | "credito";
@@ -67,12 +69,14 @@ export const MOTIVOS_NO_VENTA = [
 ] as const;
 
 /** Columnas de venta con el subtotal sin IVA (0080). */
-export const COLS_SIN_IVA = ", subtotal, subtotal_estimado";
+export const COLS_SIN_IVA = ", subtotal, subtotal_estimado, tipo_cambio_pago";
 
 /** Consulta con el subtotal; si falta la actualizacion 0080, la repite sin el. */
 export async function conSubtotal<T extends { error: { message: string } | null }>(q: (extra: string) => PromiseLike<T>): Promise<T> {
   const r = await q(COLS_SIN_IVA);
-  return r.error && /subtotal/.test(r.error.message) ? q("") : r;
+  if (!r.error || !/subtotal|tipo_cambio_pago/.test(r.error.message)) return r;
+  const r2 = await q(", subtotal, subtotal_estimado");
+  return r2.error && /subtotal/.test(r2.error.message) ? q("") : r2;
 }
 
 export const VENTA_COLS =
@@ -115,8 +119,11 @@ export const ventaSchema = z.object({
   /** Fecha en que pagaron: obligatoria al marcarla pagada (100%). */
   fecha_cobro: z.union([z.literal(""), z.null(), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha de pago inválida")]).optional().transform((v) => v || null),
   comentarios: txt(2000),
+  /** Dolares: tipo de cambio del dia del pago (obligatorio al marcarla pagada). */
+  tipo_cambio_pago: z.union([z.literal(""), z.null(), z.coerce.number().min(5, "Revisa el tipo de cambio").max(60, "Revisa el tipo de cambio")]).optional().transform((v) => (v === "" || v === undefined ? null : v)),
 }).superRefine((v, ctx) => {
   if (v.tipo !== "visita" && v.porcentaje_cobrado >= 100 && !v.fecha_cobro) ctx.addIssue({ code: "custom", path: ["fecha_cobro"], message: "Escribe la fecha en que te pagaron" });
+  if (v.tipo !== "visita" && v.moneda === "USD" && v.porcentaje_cobrado >= 100 && !v.tipo_cambio_pago) ctx.addIssue({ code: "custom", path: ["tipo_cambio_pago"], message: "Es en dólares: escribe el tipo de cambio del día en que te pagaron" });
   if (v.tipo === "visita" && !v.motivo_no_venta) ctx.addIssue({ code: "custom", path: ["motivo_no_venta"], message: "Elige por qué no se concretó la venta" });
 });
 export type VentaInput = z.input<typeof ventaSchema>;

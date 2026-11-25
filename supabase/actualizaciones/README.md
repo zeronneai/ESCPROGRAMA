@@ -91,6 +91,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 74 | `0079_meta_prospeccion.sql` | **Meta diaria de prospección**: telemarketing 8 y campo 2 prospectos por día (lunes a viernes, acumulativa desde el 16 de noviembre); la jefa cambia metas y tipo de cada vendedor; aviso rojo y ventana diaria para el vendedor. |
 | 75 | `0080_metas_ventas.sql` | **Metas mensuales de venta y ventas sin IVA**: subtotal sin IVA en cada venta (de la factura o estimado); captura manual para metas sin usuario; meta en pesos sin IVA por vendedor (Casa Local y VTS Cd Juárez en pausa, José Ortiz sin usuario); avance en % con Ventas diarias del mes en tiempo real (/metas); la jefa las cambia en Metas. |
 | 76 | `0081_metas_periodo_publico.sql` | **Metas: periodo proporcional y pantalla pública**: la jefa elige desde/hasta qué día cuenta el mes (la meta se ajusta a esos días; empieza el 16 de noviembre); al cambiar de mes se toma completo solo; link sin usuario para las teles, solo porcentajes, en tiempo real. |
+| 77 | `0082_tipo_cambio_pago.sql` | **Tipo de cambio del pago**: al marcar pagada una venta en dólares se pide el tipo de cambio del día del pago (propone el de Banxico); si la marca Conciliaciones se pone el de Banxico. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

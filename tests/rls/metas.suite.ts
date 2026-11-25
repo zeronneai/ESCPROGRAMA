@@ -36,6 +36,14 @@ export function metasSuite() {
       await q("postgres", "update public.ventas set tipo_cambio=20 where id=$1", [usd]);
       await q(w.seller1, "select public.venta_subtotal_factura($1, 1000)", [usd]);
       expect(await failure(q(w.seller2, "select public.venta_subtotal_factura($1, 1)", [usd]))).toMatch(/No autorizado/);
+      // Pagada en dolares: el vendedor pone el tipo de cambio del pago; si no (Conciliaciones), el de Banxico.
+      await q("postgres", "insert into public.tipos_cambio (fecha, usd_mxn) values (public.local_today() - 1, 18.5) on conflict (fecha) do update set usd_mxn = 18.5");
+      await q(w.seller1, "update public.ventas set porcentaje_cobrado=100, fecha_cobro=public.local_today(), tipo_cambio_pago=18.1 where id=$1", [usd]);
+      expect((await q("postgres", "select tipo_cambio_pago::float t, tipo_cambio_pago_fuente f from public.ventas where id=$1", [usd])).rows[0]).toEqual({ t: 18.1, f: "manual" });
+      await q("postgres", "update public.ventas set porcentaje_cobrado=0 where id=$1", [usd]);
+      expect((await q("postgres", "select tipo_cambio_pago from public.ventas where id=$1", [usd])).rows[0].tipo_cambio_pago).toBeNull();
+      await q("postgres", "update public.ventas set porcentaje_cobrado=100, fecha_cobro=public.local_today() where id=$1", [usd]);
+      expect((await q("postgres", "select tipo_cambio_pago::float t, tipo_cambio_pago_fuente f from public.ventas where id=$1", [usd])).rows[0]).toEqual({ t: 18.5, f: "banxico" });
       expect((await q("postgres", "select at from public.ventas_pulso")).rows[0].at).not.toEqual(pulso0);
       const mio = (await q(w.seller1, "select * from public.metas_ventas_avance()")).rows;
       const m1 = mio.find((r) => r.nombre === `M1 ${tag}`)!;

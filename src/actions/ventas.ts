@@ -28,9 +28,10 @@ export async function saveVentaAction(id: string | null, input: VentaInput, line
   let ventaId = id;
   let cobroPendiente = 0;
   let fechaCobro: string | null = null;
+  const { tipo_cambio_pago: tcPago, ...datos } = parsed.data;
   const fila: Record<string, unknown> = visita
-    ? { ...parsed.data, monto: null, pedido: null, factura: null, pago: "contado" as const, dias_credito: null, entregado: false, porcentaje_cobrado: 0 }
-    : { ...parsed.data, motivo_no_venta: null };
+    ? { ...datos, monto: null, pedido: null, factura: null, pago: "contado" as const, dias_credito: null, entregado: false, porcentaje_cobrado: 0 }
+    : { ...datos, motivo_no_venta: null, ...(datos.moneda === "USD" && datos.porcentaje_cobrado >= 100 && tcPago ? { tipo_cambio_pago: tcPago } : {}) };
   if (id) {
     if (!uuid.safeParse(id).success) return { ok: false, error: "Venta inválida" };
     const { tipo: _tipo, ...upd } = fila;
@@ -42,7 +43,9 @@ export async function saveVentaAction(id: string | null, input: VentaInput, line
     // Se registra sin cobro y, ya con sus articulos, se marca lo cobrado (para revisar la comision al pagarla).
     const cobro = Number(fila.porcentaje_cobrado ?? 0);
     fechaCobro = (fila.fecha_cobro as string | null) ?? null;
-    const { data, error } = await supabase.from("ventas").insert({ ...fila, porcentaje_cobrado: 0, fecha_cobro: null }).select("id").single();
+    const { tipo_cambio_pago: _tc, ...nueva } = fila;
+    void _tc;
+    const { data, error } = await supabase.from("ventas").insert({ ...nueva, porcentaje_cobrado: 0, fecha_cobro: null }).select("id").single();
     if (error) return { ok: false, error: friendlyError(error.message) };
     ventaId = data.id;
     cobroPendiente = cobro;
@@ -65,7 +68,7 @@ export async function saveVentaAction(id: string | null, input: VentaInput, line
     if (error) return { ok: false, error: friendlyError(error.message) };
   }
   if (cobroPendiente > 0) {
-    const { error } = await supabase.from("ventas").update({ porcentaje_cobrado: cobroPendiente, fecha_cobro: cobroPendiente >= 100 ? fechaCobro : null }).eq("id", ventaId!);
+    const { error } = await supabase.from("ventas").update({ porcentaje_cobrado: cobroPendiente, fecha_cobro: cobroPendiente >= 100 ? fechaCobro : null, ...(cobroPendiente >= 100 && fila.tipo_cambio_pago ? { tipo_cambio_pago: fila.tipo_cambio_pago } : {}) }).eq("id", ventaId!);
     if (error) {
       refresh(ventaId!);
       return { ok: false, error: `La venta se registró, pero no como pagada. ${errorCobro(error.message) ?? friendlyError(error.message)}` };
@@ -77,17 +80,24 @@ export async function saveVentaAction(id: string | null, input: VentaInput, line
 }
 
 /** Marcar rapido desde la lista: entregada o cobrada. */
-export async function quickVentaAction(id: string, patch: { entregado?: boolean; porcentaje_cobrado?: number; fecha_cobro?: string }): Promise<Result> {
+export async function quickVentaAction(id: string, patch: { entregado?: boolean; porcentaje_cobrado?: number; fecha_cobro?: string | null; tipo_cambio_pago?: number | null }): Promise<Result> {
   await requireUser();
   if (!uuid.safeParse(id).success) return { ok: false, error: "Venta inválida" };
   const p: Record<string, unknown> = {};
   if (typeof patch.entregado === "boolean") p.entregado = patch.entregado;
   if (typeof patch.porcentaje_cobrado === "number" && patch.porcentaje_cobrado >= 0 && patch.porcentaje_cobrado <= 100) p.porcentaje_cobrado = patch.porcentaje_cobrado;
+  const supabase = await createClient();
   if (p.porcentaje_cobrado === 100) {
     if (!patch.fecha_cobro || !/^\d{4}-\d{2}-\d{2}$/.test(patch.fecha_cobro)) return { ok: false, error: "Escribe la fecha en que te pagaron." };
     p.fecha_cobro = patch.fecha_cobro;
+    // En dolares: tipo de cambio del dia del pago (para saber en cuantos pesos se pago).
+    const { data: v } = await supabase.from("ventas").select("moneda").eq("id", id).maybeSingle();
+    if (v?.moneda === "USD") {
+      const tc = Number(patch.tipo_cambio_pago);
+      if (!(tc >= 5 && tc <= 60)) return { ok: false, error: "Es en dólares: escribe el tipo de cambio del día en que te pagaron." };
+      p.tipo_cambio_pago = tc;
+    }
   }
-  const supabase = await createClient();
   const { data, error } = await supabase.from("ventas").update(p).eq("id", id).select("id");
   if (error) return { ok: false, error: errorCobro(error.message) ?? friendlyError(error.message) };
   if (!data?.length) return { ok: false, error: "No tienes permiso para editar esta venta." };
@@ -216,7 +226,7 @@ export async function lineasCobroAction(ventaId: string): Promise<Result<{ linea
 }
 
 /** Marcar cobrada en un solo paso: guarda la comision de cada articulo y luego la fecha de pago. */
-export async function cobrarConComisionAction(ventaId: string, fechaCobro: string, lineas: unknown): Promise<Result> {
+export async function cobrarConComisionAction(ventaId: string, fechaCobro: string, lineas: unknown, tipoCambioPago?: number | null): Promise<Result> {
   await requireUser();
   if (!uuid.safeParse(ventaId).success) return { ok: false, error: "Venta inválida" };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaCobro)) return { ok: false, error: "Escribe la fecha en que te pagaron." };
@@ -228,7 +238,7 @@ export async function cobrarConComisionAction(ventaId: string, fechaCobro: strin
     const { error } = await supabase.rpc("venta_comisiones", { p_venta: ventaId, p_lineas: p.data });
     if (error) return { ok: false, error: /venta_comisiones|comision_pct/.test(error.message) ? "Falta correr la actualización 0072 en la base." : friendlyError(error.message) };
   }
-  const r = await quickVentaAction(ventaId, { porcentaje_cobrado: 100, fecha_cobro: fechaCobro });
+  const r = await quickVentaAction(ventaId, { porcentaje_cobrado: 100, fecha_cobro: fechaCobro, tipo_cambio_pago: tipoCambioPago ?? null });
   revalidatePath("/vendedor/comisiones");
   revalidatePath("/ventas/comisiones");
   return r;
@@ -260,4 +270,14 @@ export async function guardarSubtotalAction(ventaId: string, subtotal: number): 
   const supabase = await createClient();
   const { error } = await supabase.rpc("venta_subtotal_factura", { p_venta: ventaId, p_subtotal: subtotal });
   return error ? { ok: false, error: friendlyError(error.message) } : { ok: true };
+}
+
+/** Tipo de cambio de Banxico (DOF) para una fecha: se propone al marcar pagada una venta en dolares. */
+export async function tipoCambioDiaAction(fecha: string): Promise<number | null> {
+  await requireUser();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return null;
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("tipo_cambio_para", { p_fecha: fecha });
+  const r = (Array.isArray(data) ? data[0] : data) as { usd_mxn: number | string } | null;
+  return r?.usd_mxn != null ? Number(r.usd_mxn) : null;
 }
