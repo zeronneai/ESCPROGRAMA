@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EVENTO_CAMBIO } from "@/components/realtime-sync";
 import { colorAvance, normalizarAvance, ritmoDe, type AvanceMeta } from "@/lib/metas-venta";
@@ -121,11 +120,6 @@ export function MetasEnVivo({ inicial }: { inicial: AvanceMeta[] }) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-        {filas.some((f) => f.capturo) && (
-          <Link href="/metas/capturar" className="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-brand-800">
-            Capturar ventas de {filas.filter((f) => f.capturo).map((f) => f.nombre).join(", ")}
-          </Link>
-        )}
         <button type="button" onClick={() => (document.fullscreenElement ? document.exitFullscreen() : caja.current?.requestFullscreen())} className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 shadow-sm hover:bg-slate-50">
           Pantalla completa
         </button>

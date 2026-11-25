@@ -193,7 +193,7 @@ declare
   v_ver boolean := public.is_sales_manager() or public.is_gerente();
   v_tc numeric := (select usd_mxn from public.tipo_cambio_para(v_hoy) limit 1);
 begin
-  if not (public.is_seller() or public.is_gerente()) then raise exception 'Sin permiso' using errcode = '42501'; end if;
+  if not (public.is_seller() or public.is_gerente() or public.is_buyer()) then raise exception 'Sin permiso' using errcode = '42501'; end if;
   return query
     with s as (
       select x.vendedor_id as vid,

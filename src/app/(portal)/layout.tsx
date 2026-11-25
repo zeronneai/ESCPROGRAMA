@@ -28,6 +28,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/comprador/planeacion", label: "Planeación de compras", short: "Planear", icon: "chart", match: ["/comprador/planeacion/oc", "/comprador/planeacion/inventario"] },
     { href: "/comprador/planeacion/pedidos", label: "Pedidos de vendedores", short: "Pedidos", icon: "cart", secondary: true },
     { href: "/comprador/planeacion/asistente", label: "Asistente de compras (Claude)", short: "Asistente", icon: "chat", secondary: true },
+    { href: "/metas", label: "Metas de venta (en vivo)", short: "Metas", icon: "target", secondary: true },
     { href: "/pedidos-pegatron", label: "Pedidos Pegatron", short: "Pegatron", icon: "clipboard", secondary: true },
     { href: "/comprador/catalogo", label: "Comentarios del catálogo", icon: "chat", secondary: true },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
@@ -78,6 +79,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/ventas/comisiones", label: "Comisiones", icon: "dollar" },
     { href: "/metas", label: "Metas de venta (en vivo)", short: "Metas", icon: "target", secondary: true },
     { href: "/ventas/meta-prospeccion", label: "Configurar metas", short: "Config. metas", icon: "target", secondary: true },
+    { href: "/captura-ventas", label: "Capturar ventas (sin usuario)", short: "Capturar", icon: "dollar", secondary: true },
     { href: "/vendedor/bitacora", label: "Mi bitácora", short: "Bitácora", icon: "target" },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },
     { href: "/ventas/clientes", label: "Clientes", icon: "building" },
@@ -212,7 +214,9 @@ export default async function PortalLayout({ children }: { children: React.React
   const almacenOn = await almacenVentasActivo(await createClient());
   // La guia de la norma ISO 9001 la puede consultar todo el personal (en "Mas").
   const base = NAV[user.rol].some((i) => i.href === "/norma-iso") ? NAV[user.rol] : [...NAV[user.rol], { href: "/norma-iso", label: "Norma ISO 9001", icon: "shield" as const, secondary: true }];
-  const nav = base.filter((i) => almacenOn || !RUTAS_ALMACEN_VENTAS.includes(i.href));
+  // Vendedor que la jefa eligio para capturar ventas de una meta sin usuario (ej. telemarketing).
+  const captura = user.rol === "vendedor" && !!(await (await createClient()).from("metas_venta").select("id").eq("capturista_id", user.id).limit(1)).data?.length;
+  const nav = [...base, ...(captura ? [{ href: "/captura-ventas", label: "Capturar ventas (sin usuario)", short: "Capturar", icon: "dollar" as const, secondary: true }] : [])].filter((i) => almacenOn || !RUTAS_ALMACEN_VENTAS.includes(i.href));
   return (
     <div className="min-h-screen">
       <Suspense fallback={null}>

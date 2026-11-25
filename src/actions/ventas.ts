@@ -233,3 +233,31 @@ export async function cobrarConComisionAction(ventaId: string, fechaCobro: strin
   revalidatePath("/ventas/comisiones");
   return r;
 }
+
+/** Jefa: ventas con factura cuyo subtotal sin IVA todavia es estimado (para volver a leerlo de la factura). */
+export async function ventasSubtotalEstimadoAction(): Promise<Result<{ ventas: { id: string; factura: string | null; pdf: boolean; xml: boolean; monto: number }[] }>> {
+  const u = await requireUser();
+  if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas." };
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("ventas")
+    .select("id, factura, factura_path, xml_path, monto")
+    .eq("subtotal_estimado", true)
+    .is("cancelada_at", null)
+    .or("factura_path.not.is.null,xml_path.not.is.null")
+    .order("fecha", { ascending: false })
+    .limit(5000);
+  if (error) return { ok: false, error: /subtotal/.test(error.message) ? "Falta correr la actualización 0080 en la base." : friendlyError(error.message) };
+  type R = { id: string; factura: string | null; factura_path: string | null; xml_path: string | null; monto: string | null };
+  return { ok: true, ventas: ((data ?? []) as R[]).map((v) => ({ id: v.id, factura: v.factura, pdf: !!v.factura_path, xml: !!v.xml_path, monto: Number(v.monto ?? 0) })) };
+}
+
+/** Guarda el subtotal sin IVA leido de la factura. */
+export async function guardarSubtotalAction(ventaId: string, subtotal: number): Promise<Result> {
+  const u = await requireUser();
+  if (u.rol !== "jefe_ventas" && u.rol !== "vendedor") return { ok: false, error: "No autorizado." };
+  if (!uuid.safeParse(ventaId).success || !(subtotal > 0)) return { ok: false, error: "Dato inválido" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("venta_subtotal_factura", { p_venta: ventaId, p_subtotal: subtotal });
+  return error ? { ok: false, error: friendlyError(error.message) } : { ok: true };
+}

@@ -109,7 +109,11 @@ export function decideRoute(input: {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   // Metas de venta en vivo: ventas, gerente y CEO.
-  if (under("/metas") && !["vendedor", "jefe_ventas", "gerente", "ceo"].includes(profile.rol)) {
+  if (under("/metas") && !["vendedor", "jefe_ventas", "gerente", "ceo", "comprador"].includes(profile.rol)) {
+    return { type: "redirect", to: homeFor(profile.rol) };
+  }
+  // Captura manual de ventas para metas sin usuario: jefa y el vendedor que ella elija (lo revisa la pagina).
+  if (under("/captura-ventas") && !["vendedor", "jefe_ventas"].includes(profile.rol)) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   // Pedidos al comprador: ventas, gerente y CEO.

@@ -1,6 +1,7 @@
 import { Card, EmptyState, PageHeader, StatCard } from "@/components/ui";
 import Link from "next/link";
 import { ConfigMetasVenta, type MetaFila } from "@/components/metas/config-metas-venta";
+import { LeerSubtotales } from "@/components/ventas/leer-subtotales";
 import { ConfigMeta, TipoVendedor } from "@/components/prospeccion/config-meta";
 import { requireRoles } from "@/lib/auth/sales";
 import { TIPOS_PROSPECCION, type AvanceProspeccion, type TipoProspeccion } from "@/lib/meta-prospeccion";
@@ -21,6 +22,9 @@ export default async function MetaProspeccion() {
     supabase.from("metas_venta").select("id, nombre, vendedor_id, capturista_id, meta, estado").order("orden").order("nombre"),
     supabase.from("profiles").select("id, nombre").in("rol", ["vendedor", "jefe_ventas"]).eq("activo", true).order("nombre"),
   ]);
+  const { count: estimados } = edita
+    ? await supabase.from("ventas").select("id", { count: "exact", head: true }).eq("subtotal_estimado", true).is("cancelada_at", null).or("factura_path.not.is.null,xml_path.not.is.null")
+    : { count: null };
   if (error || !cfg)
     return (
       <div className="space-y-4">
@@ -47,7 +51,8 @@ export default async function MetaProspeccion() {
         ) : (
           <ConfigMetasVenta metas={((metasV ?? []) as MetaFila[]).map((m) => ({ ...m, meta: Number(m.meta) }))} usuarios={(usuarios ?? []) as { id: string; nombre: string }[]} edita={edita} />
         )}
-        <p className="text-xs text-slate-500">El avance es lo registrado en Ventas diarias del mes por ese usuario, sin IVA. Para una meta sin usuario (como José Ortiz), elige quién captura sus ventas: esa persona las sube a mano en Metas, Capturar ventas. Una meta en pausa no sale en las gráficas.</p>
+        {edita && estimados != null && <LeerSubtotales pendientes={estimados} />}
+        <p className="text-xs text-slate-500">El avance es lo registrado en Ventas diarias del mes por ese usuario, sin IVA. Para una meta sin usuario (como José Ortiz), elige quién captura sus ventas: esa persona (y tú) las sube a mano en el menú, Capturar ventas. Una meta en pausa no sale en las gráficas.</p>
       </Card>
 
       <Card className="space-y-3 p-4">

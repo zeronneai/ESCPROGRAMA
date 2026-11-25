@@ -97,7 +97,8 @@ export async function capturarVentaMetaAction(input: z.input<typeof captura>): P
     ...d, folio: d.folio || null, cliente: d.cliente || null, nota: d.nota || null, tipo_cambio: d.moneda === "USD" ? (d.tipo_cambio ?? null) : null,
   });
   if (error) return { ok: false, error: /row-level/.test(error.message) ? "No tienes permiso para capturar ventas de esta meta." : friendlyError(error.message) };
-  revalidatePath("/metas/capturar");
+  revalidatePath("/captura-ventas");
+  revalidatePath("/metas");
   return { ok: true };
 }
 
@@ -108,6 +109,7 @@ export async function cancelarCapturaAction(id: string): Promise<Result> {
   const { data, error } = await supabase.from("metas_venta_capturas").update({ cancelada_at: new Date().toISOString() }).eq("id", id).select("id");
   if (error) return { ok: false, error: friendlyError(error.message) };
   if (!data?.length) return { ok: false, error: "No se pudo cancelar." };
-  revalidatePath("/metas/capturar");
+  revalidatePath("/captura-ventas");
+  revalidatePath("/metas");
   return { ok: true };
 }

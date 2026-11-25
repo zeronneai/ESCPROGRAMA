@@ -12,7 +12,7 @@ type Cap = { id: string; meta_id: string; fecha: string; folio: string | null; c
 
 /** Capturar a mano las ventas de una meta sin usuario (ej. Jose Ortiz). */
 export default async function CapturarPage() {
-  const u = await requireRoles(["vendedor", "jefe_ventas", "gerente", "ceo"]);
+  const u = await requireRoles(["vendedor", "jefe_ventas"]);
   const supabase = await createClient();
   const hoy = hoyMx();
   let q = supabase.from("metas_venta").select("id, nombre").is("vendedor_id", null).eq("estado", "activa").order("orden");
@@ -28,7 +28,7 @@ export default async function CapturarPage() {
   return (
     <div className="space-y-5">
       <PageHeader title="Capturar ventas" subtitle="Ventas de quien no tiene usuario en el portal. Se capturan SIN IVA (el subtotal de la factura) y suman al momento en las gráficas de Metas." />
-      <Link href="/metas" className="text-sm font-medium text-brand-700 underline">← Ver gráficas</Link>
+      <Link href="/metas" className="text-sm font-medium text-brand-700 underline">Ver gráficas de metas →</Link>
       {error ? (
         <EmptyState title="Falta la actualización de la base">Corre <code>0080_metas_ventas.sql</code> en el SQL Editor de Supabase.</EmptyState>
       ) : !ms.length ? (
