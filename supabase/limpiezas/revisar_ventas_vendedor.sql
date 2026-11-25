@@ -5,7 +5,7 @@
 -- 2) Pega todo en SQL Editor y presiona Run. Sale una lista por factura y al final los totales.
 -- =============================================================================
 with params as (
-  select 'Alejandra Rangel'::text as vendedora, date '2026-11-01' as desde, public.local_today() as hasta
+  select 'Berenice Bustillos'::text as vendedora, date '2026-11-01' as desde, public.local_today() as hasta
 ), v as (
   select x.fecha, x.factura, c.nombre as cliente, x.moneda,
     x.monto as total_con_iva, x.subtotal as sin_iva, x.subtotal_estimado as sin_iva_calculado,
