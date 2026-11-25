@@ -23,7 +23,7 @@ export default async function MetaProspeccion() {
     supabase.from("prospeccion_config").select("meta_telemarketing, meta_campo, inicio").eq("id", 1).maybeSingle(),
     supabase.rpc("prospeccion_avance"),
     supabase.from("metas_venta").select("id, nombre, vendedor_id, capturista_id, meta, estado").order("orden").order("nombre"),
-    supabase.from("profiles").select("id, nombre").in("rol", ["vendedor", "jefe_ventas"]).eq("activo", true).order("nombre"),
+    supabase.from("profiles").select("id, nombre, rol").in("rol", ["vendedor", "jefe_ventas", "marketplaces"]).eq("activo", true).order("nombre"),
   ]);
   const { data: mcfg } = await supabase.from("metas_config").select("desde, hasta").eq("id", 1).maybeSingle();
   const { count: estimados } = edita
@@ -63,7 +63,7 @@ export default async function MetaProspeccion() {
         {errMetas ? (
           <p className="text-sm text-amber-800">Falta correr <code>0080_metas_ventas.sql</code> en Supabase.</p>
         ) : (
-          <ConfigMetasVenta metas={((metasV ?? []) as MetaFila[]).map((m) => ({ ...m, meta: Number(m.meta) }))} usuarios={(usuarios ?? []) as { id: string; nombre: string }[]} edita={edita} />
+          <ConfigMetasVenta metas={((metasV ?? []) as MetaFila[]).map((m) => ({ ...m, meta: Number(m.meta) }))} usuarios={(usuarios ?? []) as { id: string; nombre: string; rol: string }[]} edita={edita} />
         )}
         {mcfg ? <ConfigPeriodo desde={mcfg.desde} hasta={mcfg.hasta} edita={editaPeriodo} /> : !errMetas && <p className="text-sm text-amber-800">Para el periodo proporcional y el link de las pantallas falta correr <code>0081_metas_periodo_publico.sql</code>.</p>}
         {edita && estimados != null && <LeerSubtotales pendientes={estimados} />}

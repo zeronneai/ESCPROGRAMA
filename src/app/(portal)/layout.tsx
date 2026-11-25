@@ -216,7 +216,7 @@ export default async function PortalLayout({ children }: { children: React.React
   // La guia de la norma ISO 9001 la puede consultar todo el personal (en "Mas").
   const base = NAV[user.rol].some((i) => i.href === "/norma-iso") ? NAV[user.rol] : [...NAV[user.rol], { href: "/norma-iso", label: "Norma ISO 9001", icon: "shield" as const, secondary: true }];
   // Vendedor que la jefa eligio para capturar ventas de una meta sin usuario (ej. telemarketing).
-  const captura = user.rol === "vendedor" && !!(await (await createClient()).from("metas_venta").select("id").eq("capturista_id", user.id).limit(1)).data?.length;
+  const captura = (user.rol === "vendedor" || user.rol === "marketplaces") && !!(await (await createClient()).from("metas_venta").select("id").eq("capturista_id", user.id).limit(1)).data?.length;
   const nav = [...base, ...(captura ? [{ href: "/captura-ventas", label: "Sumar ventas de José Ortiz", short: "Sumar", icon: "dollar" as const, secondary: true }] : [])].filter((i) => almacenOn || !RUTAS_ALMACEN_VENTAS.includes(i.href));
   return (
     <div className="min-h-screen">

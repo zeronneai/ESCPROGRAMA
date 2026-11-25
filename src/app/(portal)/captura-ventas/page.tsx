@@ -12,7 +12,7 @@ type Cap = { id: string; meta_id: string; fecha: string; folio: string | null; c
 
 /** Capturar a mano las ventas de una meta sin usuario (ej. Jose Ortiz). */
 export default async function CapturarPage() {
-  const u = await requireRoles(["vendedor", "jefe_ventas"]);
+  const u = await requireRoles(["vendedor", "jefe_ventas", "marketplaces"]);
   const supabase = await createClient();
   const hoy = hoyMx();
   let q = supabase.from("metas_venta").select("id, nombre").is("vendedor_id", null).eq("estado", "activa").order("orden");

@@ -7,7 +7,7 @@ import { toast } from "@/components/feedback-global";
 import { Button } from "@/components/ui";
 
 export type MetaFila = { id: string | null; nombre: string; vendedor_id: string | null; capturista_id: string | null; meta: number; estado: "activa" | "pausada" };
-type Usuario = { id: string; nombre: string };
+type Usuario = { id: string; nombre: string; rol?: string };
 
 function Fila({ m, usuarios, edita, nueva, alTerminar }: { m: MetaFila; usuarios: Usuario[]; edita: boolean; nueva?: boolean; alTerminar?: () => void }) {
   const router = useRouter();
@@ -33,7 +33,7 @@ function Fila({ m, usuarios, edita, nueva, alTerminar }: { m: MetaFila; usuarios
       <td className="px-3 py-2">
         <select className={inp} value={vend} onChange={(e) => { setVend(e.target.value); if (!nombre) setNombre(usuarios.find((u) => u.id === e.target.value)?.nombre ?? ""); }} disabled={!edita} aria-label="Usuario">
           <option value="">Sin usuario</option>
-          {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nombre}</option>)}
+          {usuarios.filter((u) => u.rol !== "marketplaces").map((u) => <option key={u.id} value={u.id}>{u.nombre}</option>)}
         </select>
       </td>
       <td className="px-3 py-2">
