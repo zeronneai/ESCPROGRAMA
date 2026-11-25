@@ -47,7 +47,7 @@ function Anillo({ pct, ritmo, tam = 150, grosor = 14, children }: { pct: number;
   );
 }
 
-export function MetasEnVivo({ inicial, token }: { inicial: AvanceMeta[]; /** Pantalla publica: link sin usuario. */ token?: string }) {
+export function MetasEnVivo({ inicial, publico: token }: { inicial: AvanceMeta[]; /** Pantalla publica: sin usuario. */ publico?: boolean }) {
   const [filas, setFilas] = useState(inicial);
   const [act, setAct] = useState(() => Date.now());
   const [ahora, setAhora] = useState(() => Date.now());
@@ -57,7 +57,7 @@ export function MetasEnVivo({ inicial, token }: { inicial: AvanceMeta[]; /** Pan
   const caja = useRef<HTMLDivElement>(null);
 
   const cargar = useCallback(async () => {
-    const { data, error } = token ? await createClient().rpc("metas_ventas_publico", { p_token: token }) : await createClient().rpc("metas_ventas_avance");
+    const { data, error } = token ? await createClient().rpc("metas_ventas_publico") : await createClient().rpc("metas_ventas_avance");
     if (error || !data) return;
     const nuevas = normalizarAvance(data as Record<string, unknown>[]);
     const subieron = nuevas.filter((f) => f.pct > (previo.current.get(f.id) ?? f.pct));

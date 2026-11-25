@@ -71,12 +71,11 @@ export function metasSuite() {
       expect(Number(gp.meta_mes)).toBe(500000);
       expect(gp.dias_mes).toBe(10);
       // Pantalla publica: con el link, sin montos; sin link no abre
-      const tok = (await q("postgres", "select token from public.metas_config")).rows[0].token as string;
-      const pub = (await q(anon, "select * from public.metas_ventas_publico($1)", [tok])).rows.find((r) => r.nombre === `M2 ${tag}`)!;
+      const pub = (await q(anon, "select * from public.metas_ventas_publico()")).rows.find((r) => r.nombre === `M2 ${tag}`)!;
       expect(pub.meta).toBeNull();
       expect(pub.vendido).toBeNull();
       expect(pub.vendedor_id).toBeNull();
-      expect(await failure(q(anon, "select * from public.metas_ventas_publico($1)", ["x".repeat(64)]))).toMatch(/Link no valido/);
+      expect((await q(anon, "select * from public.metas_ventas_publico()")).rows.some((r) => r.nombre === `M2 ${tag}`)).toBe(true);
       expect(await failure(q(anon, "select * from public.metas_ventas_avance()"))).toMatch(/permission denied/);
       await q(jefa, "update public.metas_config set desde='2026-11-16', hasta=null where id=1");
       await q(jefa, "update public.metas_venta set estado='pausada' where nombre=$1", [`M2 ${tag}`]);

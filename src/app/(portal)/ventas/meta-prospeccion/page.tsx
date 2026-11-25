@@ -23,7 +23,7 @@ export default async function MetaProspeccion() {
     supabase.from("metas_venta").select("id, nombre, vendedor_id, capturista_id, meta, estado").order("orden").order("nombre"),
     supabase.from("profiles").select("id, nombre").in("rol", ["vendedor", "jefe_ventas"]).eq("activo", true).order("nombre"),
   ]);
-  const { data: mcfg } = await supabase.from("metas_config").select("desde, hasta, token").eq("id", 1).maybeSingle();
+  const { data: mcfg } = await supabase.from("metas_config").select("desde, hasta").eq("id", 1).maybeSingle();
   const { count: estimados } = edita
     ? await supabase.from("ventas").select("id", { count: "exact", head: true }).eq("subtotal_estimado", true).is("cancelada_at", null).or("factura_path.not.is.null,xml_path.not.is.null")
     : { count: null };
@@ -53,7 +53,7 @@ export default async function MetaProspeccion() {
         ) : (
           <ConfigMetasVenta metas={((metasV ?? []) as MetaFila[]).map((m) => ({ ...m, meta: Number(m.meta) }))} usuarios={(usuarios ?? []) as { id: string; nombre: string }[]} edita={edita} />
         )}
-        {mcfg ? <ConfigPeriodo desde={mcfg.desde} hasta={mcfg.hasta} token={mcfg.token} edita={edita} /> : !errMetas && <p className="text-sm text-amber-800">Para el periodo proporcional y el link de las pantallas falta correr <code>0081_metas_periodo_publico.sql</code>.</p>}
+        {mcfg ? <ConfigPeriodo desde={mcfg.desde} hasta={mcfg.hasta} edita={edita} /> : !errMetas && <p className="text-sm text-amber-800">Para el periodo proporcional y el link de las pantallas falta correr <code>0081_metas_periodo_publico.sql</code>.</p>}
         {edita && estimados != null && <LeerSubtotales pendientes={estimados} />}
         <p className="text-xs text-slate-500">El avance es lo registrado en Ventas diarias del mes por ese usuario, sin IVA. Para una meta sin usuario (como José Ortiz), elige quién captura sus ventas: esa persona (y tú) las sube a mano en el menú, Capturar ventas. Una meta en pausa no sale en las gráficas.</p>
       </Card>

@@ -109,7 +109,7 @@ describe("decideRoute", () => {
     for (const r of ["vendedor", "jefe_ventas", "gerente", "ceo"] as const) expect(d("/metas", p(r))).toEqual({ type: "next" });
     for (const r of ["almacen", "aux_finanzas"] as const) expect(d("/metas", p(r))).toEqual({ type: "redirect", to: "/inicio" });
     for (const r of ["vendedor", "jefe_ventas"] as const) expect(d("/captura-ventas", p(r))).toEqual({ type: "next" });
-    expect(decideRoute({ pathname: "/pantalla/metas/abc", hasUser: false, profile: null })).toEqual({ type: "next" });
+    expect(decideRoute({ pathname: "/pantalla/metas", hasUser: false, profile: null })).toEqual({ type: "next" });
     for (const r of ["gerente", "comprador"] as const) expect(d("/captura-ventas", p(r))).toEqual({ type: "redirect", to: "/inicio" });
   });
 

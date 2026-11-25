@@ -5,8 +5,8 @@
 --    ajusta en proporcion a los dias: del 16 al 30 de noviembre son 15 de 30 dias = 50% de la meta.
 --    Empieza contando desde el 16 de noviembre de 2026.
 --  * Al cambiar de mes se toma solo el mes nuevo completo (del 1 al ultimo dia), sin tocar nada.
---  * Link publico (sin usuario) para las pantallas: solo nombres y porcentajes, sin montos; se
---    actualiza en tiempo real. La jefa puede cambiar el link cuando quiera (el anterior deja de abrir).
+--  * Link publico (sin usuario ni contrasena) para las pantallas: /pantalla/metas. Solo nombres y
+--    porcentajes, sin montos; se actualiza en tiempo real.
 -- Como aplicarlo: pega este archivo COMPLETO en SQL Editor y presiona Run.
 -- =============================================================================
 begin;
@@ -117,16 +117,15 @@ $$;
 revoke all on function public.metas_ventas_avance(date) from public, anon;
 grant execute on function public.metas_ventas_avance(date) to authenticated;
 
--- Pantallas (sin usuario, con el link): solo porcentajes.
-create or replace function public.metas_ventas_publico(p_token text)
+-- Pantallas (sin usuario): solo porcentajes.
+drop function if exists public.metas_ventas_publico(text);
+create or replace function public.metas_ventas_publico(p_token text default null)
 returns table (id uuid, nombre text, vendedor_id uuid, meta numeric, vendido numeric, pct numeric, ventas int,
   usd_sin_tc int, mes date, dia int, dias_mes int, es_mio boolean, equipo_pct numeric, capturo boolean,
   meta_mes numeric, desde date, hasta date)
 language plpgsql stable security definer set search_path = public as $$
 begin
-  if p_token is null or length(p_token) < 32 or not exists (select 1 from public.metas_config where token = p_token) then
-    raise exception 'Link no valido' using errcode = '42501';
-  end if;
+  -- Publico: no pide nada (p_token se ignora; queda por compatibilidad).
   return query select * from public.metas_calculo(null, false);
 end;
 $$;

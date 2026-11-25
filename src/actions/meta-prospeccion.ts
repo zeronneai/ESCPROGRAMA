@@ -133,15 +133,3 @@ export async function guardarPeriodoMetasAction(input: z.input<typeof periodo>):
   revalidatePath("/metas");
   return { ok: true };
 }
-
-/** Link nuevo para las pantallas (el anterior deja de abrir). */
-export async function nuevoLinkMetasAction(): Promise<Result> {
-  const u = await requireUser();
-  if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas." };
-  const { randomBytes } = await import("node:crypto");
-  const supabase = await createClient();
-  const { error } = await supabase.from("metas_config").update({ token: randomBytes(24).toString("hex"), updated_by: u.id, updated_at: new Date().toISOString() }).eq("id", 1);
-  if (error) return { ok: false, error: friendlyError(error.message) };
-  revalidatePath("/ventas/meta-prospeccion");
-  return { ok: true };
-}
