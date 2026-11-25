@@ -21,21 +21,36 @@ export interface MovConc {
   tomado_por: string | null;
   tomado_nombre: string | null;
   tomado_at: string | null;
+  /** Cuando se subio (de ahi cuentan los 7 dias para identificarlo). */
+  created_at: string;
+  /** Se identifico despues de los 7 dias (comision -10%, siguiente quincena). */
+  tardio: boolean;
+  /** A nombre de quien lo identifico la jefa, la gerente o el CEO. */
+  tomado_para: string | null;
+  /** El vendedor dueno del pago (si lo identifico la direccion a su nombre, no es quien lo tomo). */
+  vendedor_id: string | null;
   facturas: FacturaConc[];
 }
 
+export const PLAZO_DIAS = 7;
+/** Dias que le quedan para identificarlo (negativo = ya vencio). */
+export const diasRestantes = (creado: string, ahora = Date.now()) => Math.ceil((new Date(creado).getTime() + PLAZO_DIAS * 86400_000 - ahora) / 86400_000);
+
 /** Abonos de las conciliaciones (mas recientes primero) con las facturas que los vendedores les pusieron. */
 export async function cargarMovimientos(supabase: SupabaseClient, opts: { conciliacionId?: string; limite?: number } = {}): Promise<{ movs: MovConc[]; error: string | null }> {
-  let q = supabase
-    .from("conciliacion_movimientos")
-    .select("id, conciliacion_id, banco, cuenta, moneda, fecha, descripcion, referencia, monto, tomado_por, tomado_nombre, tomado_at")
-    .order("fecha", { ascending: false })
-    .order("monto", { ascending: false })
-    .limit(opts.limite ?? 1500);
-  if (opts.conciliacionId) q = q.eq("conciliacion_id", opts.conciliacionId);
-  const { data, error } = await q;
+  const armar = (cols: string) => {
+    let q = supabase.from("conciliacion_movimientos").select(cols).order("fecha", { ascending: false }).order("monto", { ascending: false }).limit(opts.limite ?? 1500);
+    if (opts.conciliacionId) q = q.eq("conciliacion_id", opts.conciliacionId);
+    return q;
+  };
+  const base = "id, conciliacion_id, banco, cuenta, moneda, fecha, descripcion, referencia, monto, tomado_por, tomado_nombre, tomado_at, created_at";
+  // Sin la actualizacion 0077 todavia no hay plazo ni identificacion a nombre de otro.
+  let r = await armar(`${base}, tardio, tomado_para, vendedor_id`);
+  if (r.error && /tardio|tomado_para|vendedor_id/.test(r.error.message)) r = await armar(base);
+  const { error } = r;
+  const data = (r.data ?? []) as unknown as Record<string, unknown>[];
   if (error) return { movs: [], error: error.message };
-  const ids = (data ?? []).filter((m) => m.tomado_por).map((m) => m.id as string);
+  const ids = data.filter((m) => m.tomado_por).map((m) => m.id as string);
   const facts = new Map<string, FacturaConc[]>();
   for (let i = 0; i < ids.length; i += 300) {
     const { data: fs } = await supabase
@@ -50,7 +65,7 @@ export async function cargarMovimientos(supabase: SupabaseClient, opts: { concil
     }
   }
   return {
-    movs: (data ?? []).map((m) => ({ ...(m as Omit<MovConc, "monto" | "facturas">), monto: Number(m.monto), facturas: facts.get(m.id as string) ?? [] })),
+    movs: data.map((m) => ({ ...(m as unknown as Omit<MovConc, "monto" | "facturas" | "tardio" | "tomado_para" | "vendedor_id">), tardio: !!m.tardio, tomado_para: (m.tomado_para as string | null) ?? null, vendedor_id: (m.vendedor_id as string | null) ?? (m.tomado_para ? null : (m.tomado_por as string | null)), monto: Number(m.monto), facturas: facts.get(m.id as string) ?? [] })),
     error: null,
   };
 }

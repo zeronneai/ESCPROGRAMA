@@ -271,3 +271,13 @@ describe("estado de cuenta (conciliacion)", () => {
     expect(foliosSugeridos("BNET 1585530792 pago fact 10872 ES")).toEqual(["10872"]);
   });
 });
+
+describe("plazo para identificar pagos", () => {
+  it("cuenta 7 dias desde que se sube", async () => {
+    const { diasRestantes } = await import("@/lib/conciliaciones");
+    const ahora = new Date("2026-11-24T12:00:00Z").getTime();
+    expect(diasRestantes("2026-11-24T10:00:00Z", ahora)).toBe(7);
+    expect(diasRestantes("2026-11-20T12:00:00Z", ahora)).toBe(3);
+    expect(diasRestantes("2026-11-16T12:00:00Z", ahora)).toBeLessThanOrEqual(0);
+  });
+});

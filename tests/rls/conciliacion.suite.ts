@@ -6,6 +6,7 @@ import { createWorld, type World } from "./fixtures";
 let w: World;
 let aux: Actor;
 let jefa: Actor;
+let gerente: Actor;
 const q = (actor: Actor, sql: string, params: unknown[] = []) => as(actor, (x) => x(sql, params));
 async function persona(rol: string, nombre: string): Promise<Actor> {
   const id = randomUUID();
@@ -20,6 +21,7 @@ export function conciliacionSuite() {
       w = await createWorld();
       aux = await persona("aux_finanzas", "Aux Conc");
       jefa = await persona("jefe_ventas", "Jefa Conc");
+      gerente = await persona("gerente", "Gerente Conc");
     });
 
     it("finanzas sube abonos (sin repetir); el vendedor toma uno, marca pagada su factura o la deja apartada hasta subirla", async () => {
@@ -46,7 +48,7 @@ export function conciliacionSuite() {
       expect(await failure(q(w.seller1, "select public.conciliacion_tomar($1, $2)", [m1, [folio]]))).toMatch(/COMISION_FALTA/);
       await q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l, importe: 1000, comision_pct: 3 }])]);
       const t1 = (await q(w.seller1, "select public.conciliacion_tomar($1, $2) r", [m1, [folio.toLowerCase()]])).rows[0].r;
-      expect(t1).toEqual([{ folio, estado: "pagada" }]);
+      expect(t1).toEqual([{ folio, estado: "pagada", tardio: false }]);
       const vv = (await q(w.seller1, "select porcentaje_cobrado::numeric p, fecha_cobro::text f from public.ventas where id=$1", [v])).rows[0];
       expect([Number(vv.p), vv.f]).toEqual([100, "2026-11-23"]);
       // Otro vendedor ya no lo puede tomar
@@ -56,7 +58,7 @@ export function conciliacionSuite() {
 
       // Factura que todavia no sube: queda apartada; no esta en ventas (no sale en recepcion)
       const folio2 = `F-${tag}2`;
-      expect((await q(w.seller1, "select public.conciliacion_tomar($1, $2) r", [m2, [folio2]])).rows[0].r).toEqual([{ folio: folio2, estado: "pendiente" }]);
+      expect((await q(w.seller1, "select public.conciliacion_tomar($1, $2) r", [m2, [folio2]])).rows[0].r).toEqual([{ folio: folio2, estado: "pendiente", tardio: false }]);
       // La suelta y la vuelve a tomar
       await q(w.seller1, "select public.conciliacion_soltar($1)", [m2]);
       await q(w.seller1, "select public.conciliacion_tomar($1, $2)", [m2, [folio2]]);
@@ -87,6 +89,40 @@ export function conciliacionSuite() {
       const l = (await q(w.seller1, "select id from public.venta_lineas where venta_id=$1", [rv.venta_id])).rows[0].id;
       await q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [rv.venta_id, JSON.stringify([{ id: l, importe: 258, comision_pct: 2 }])]);
       expect((await q(w.seller1, "select public.conciliacion_marcar_pagada($1) r", [fila])).rows[0].r).toBe("pagada");
+    });
+    it("plazo de 7 dias: identificado tarde baja 10% la comision y se paga la siguiente quincena; la gerente identifica a nombre de otro", async () => {
+      const tag = randomUUID().slice(0, 6).toUpperCase();
+      await q(aux, "select public.conciliacion_subir($1::jsonb)", [JSON.stringify({ banco: "BBVA", cuenta: "015" + tag, moneda: "MXN", abonos: [
+        { fecha: "2026-11-10", descripcion: `TARDE ${tag}`, monto: 1160 }, { fecha: "2026-11-10", descripcion: `SINUSR ${tag}`, monto: 700 }, { fecha: "2026-11-10", descripcion: `AJENO ${tag}`, monto: 900 }] })]);
+      const id = async (d: string) => (await q(w.seller1, "select id from public.conciliacion_movimientos where descripcion=$1", [d])).rows[0].id;
+      const mT = await id(`TARDE ${tag}`);
+      const mS = await id(`SINUSR ${tag}`);
+      const mA = await id(`AJENO ${tag}`);
+      // Se subio hace 8 dias
+      await q("postgres", "update public.conciliacion_movimientos set created_at = now() - interval '8 days' where id in ($1, $2)", [mT, mS]);
+      const folio = `T-${tag}`;
+      const v = (await q(w.seller1, "insert into public.ventas (customer_id, monto, pago, factura, fecha) values ($1, 1160, 'contado', $2, '2026-11-05') returning id", [w.customerId, folio])).rows[0].id;
+      const l = (await q(w.seller1, "insert into public.venta_lineas (venta_id, descripcion, cantidad) values ($1,'Guante',1) returning id", [v])).rows[0].id;
+      await q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l, importe: 1000, comision_pct: 5 }])]);
+      const r = (await q(w.seller1, "select public.conciliacion_tomar($1, $2) r", [mT, [folio]])).rows[0].r;
+      expect(r).toEqual([{ folio, estado: "pagada", tardio: true }]);
+      const vv = (await q(w.seller1, "select comision_descuento_pct::numeric d, comision_quincena is not null q from public.ventas where id=$1", [v])).rows[0];
+      expect([Number(vv.d), vv.q]).toEqual([10, true]);
+      expect((await q("postgres", "select public.quincena_siguiente('2026-11-10')::text a, public.quincena_siguiente('2026-11-20')::text b")).rows[0]).toEqual({ a: "2026-11-16", b: "2026-12-01" });
+
+      // La gerente identifica a nombre de alguien sin usuario
+      expect(await failure(q(w.seller1, "select public.conciliacion_tomar($1, $2, null, 'Don Pepe')", [mS, ["X1"]]))).toMatch(/Solo la jefa de ventas, la gerente/);
+      const r2 = (await q(gerente, "select public.conciliacion_tomar($1, $2, null, 'Don Pepe') r", [mS, ["X1"]])).rows[0].r;
+      expect(r2).toEqual([{ folio: "X1", estado: "pendiente", tardio: true }]);
+      expect((await q(gerente, "select tomado_para, vendedor_id from public.conciliacion_movimientos where id=$1", [mS])).rows[0]).toEqual({ tomado_para: "Don Pepe", vendedor_id: null });
+      // ...y a nombre de un vendedor con usuario: si le falta la comision queda ligada
+      const folio2 = `A-${tag}`;
+      const v2 = (await q(w.seller2, "insert into public.ventas (customer_id, monto, pago, factura) values ($1, 900, 'contado', $2) returning id", [w.customerId, folio2])).rows[0].id;
+      await q(w.seller2, "insert into public.venta_lineas (venta_id, descripcion, cantidad) values ($1,'Bata',1)", [v2]);
+      const r3 = (await q(gerente, "select public.conciliacion_tomar($1, $2, $3) r", [mA, [folio2], w.ids.s2])).rows[0].r;
+      expect(r3).toEqual([{ folio: folio2, estado: "falta_comision", tardio: false }]);
+      expect((await q(w.seller2, "select count(*)::int n from public.notifications where user_id=$1 and ref_id=$2", [w.ids.s2, mA])).rows[0].n).toBe(1);
+      await q(gerente, "select public.conciliacion_soltar($1)", [mA]);
     });
   });
 }

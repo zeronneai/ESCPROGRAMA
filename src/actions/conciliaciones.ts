@@ -120,14 +120,18 @@ export async function buscarFacturasAction(folios: string[]): Promise<Result<{ f
 }
 
 /** El vendedor toma un abono con la(s) factura(s) que paga. */
-export async function tomarPagoAction(movId: string, folios: string[]): Promise<Result<{ resultado: { folio: string; estado: string }[] }>> {
+export async function tomarPagoAction(movId: string, folios: string[], aNombre?: { vendedor?: string | null; para?: string | null }): Promise<Result<{ resultado: { folio: string; estado: string; tardio?: boolean }[] }>> {
   await requireUser();
   if (!z.string().uuid().safeParse(movId).success) return { ok: false, error: "Pago inválido" };
+  if (aNombre?.vendedor && !z.string().uuid().safeParse(aNombre.vendedor).success) return { ok: false, error: "Vendedor inválido" };
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("conciliacion_tomar", { p_mov: movId, p_folios: folios.map((f) => f.trim()).filter(Boolean).slice(0, 30) });
+  const args: Record<string, unknown> = { p_mov: movId, p_folios: folios.map((f) => f.trim()).filter(Boolean).slice(0, 30) };
+  if (aNombre?.vendedor) args.p_vendedor = aNombre.vendedor;
+  else if (aNombre?.para?.trim()) args.p_para = aNombre.para.trim().slice(0, 80);
+  const { data, error } = await supabase.rpc("conciliacion_tomar", args);
   if (error) return { ok: false, error: msg(error.message) };
   revalidar();
-  return { ok: true, resultado: (data ?? []) as { folio: string; estado: string }[] };
+  return { ok: true, resultado: (data ?? []) as { folio: string; estado: string; tardio?: boolean }[] };
 }
 
 /** Soltar un abono tomado. */

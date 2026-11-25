@@ -40,10 +40,10 @@ export async function ComisionesVista({ sp, ruta, modo, vendedorId }: { sp: Comi
   const d1 = propio ? (sp.hasta && FECHA.test(sp.hasta) ? sp.hasta : "2100-12-31") : to.toISODate()!;
   const col = campo === "pago" ? "fecha_cobro" : "fecha";
 
-  const armar = (lineasCols: string) => {
+  const armar = (lineasCols: string, extra = ", comision_descuento_pct, comision_quincena") => {
   let q = supabase
     .from("ventas")
-    .select(`id, vendedor_id, factura, fecha, fecha_cobro, monto, moneda, porcentaje_cobrado, comision_revisada_at, customers(nombre), venta_lineas(${lineasCols})`)
+    .select(`id, vendedor_id, factura, fecha, fecha_cobro, monto, moneda, porcentaje_cobrado, comision_revisada_at${extra}, customers(nombre), venta_lineas(${lineasCols})`)
     .eq("tipo", "venta")
     .is("cancelada_at", null)
     .order("fecha", { ascending: false })
@@ -58,11 +58,13 @@ export async function ComisionesVista({ sp, ruta, modo, vendedorId }: { sp: Comi
   };
   // Sin la actualizacion 0075 todavia no existe el envio por articulo.
   const [r0, { data: vends }] = await Promise.all([armar("id, descripcion, cantidad, importe, envio, comision_pct, comision, articulos(clave)"), supabase.from("profiles").select("id, nombre").in("rol", ["vendedor", "jefe_ventas"])]);
-  const { data, error } = r0.error && /envio/.test(r0.error.message) ? await armar("id, descripcion, cantidad, importe, comision_pct, comision, articulos(clave)") : r0;
+  // Sin la 0077 todavia no hay descuento por identificar tarde; sin la 0075, no hay envio.
+  const r1 = r0.error && /comision_descuento|comision_quincena/.test(r0.error.message) ? await armar("id, descripcion, cantidad, importe, envio, comision_pct, comision, articulos(clave)", "") : r0;
+  const { data, error } = r1.error && /envio/.test(r1.error.message) ? await armar("id, descripcion, cantidad, importe, comision_pct, comision, articulos(clave)", "") : r1;
   const nombres = new Map((vends ?? []).map((p) => [p.id as string, p.nombre as string]));
 
   type L = { id: string; descripcion: string; cantidad: string | null; importe: string | null; envio?: string | null; comision_pct: string | null; comision: string | null; articulos: { clave: string } | null };
-  type V = { id: string; vendedor_id: string; factura: string | null; fecha: string; fecha_cobro: string | null; monto: string | null; moneda: string; porcentaje_cobrado: string; comision_revisada_at: string | null; customers: { nombre: string } | null; venta_lineas: L[] };
+  type V = { id: string; vendedor_id: string; factura: string | null; fecha: string; fecha_cobro: string | null; monto: string | null; moneda: string; porcentaje_cobrado: string; comision_revisada_at: string | null; comision_descuento_pct?: string | null; comision_quincena?: string | null; customers: { nombre: string } | null; venta_lineas: L[] };
   const porVend = new Map<string, ComVendedor>();
   for (const v of (data ?? []) as unknown as V[]) {
     const lineas = (v.venta_lineas ?? []).map((l) => ({
@@ -72,7 +74,8 @@ export async function ComisionesVista({ sp, ruta, modo, vendedorId }: { sp: Comi
     const f: ComFactura = {
       id: v.id, factura: v.factura, cliente: v.customers?.nombre ?? "Cliente", fecha: v.fecha.slice(0, 10), fecha_cobro: v.fecha_cobro, moneda: v.moneda,
       monto: v.monto == null ? null : Number(v.monto), pagada: Number(v.porcentaje_cobrado) >= 100, revisada: !!v.comision_revisada_at, lineas,
-      comision: lineas.reduce((a, l) => a + (l.comision ?? 0), 0), faltan: lineas.filter((l) => l.pct == null || l.importe == null).length,
+      descuento: Number(v.comision_descuento_pct ?? 0), quincena: v.comision_quincena ?? null,
+      comision: Math.round(lineas.reduce((a, l) => a + (l.comision ?? 0), 0) * (1 - Number(v.comision_descuento_pct ?? 0) / 100) * 100) / 100, faltan: lineas.filter((l) => l.pct == null || l.importe == null).length,
     };
     if (ver === "pendientes" && !f.faltan) continue;
     if (ver === "por_revisar" && f.faltan) continue;

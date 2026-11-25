@@ -18,6 +18,9 @@ export interface ComFactura {
   monto: number | null;
   pagada: boolean;
   revisada: boolean;
+  /** Pago identificado tarde en Conciliaciones: % que se le baja a la comision y quincena en que se paga. */
+  descuento: number;
+  quincena: string | null;
   lineas: ComLinea[];
   comision: number;
   faltan: number;

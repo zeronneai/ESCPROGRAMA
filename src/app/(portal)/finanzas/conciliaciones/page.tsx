@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { ListaConciliacion } from "@/components/finanzas/lista-conciliacion";
 import { SubirConciliacion } from "@/components/finanzas/subir-conciliacion";
 import { Card, PageHeader } from "@/components/ui";
 import { requireRoles } from "@/lib/auth/sales";
+import { cargarMovimientos, diasRestantes } from "@/lib/conciliaciones";
 import { createClient } from "@/lib/supabase/server";
 import { money2 } from "@/lib/ventas";
 
@@ -9,7 +11,7 @@ const fecha = (d: string | null) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).
 
 /** Conciliaciones (finanzas): subir estados de cuenta y ver que abonos ya identificaron los vendedores. */
 export default async function Conciliaciones() {
-  const u = await requireRoles(["aux_finanzas", "supervisor_finanzas", "jefe_ventas"]);
+  const u = await requireRoles(["aux_finanzas", "supervisor_finanzas", "jefe_ventas", "gerente", "ceo"]);
   const supabase = await createClient();
   const [{ data: concs, error }, { data: movs }] = await Promise.all([
     supabase.from("conciliaciones").select("id, banco, cuenta, moneda, desde, hasta, abonos, nuevos, nombre_archivo, created_at").order("created_at", { ascending: false }).limit(100),
@@ -23,12 +25,33 @@ export default async function Conciliaciones() {
     else { x.libres += 1; x.libreMonto += Number(m.monto); }
     por.set(m.conciliacion_id as string, x);
   }
-  const finanzas = u.rol !== "jefe_ventas";
+  const finanzas = u.rol === "aux_finanzas" || u.rol === "supervisor_finanzas";
+  // Todos los abonos (para ver los pendientes y, la direccion, identificarlos a nombre de un vendedor).
+  const [{ movs: todos }, { data: vends }] = await Promise.all([
+    cargarMovimientos(supabase),
+    finanzas ? Promise.resolve({ data: [] as { id: string; nombre: string }[] }) : supabase.from("profiles").select("id, nombre").in("rol", ["vendedor", "jefe_ventas"]).eq("activo", true).order("nombre"),
+  ]);
+  const libres = todos.filter((m) => !m.tomado_por);
+  const vencidos = libres.filter((m) => diasRestantes(m.created_at) <= 0);
   return (
     <div className="space-y-5">
       <PageHeader title="Conciliaciones" subtitle="Sube el estado de cuenta: los vendedores identifican sus pagos y sus facturas quedan pagadas con la fecha del abono." />
       {error && <Card className="border-amber-200 bg-amber-50 text-sm text-amber-900">Falta correr la actualización 0076 en la base.</Card>}
       {finanzas && !error && <SubirConciliacion />}
+      {!error && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"><p className="text-xs text-amber-800">Por identificar (en plazo)</p><p className="text-xl font-bold text-amber-900">{libres.length - vencidos.length}</p></div>
+          <div className={`rounded-xl border px-4 py-3 ${vencidos.length ? "border-red-300 bg-red-600 text-white" : "border-slate-200 bg-white"}`}><p className="text-xs">No identificados (+7 días)</p><p className="text-xl font-bold">{vencidos.length}</p></div>
+          <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3"><p className="text-xs text-green-800">Identificados</p><p className="text-xl font-bold text-green-900">{todos.length - libres.length}</p></div>
+        </div>
+      )}
+      {!error && todos.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-base font-semibold text-slate-900">Pagos</h2>
+          {!finanzas && <p className="text-xs text-slate-500">Puedes identificar un pago a nombre de un vendedor (o de alguien sin usuario en el portal).</p>}
+          <ListaConciliacion movs={todos} modo={finanzas ? "finanzas" : "direccion"} uid={u.id} vendedores={(vends ?? []) as { id: string; nombre: string }[]} inicial={vencidos.length ? "vencidos" : "libres"} />
+        </section>
+      )}
       <section className="space-y-2">
         <h2 className="text-base font-semibold text-slate-900">Estados de cuenta subidos</h2>
         <Card className="divide-y divide-slate-100 p-0">

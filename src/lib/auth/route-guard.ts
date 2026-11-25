@@ -104,7 +104,8 @@ export function decideRoute(input: {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   // Recepcion de facturas fisicas: finanzas las recibe; la jefa de ventas lo consulta.
-  if (under("/finanzas") && !["aux_finanzas", "supervisor_finanzas", "jefe_ventas"].includes(profile.rol)) {
+  // La gerente y el CEO ven (e identifican) las conciliaciones.
+  if (under("/finanzas") && !["aux_finanzas", "supervisor_finanzas", "jefe_ventas"].includes(profile.rol) && !(under("/finanzas/conciliaciones") && ["gerente", "ceo"].includes(profile.rol))) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   // Pagos a proveedores extranjeros: comprador y CEO.

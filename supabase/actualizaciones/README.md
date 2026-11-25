@@ -86,6 +86,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 69 | `0074_comisiones_revision.sql` | **Comisiones: revisión de la jefa.** El vendedor llena las faltantes (aunque ya esté pagada); la jefa revisa; la gerente ve solo lo revisado. |
 | 70 | `0075_envio_en_comision.sql` | **Envío incluido en los artículos**: se resta del importe y la comisión se calcula sobre lo que queda. |
 | 71 | `0076_conciliaciones.sql` | **Conciliaciones bancarias**: finanzas sube el estado de cuenta (solo abonos); los vendedores identifican sus pagos y su factura queda pagada con la fecha del abono. |
+| 72 | `0077_conciliacion_plazo.sql` | **Conciliaciones: 7 días para identificar** (después en rojo, comisión −10% y siguiente quincena); la gerente y el CEO ven e identifican a nombre de un vendedor; aviso en tiempo real. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

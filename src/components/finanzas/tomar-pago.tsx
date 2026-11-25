@@ -7,7 +7,7 @@ import { comisionesVentaAction } from "@/actions/ventas";
 import { toast } from "@/components/feedback-global";
 import { Button } from "@/components/ui";
 import { ComisionEditor, completa, filaDe, payloadDe, type FilaCom } from "@/components/ventas/comision-editor";
-import { foliosSugeridos, type MovConc } from "@/lib/conciliaciones";
+import { diasRestantes, foliosSugeridos, type MovConc } from "@/lib/conciliaciones";
 import { money2 } from "@/lib/ventas";
 
 const partir = (s: string) => s.split(/[\s,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean);
@@ -68,6 +68,9 @@ export function TomarPago({ mov, onClose }: { mov: MovConc; onClose: () => void 
         <p className="font-semibold text-brand-950">¿Qué factura(s) paga este abono de {money2(mov.monto, mov.moneda)}?</p>
         <button type="button" onClick={onClose} className="text-xs text-slate-500 hover:underline">Cancelar</button>
       </div>
+      {diasRestantes(mov.created_at) <= 0 && (
+        <p className="rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-red-800">Este pago ya pasó los 7 días para identificarlo: la comisión de estas facturas baja 10% y se paga hasta la siguiente quincena.</p>
+      )}
       <div className="flex flex-wrap gap-2">
         <input
           value={texto}
@@ -112,6 +115,57 @@ export function TomarPago({ mov, onClose }: { mov: MovConc; onClose: () => void 
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * La jefa de ventas, la gerente o el CEO identifican un pago a nombre de un vendedor (o de alguien
+ * sin usuario). Si la factura ya esta en la bitacora de ese vendedor, se marca pagada (o queda ligada
+ * para que el vendedor ponga la comision).
+ */
+export function IdentificarPara({ mov, vendedores, onClose }: { mov: MovConc; vendedores: { id: string; nombre: string }[]; onClose: () => void }) {
+  const router = useRouter();
+  const [pend, start] = useTransition();
+  const [quien, setQuien] = useState("");
+  const [otro, setOtro] = useState("");
+  const [texto, setTexto] = useState("");
+  const sugeridos = foliosSugeridos(mov.descripcion);
+  const folios = partir(texto);
+  const listo = folios.length > 0 && (quien === "otro" ? otro.trim().length > 1 : !!quien);
+  const guardar = () =>
+    start(async () => {
+      const r = await tomarPagoAction(mov.id, folios, quien === "otro" ? { para: otro } : { vendedor: quien });
+      if (!r.ok) return toast(r.error, "error");
+      const pag = r.resultado.filter((x) => x.estado === "pagada").length;
+      const com = r.resultado.filter((x) => x.estado === "falta_comision").length;
+      toast([`Pago identificado`, pag && `${pag} factura(s) pagadas`, com && `${com} esperan la comisión del vendedor`].filter(Boolean).join(" · "), "success");
+      onClose();
+      router.refresh();
+    });
+  return (
+    <div className="mt-2 w-full space-y-3 rounded-xl border-2 border-slate-700 bg-slate-50 p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-semibold text-slate-900">Identificar este abono de {money2(mov.monto, mov.moneda)} a nombre de:</p>
+        <button type="button" onClick={onClose} className="text-xs text-slate-500 hover:underline">Cancelar</button>
+      </div>
+      {diasRestantes(mov.created_at) <= 0 && <p className="rounded-md bg-red-50 px-3 py-2 text-xs font-medium text-red-800">Ya pasaron los 7 días: la comisión baja 10% y se paga la siguiente quincena.</p>}
+      <div className="flex flex-wrap gap-2">
+        <select value={quien} onChange={(e) => setQuien(e.target.value)} className="rounded-md border border-slate-300 px-2 py-2 text-sm">
+          <option value="">Elige al vendedor</option>
+          {vendedores.map((v) => <option key={v.id} value={v.id}>{v.nombre}</option>)}
+          <option value="otro">Otro (sin usuario en el portal)</option>
+        </select>
+        {quien === "otro" && <input value={otro} onChange={(e) => setOtro(e.target.value)} maxLength={80} placeholder="Nombre del vendedor" className="rounded-md border border-slate-300 px-3 py-2 text-sm" />}
+      </div>
+      <input value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Folio(s) de factura, separados por coma" className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+      {sugeridos.length > 0 && (
+        <p className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+          En la descripción viene:
+          {sugeridos.map((x) => <button key={x} type="button" onClick={() => setTexto([...new Set([...partir(texto), x])].join(", "))} className="rounded-full border border-slate-300 bg-white px-2 py-0.5 font-mono">{x}</button>)}
+        </p>
+      )}
+      <Button type="button" onClick={guardar} loading={pend} disabled={!listo}>Identificar pago</Button>
     </div>
   );
 }

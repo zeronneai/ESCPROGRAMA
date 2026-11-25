@@ -31,7 +31,7 @@ function FacturaComision({ f, modo }: { f: ComFactura; modo: "vendedor" | "jefa"
   const puede = (i: number, k: CampoCom) => jefa || (!f.revisada && (!f.pagada || ini[i][k] === ""));
   const editable = f.lineas.some((_, i) => puede(i, "imp") || puede(i, "pct") || puede(i, "env"));
   const cambio = filas.some((x, i) => x.imp !== ini[i].imp || x.pct !== ini[i].pct || x.env !== ini[i].env);
-  const total = filas.reduce((a, x) => a + (comisionDe(x) ?? 0), 0);
+  const total = filas.reduce((a, x) => a + (comisionDe(x) ?? 0), 0) * (1 - f.descuento / 100);
   const guardar = () =>
     start(async () => {
       const r = await comisionesVentaAction(f.id, filas.map(payloadDe));
@@ -62,6 +62,11 @@ function FacturaComision({ f, modo }: { f: ComFactura; modo: "vendedor" | "jefa"
           <span className="font-bold tabular-nums text-slate-900">{money2(cambio ? total : f.comision, f.moneda)}</span>
         </span>
       </div>
+      {f.descuento > 0 && (
+        <p className="border-b border-red-100 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-800">
+          Pago identificado tarde en Conciliaciones: comisión −{f.descuento}%{f.quincena ? `, se paga en la quincena del ${fecha(f.quincena)}` : ", se paga la siguiente quincena"}.
+        </p>
+      )}
       <div className="p-2">
         <ComisionEditor filas={filas} setFilas={setFilas} moneda={f.moneda} puede={editable ? puede : () => false} />
       </div>
@@ -130,6 +135,7 @@ export function ComisionesTabla({ vendedores, modo }: { vendedores: ComVendedor[
                         <span className="font-semibold text-slate-900">{f.factura ? `Factura ${f.factura}` : "Venta sin folio"}</span>
                         <span className="text-slate-600"> · {f.cliente}</span>
                         <span className="block text-xs text-slate-500">{f.pagada ? `Pagada ${fecha(f.fecha_cobro)}` : `Factura del ${fecha(f.fecha)}`}</span>
+                        {f.descuento > 0 && <span className="block text-xs font-medium text-red-700">Identificado tarde: −{f.descuento}%{f.quincena ? `, quincena del ${fecha(f.quincena)}` : ""}</span>}
                       </span>
                       <span className="font-bold tabular-nums text-slate-900">{money2(f.comision, f.moneda)}</span>
                     </div>
