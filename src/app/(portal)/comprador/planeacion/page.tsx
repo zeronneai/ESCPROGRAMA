@@ -35,7 +35,8 @@ export default async function PlaneacionPage({ searchParams }: { searchParams: P
       </div>
     );
   }
-  const { proveedores, articulos, ocs, corte, hoy, ventasPortal } = datos;
+  const { proveedores, articulos, ocs, corte, hoy, ventasPortal, pedidosOtros } = datos;
+  const nPedidos = articulos.reduce((n, a) => n + (a.pedidos?.lista.length ?? 0), 0) + pedidosOtros.length;
   if (!proveedores.length) {
     return (
       <div className="space-y-4">
@@ -73,6 +74,15 @@ export default async function PlaneacionPage({ searchParams }: { searchParams: P
       <Link href="/comprador/planeacion/inventario" className="inline-flex items-center gap-2 rounded-lg border border-brand-300 bg-white px-3 py-2 text-sm font-semibold text-brand-800 shadow-sm hover:bg-brand-50">
         Ver inventario por artículo (con buscador y las ventas que lo descontaron) →
       </Link>
+      <div className="flex flex-wrap gap-2">
+        <Link href="/comprador/planeacion/pedidos" className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold shadow-sm ${nPedidos ? "border-violet-300 bg-violet-50 text-violet-900 hover:bg-violet-100" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>
+          Pedidos de vendedores{nPedidos ? <span className="rounded-full bg-violet-600 px-2 text-xs text-white">{nPedidos}</span> : null}
+          {pedidosOtros.length ? <span className="text-xs font-normal">({pedidosOtros.length} fuera del kárdex)</span> : null}
+        </Link>
+        <Link href="/comprador/planeacion/asistente" className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50">
+          Asistente de compras (Claude) →
+        </Link>
+      </div>
 
       <div className="space-y-2">
         {(["usa", "china"] as const).map((origen) => (

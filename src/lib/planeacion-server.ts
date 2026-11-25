@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DateTime } from "luxon";
 import { claveDeArticulo } from "./pegatron-recuento";
+import { resumenPedidos, type Frecuencia, type PedidoPlan } from "./pedidos";
 import {
   addDias,
   EN_CAMINO,
@@ -36,7 +37,12 @@ export interface DatosPlaneacion {
   articulos: (ArticuloPlan & { proveedor_id: string })[];
   ocs: OcResumen[];
   ventasPortal: number; // renglones de venta del portal despues del corte
+  /** Pedidos activos de vendedores que no son del kardex ("otro") o cuya clave ya no esta activa. */
+  pedidosOtros: PedidoOtro[];
 }
+
+export type PedidoOtro = PedidoPlan & { clave: string | null; descripcion: string; um: string | null };
+type PedidoRow = { id: string; clave: string | null; descripcion: string; cantidad: string; um: string | null; frecuencia: Frecuencia; cliente: string | null; notas: string | null; created_at: string; profiles: { nombre: string } | null };
 
 /** Trae todos los renglones (Supabase regresa 1000 por consulta). */
 async function todas<T>(hacer: (desde: number, hasta: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
@@ -189,6 +195,28 @@ export async function cargarPlaneacion(supabase: SupabaseClient, soloProveedor?:
     }
   }
 
+  // Pedidos activos de vendedores (si falta la actualizacion 0078 no hay).
+  const pedidos = new Map<string, PedidoPlan[]>();
+  const pedidosOtros: PedidoOtro[] = [];
+  {
+    const { data, error } = await supabase
+      .from("pedidos_vendedor")
+      .select("id, clave, descripcion, cantidad, um, frecuencia, cliente, notas, created_at, profiles(nombre)")
+      .eq("estado", "activo")
+      .order("created_at")
+      .limit(2000);
+    if (!error) {
+      for (const r of (data ?? []) as unknown as PedidoRow[]) {
+        const p: PedidoPlan = { id: r.id, vendedor: r.profiles?.nombre ?? "", cantidad: Number(r.cantidad), frecuencia: r.frecuencia, cliente: r.cliente, notas: r.notas, created_at: r.created_at };
+        if (r.clave && claves.has(r.clave)) {
+          const l = pedidos.get(r.clave) ?? [];
+          l.push(p);
+          pedidos.set(r.clave, l);
+        } else if (!soloProveedor) pedidosOtros.push({ ...p, clave: r.clave, descripcion: r.descripcion, um: r.um });
+      }
+    }
+  }
+
   const articulos = arts.map((a) => {
     const vend = (ventas.get(a.clave) ?? []).reduce((s, v) => s + v.cantidad, 0);
     const existencia_corte = exist.get(a.clave) ?? 0;
@@ -211,8 +239,9 @@ export async function cargarPlaneacion(supabase: SupabaseClient, soloProveedor?:
       historial: corte ? historialConPortal(h, corte, hoy, ventas.get(a.clave) ?? [], existencia > 0) : h,
       llegadas: (llegadas.get(a.clave) ?? []).sort((x, y) => x.fecha.localeCompare(y.fecha)),
       pegatron: pegatron.get(a.clave) ?? null,
+      pedidos: pedidos.has(a.clave) ? { ...resumenPedidos(pedidos.get(a.clave)!), lista: pedidos.get(a.clave)! } : null,
     };
   });
 
-  return { corte, hoy, proveedores, articulos, ocs: [...resumen.values()], ventasPortal };
+  return { corte, hoy, proveedores, articulos, ocs: [...resumen.values()], ventasPortal, pedidosOtros };
 }

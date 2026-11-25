@@ -259,3 +259,13 @@ export async function ajustesProveedorAction(id: string, input: z.input<typeof a
   refrescar();
   return { ok: true };
 }
+
+/** Reglas que el comprador le deja escritas al asistente de compras. */
+export async function guardarReglasAsistenteAction(reglas: string): Promise<Result> {
+  if (!(await comprador())) return NO;
+  const supabase = await createClient();
+  const { error } = await supabase.from("plan_asistente").upsert({ id: 1, reglas: String(reglas ?? "").slice(0, 8000) });
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/comprador/planeacion/asistente");
+  return { ok: true };
+}

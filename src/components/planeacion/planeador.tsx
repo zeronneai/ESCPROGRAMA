@@ -18,6 +18,7 @@ import {
   type PlanProveedor,
   type Semaforo,
 } from "@/lib/planeacion";
+import { FRECUENCIA_CORTA } from "@/lib/pedidos";
 import { GraficaArticulo } from "./grafica";
 
 const PILL: Record<Semaforo, string> = {
@@ -108,6 +109,10 @@ export function Planeador({ prov, articulos, hoy }: { prov: PlanProveedor; artic
           <input type="checkbox" checked={p.traspasos} onChange={(e) => setP({ ...p, traspasos: e.target.checked })} />
           Contar traspasos como venta
         </label>
+        <label className="flex items-center gap-2 pb-1.5 text-sm text-slate-700" title="Pedidos semanales, mensuales o anuales de los vendedores">
+          <input type="checkbox" checked={p.pedidos !== false} onChange={(e) => setP({ ...p, pedidos: e.target.checked })} />
+          Sumar pedidos recurrentes de vendedores
+        </label>
         <p className="ml-auto max-w-md text-xs text-slate-500">
           {china
             ? `China: pedir al bajar de ${fmtNum(prov.punto_meses, 1)} meses, hasta ${fmtNum(prov.cobertura_meses, 1)} meses. Entrega ${prov.entrega_dias} días. La orden llega completa.`
@@ -168,6 +173,11 @@ export function Planeador({ prov, articulos, hoy }: { prov: PlanProveedor; artic
                     <td className="max-w-[280px] px-3 py-2">
                       <p className="font-medium">{a.clave}</p>
                       <p className="line-clamp-2 text-xs text-slate-500">{a.nombre}</p>
+                      {a.pedidos && (
+                        <p className="mt-0.5 text-[11px] font-semibold text-violet-700" title={a.pedidos.lista.map((x) => `${x.vendedor}: ${fmtNum(x.cantidad)} ${x.frecuencia}${x.cliente ? ` (${x.cliente})` : ""}`).join("\n")}>
+                          Pedido de vendedor:{a.pedidos.unica ? ` ${fmtNum(a.pedidos.unica)} única` : ""}{a.pedidos.unica && a.pedidos.mensual ? " ·" : ""}{a.pedidos.mensual ? ` +${fmtNum(a.pedidos.mensual, 1)}/mes` : ""}
+                        </p>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-right">
                       {fmtNum(a.existencia)}
@@ -238,6 +248,13 @@ function Detalle({ a, c, prov, p, hoy, pedir }: { a: ArticuloPlan; c: Calculo; p
         {a.recibido_post > 0 && fila("Recibido de OCs desde el corte", `+${fmtNum(a.recibido_post)}`)}
         {fila("Existencia para planear", fmtNum(a.existencia))}
         {a.pegatron?.cantidad ? fila(`Pegatron de línea por pedir (${a.pegatron.pos.join(", ")})`, `−${fmtNum(a.pegatron.cantidad)}`) : null}
+        {a.pedidos?.unica ? fila("Pedidos especiales de vendedores (se apartan)", `−${fmtNum(a.pedidos.unica)}`) : null}
+        {a.pedidos?.lista.map((x) => (
+          <div key={x.id} className="flex justify-between gap-3 py-0.5 pl-3 text-xs text-violet-800">
+            <span>{x.vendedor}{x.cliente ? ` · ${x.cliente}` : ""}</span>
+            <span>{fmtNum(x.cantidad)} · {FRECUENCIA_CORTA[x.frecuencia]}</span>
+          </div>
+        ))}
         {fila("En camino", fmtNum(c.transito))}
         {a.llegadas.map((l) => (
           <div key={l.oc_id} className="flex justify-between gap-3 py-0.5 pl-3 text-xs text-slate-500">
@@ -250,7 +267,8 @@ function Detalle({ a, c, prov, p, hoy, pedir }: { a: ArticuloPlan; c: Calculo; p
         {fila("Días sin stock suficiente para un pedido normal", `${fmtNum(c.bajoStock * 100)}%`)}
         {fila(`Promedio simple (${p.ventana} m)`, `${fmtNum(c.simple, 1)}/mes`)}
         {fila("Venta real (solo días con stock suficiente)", `${fmtNum(c.real, 1)}/mes`)}
-        {fila(`Demanda para planear (+${fmtNum(p.crecimiento * 100)}%)`, `${fmtNum(c.plan, 1)}/mes`)}
+        {c.extraVend ? fila("Pedidos recurrentes de vendedores", `+${fmtNum(c.extraVend, 1)}/mes`) : null}
+        {fila(`Demanda para planear (+${fmtNum(p.crecimiento * 100)}%${c.extraVend ? " + vendedores" : ""})`, `${fmtNum(c.plan, 1)}/mes`)}
         {fila("Punto de pedido", fmtNum(c.reorden))}
         {fila("Objetivo", fmtNum(c.objetivo))}
         {a.empaque && a.empaque > 1 ? fila("Empaque", `${fmtNum(a.empaque)} por caja`) : null}

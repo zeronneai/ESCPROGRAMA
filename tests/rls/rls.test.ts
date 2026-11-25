@@ -16,6 +16,7 @@ import { planeacionSuite } from "./planeacion.suite";
 import { calcTabulador } from "@/lib/pricing/tabulador";
 import { DATABASE_URL, as, failure, pool, type Actor } from "./helpers";
 import { recepcionSuite } from "./recepcion.suite";
+import { pedidosSuite } from "./pedidos.suite";
 import { conciliacionSuite } from "./conciliacion.suite";
 
 const seller1 = randomUUID();
@@ -570,6 +571,7 @@ almacenSuite();
 pagosSuite();
 planeacionSuite();
 recepcionSuite();
+pedidosSuite();
 conciliacionSuite();
 
 afterAll(async () => {

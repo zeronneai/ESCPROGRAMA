@@ -1,4 +1,4 @@
--- Revisa que actualizaciones (0059 a 0077) ya estan corridas en la base.
+-- Revisa que actualizaciones (0059 a 0078) ya estan corridas en la base.
 -- Pegalo en el SQL Editor de Supabase y presiona Run. No cambia nada, solo consulta.
 select actualizacion,
        case when ya then 'Ya está corrida' else 'FALTA correrla' end as estado
@@ -21,6 +21,7 @@ from (values
   ('0074 Revisión de comisiones',           exists (select 1 from information_schema.columns where table_schema='public' and table_name='ventas' and column_name='comision_revisada_at')),
   ('0075 Envío en la comisión',             exists (select 1 from information_schema.columns where table_schema='public' and table_name='venta_lineas' and column_name='envio')),
   ('0076 Conciliaciones bancarias',         to_regclass('public.conciliacion_movimientos') is not null),
-  ('0077 Plazo de 7 días en conciliaciones', exists (select 1 from information_schema.columns where table_schema='public' and table_name='conciliacion_movimientos' and column_name='tardio'))
+  ('0077 Plazo de 7 días en conciliaciones', exists (select 1 from information_schema.columns where table_schema='public' and table_name='conciliacion_movimientos' and column_name='tardio')),
+  ('0078 Pedidos de vendedores y asistente', to_regclass('public.pedidos_vendedor') is not null)
 ) as x(actualizacion, ya)
 order by actualizacion;

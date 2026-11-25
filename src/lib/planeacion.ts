@@ -9,6 +9,8 @@
  * Siempre se redondea al empaque (cajas completas).
  */
 
+import type { PedidoPlan } from "./pedidos";
+
 export const DIAS_MES = 30.4;
 
 export type Origen = "china" | "usa";
@@ -81,14 +83,18 @@ export interface ArticuloPlan {
   pegatron?: { cantidad: number; pos: string[] } | null;
   historial: MesHist[];
   llegadas: Llegada[];
+  /** Pedidos activos de vendedores: unica = se aparta una vez; mensual = demanda extra por mes (semanal, mensual, anual). */
+  pedidos?: { unica: number; mensual: number; lista: PedidoPlan[] } | null;
 }
 
 export interface Parametros {
   ventana: number; // meses
   crecimiento: number; // 0.16
   traspasos: boolean;
+  /** Sumar los pedidos recurrentes de los vendedores a la demanda. */
+  pedidos?: boolean;
 }
-export const PARAMETROS_BASE: Parametros = { ventana: 12, crecimiento: 0.16, traspasos: true };
+export const PARAMETROS_BASE: Parametros = { ventana: 12, crecimiento: 0.16, traspasos: true, pedidos: true };
 
 export type Semaforo = "rojo" | "amarillo" | "verde" | "gris";
 export const SEMAFORO: Record<Semaforo, string> = {
@@ -112,6 +118,8 @@ export interface Calculo {
   reorden: number;
   objetivo: number;
   sugerido: number;
+  /** Demanda mensual extra por pedidos recurrentes de vendedores. */
+  extraVend: number;
   cajas: number | null;
   cbm: number;
   importe: number;
@@ -168,15 +176,17 @@ export function redondeaEmpaque(cantidad: number, empaque: number | null): numbe
 
 export function calcular(a: ArticuloPlan, prov: PlanProveedor, p: Parametros, hoy: string, extra = 0): Calculo {
   const vr = ventaReal(a.historial, p);
-  const plan = vr.real * (1 + p.crecimiento);
+  const extraVend = p.pedidos === false ? 0 : (a.pedidos?.mensual ?? 0);
+  const plan = vr.real * (1 + p.crecimiento) + extraVend;
   const leadM = prov.entrega_dias / DIAS_MES;
   const transito = a.llegadas.reduce((s, l) => s + l.cantidad, 0);
-  const comprometido = a.pegatron?.cantidad ?? 0;
+  const comprometido = (a.pegatron?.cantidad ?? 0) + (a.pedidos?.unica ?? 0);
   const posicion = a.existencia + transito - comprometido;
   const china = prov.origen === "china";
   const reorden = china ? plan * prov.punto_meses : plan * (leadM + prov.base_meses);
   const objetivo = china ? plan * prov.cobertura_meses : plan * (leadM + prov.objetivo_meses);
-  const necesita = plan > 0 && posicion < reorden ? objetivo - posicion : 0;
+  // Un pedido especial que no alcanza con lo que hay se pide aunque el articulo no tenga venta.
+  const necesita = plan > 0 && posicion < reorden ? objetivo - posicion : posicion < 0 ? -posicion : 0;
   const sugerido = redondeaEmpaque(necesita, a.empaque) + extra;
   // Proyeccion mes a mes: cuando se acaba (con lo que viene en camino, sin lo sugerido).
   let agota: string | null = null;
@@ -196,7 +206,7 @@ export function calcular(a: ArticuloPlan, prov: PlanProveedor, p: Parametros, ho
   }
   const llegariaHoy = addDias(hoy, prov.entrega_dias);
   let semaforo: Semaforo;
-  if (plan <= 0) semaforo = "gris";
+  if (plan <= 0) semaforo = posicion < 0 ? "amarillo" : "gris";
   else if (agota && agota < llegariaHoy) semaforo = "rojo";
   else if (posicion < reorden) semaforo = "amarillo";
   else semaforo = "verde";
@@ -211,6 +221,7 @@ export function calcular(a: ArticuloPlan, prov: PlanProveedor, p: Parametros, ho
     reorden,
     objetivo,
     sugerido,
+    extraVend,
     cajas: emp ? sugerido / emp : null,
     cbm: emp && a.cbm_empaque ? (sugerido / emp) * a.cbm_empaque : 0,
     importe: sugerido * (a.precio ?? 0),

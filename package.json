@@ -15,6 +15,7 @@
   },
   "packageManager": "pnpm@10.28.0",
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.14.0",
     "@hookform/resolvers": "^5.9.1",
     "@react-pdf/renderer": "^4.9.0",
     "@supabase/ssr": "^0.12.7",

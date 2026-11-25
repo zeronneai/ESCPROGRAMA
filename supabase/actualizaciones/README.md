@@ -87,6 +87,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 70 | `0075_envio_en_comision.sql` | **Envío incluido en los artículos**: se resta del importe y la comisión se calcula sobre lo que queda. |
 | 71 | `0076_conciliaciones.sql` | **Conciliaciones bancarias**: finanzas sube el estado de cuenta (solo abonos); los vendedores identifican sus pagos y su factura queda pagada con la fecha del abono. |
 | 72 | `0077_conciliacion_plazo.sql` | **Conciliaciones: 7 días para identificar** (después en rojo, comisión −10% y siguiente quincena); la gerente y el CEO ven e identifican a nombre de un vendedor; aviso en tiempo real. |
+| 73 | `0078_pedidos_vendedores.sql` | **Pedidos de vendedores y asistente de compras**: los vendedores piden artículos del kárdex u "otro" (única, semanal, mensual, anual); las únicas se cierran solas al entrar en una OC; reglas y uso del asistente (Claude). |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

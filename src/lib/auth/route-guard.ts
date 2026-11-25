@@ -108,6 +108,10 @@ export function decideRoute(input: {
   if (under("/finanzas") && !["aux_finanzas", "supervisor_finanzas", "jefe_ventas"].includes(profile.rol) && !(under("/finanzas/conciliaciones") && ["gerente", "ceo"].includes(profile.rol))) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
+  // Pedidos al comprador: ventas, gerente y CEO.
+  if (under("/pedidos-compras") && !["vendedor", "jefe_ventas", "gerente", "ceo"].includes(profile.rol)) {
+    return { type: "redirect", to: homeFor(profile.rol) };
+  }
   // Pagos a proveedores extranjeros: comprador y CEO.
   if (under("/pagos") && profile.rol !== "comprador" && profile.rol !== "ceo") {
     return { type: "redirect", to: homeFor(profile.rol) };
