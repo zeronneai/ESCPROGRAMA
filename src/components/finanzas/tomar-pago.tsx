@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { buscarFacturasAction, tomarPagoAction, type FacturaBuscada } from "@/actions/conciliaciones";
 import { comisionesVentaAction } from "@/actions/ventas";
 import { toast } from "@/components/feedback-global";
+import { FacturaForm } from "@/components/almacen/factura-form";
 import { Button } from "@/components/ui";
 import { ComisionEditor, completa, filaDe, payloadDe, type FilaCom } from "@/components/ventas/comision-editor";
 import { diasRestantes, foliosSugeridos, type MovConc } from "@/lib/conciliaciones";
@@ -17,13 +18,14 @@ const partir = (s: string) => s.split(/[\s,;]+/).map((x) => x.trim().toUpperCase
  * se pide su comision aqui mismo y queda pagada con la fecha del abono. Si no la ha subido, el pago
  * queda apartado hasta que suba el PDF.
  */
-export function TomarPago({ mov, onClose }: { mov: MovConc; onClose: () => void }) {
+export function TomarPago({ mov, onClose, today, almacen = false }: { mov: MovConc; onClose: () => void; today?: string; almacen?: boolean }) {
   const router = useRouter();
   const [pend, start] = useTransition();
   const [texto, setTexto] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [facturas, setFacturas] = useState<(FacturaBuscada & { filas: FilaCom[] })[] | null>(null);
   const sugeridos = foliosSugeridos(mov.descripcion);
+  const [subir, setSubir] = useState(false);
 
   const revisar = async (t = texto) => {
     const folios = partir(t);
@@ -65,7 +67,7 @@ export function TomarPago({ mov, onClose }: { mov: MovConc; onClose: () => void 
   return (
     <div className="mt-2 w-full space-y-3 rounded-xl border-2 border-brand-600 bg-brand-50/40 p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-semibold text-brand-950">¿Qué factura(s) paga este abono de {money2(mov.monto, mov.moneda)}?</p>
+        <p className="font-semibold text-brand-950">Identificar abono de {money2(mov.monto, mov.moneda)}: ¿qué factura(s) paga?</p>
         <button type="button" onClick={onClose} className="text-xs text-slate-500 hover:underline">Cancelar</button>
       </div>
       {diasRestantes(mov.created_at) <= 0 && (
@@ -88,6 +90,30 @@ export function TomarPago({ mov, onClose }: { mov: MovConc; onClose: () => void 
           {sugeridos.map((s) => <button key={s} type="button" onClick={() => agregar(s)} className="rounded-full border border-slate-300 bg-white px-2 py-0.5 font-mono hover:border-brand-600">{s}</button>)}
         </p>
       )}
+      <p className="text-xs text-slate-600">
+        Escribe el número de factura.{" "}
+        {!subir ? (
+          <button type="button" onClick={() => setSubir(true)} className="font-semibold text-brand-700 underline">¿Todavía no la subes a tu bitácora? Sube su PDF aquí</button>
+        ) : (
+          <button type="button" onClick={() => setSubir(false)} className="text-slate-500 underline">Ocultar subir PDF</button>
+        )}
+      </p>
+      {subir && (
+        <div className="rounded-xl border border-slate-300 bg-white p-2">
+          <FacturaForm
+            modo="venta"
+            almacen={almacen}
+            today={today}
+            onGuardada={(_id, folio) => {
+              setSubir(false);
+              const t = [...new Set([...partir(texto), folio.trim().toUpperCase()])].filter(Boolean).join(", ");
+              setTexto(t);
+              toast(`Factura ${folio} registrada en tu bitácora. Ahora confirma la comisión e identifica el pago.`, "success");
+              void revisar(t);
+            }}
+          />
+        </div>
+      )}
       {facturas && (
         <div className="space-y-2">
           {facturas.map((f, i) => (
@@ -96,7 +122,12 @@ export function TomarPago({ mov, onClose }: { mov: MovConc; onClose: () => void 
                 <span><b>Factura {f.folio}</b>{f.cliente ? ` · ${f.cliente}` : ""}</span>
                 {f.monto != null && <span className="tabular-nums text-slate-700">{money2(f.monto, f.moneda ?? "MXN")}</span>}
               </p>
-              {!f.venta_id && <p className="text-xs text-amber-800">Todavía no la subes a tu bitácora: el pago queda apartado y, cuando subas su PDF, se liga sola y queda pagada.</p>}
+              {!f.venta_id && (
+                <p className="text-xs text-amber-800">
+                  Todavía no está en tu bitácora: puedes identificar el pago y queda apartado (cuando subas su PDF se liga sola y queda pagada), o{" "}
+                  <button type="button" onClick={() => setSubir(true)} className="font-semibold underline">sube su PDF ahora</button>.
+                </p>
+              )}
               {f.venta_id && f.pagada && <p className="text-xs text-slate-500">Ya estaba marcada pagada: solo se liga este abono.</p>}
               {f.venta_id && !f.pagada && (
                 <div className="mt-1 space-y-1">
@@ -110,7 +141,7 @@ export function TomarPago({ mov, onClose }: { mov: MovConc; onClose: () => void 
             <p className="text-xs text-amber-800">Las facturas suman {money2(suma, mov.moneda)} y el abono es de {money2(mov.monto, mov.moneda)}. Revisa que estén todas.</p>
           )}
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" onClick={tomar} loading={pend} disabled={faltaComision}>Es mío, tomar pago</Button>
+            <Button type="button" onClick={tomar} loading={pend} disabled={faltaComision}>Identificar pago</Button>
             {faltaComision && <span className="text-xs text-amber-800">Falta la comisión de algún artículo.</span>}
           </div>
         </div>

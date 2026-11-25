@@ -20,7 +20,7 @@ const fecha = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("es-MX
  * - direccion (jefa, gerente, CEO): ademas identifica a nombre de un vendedor.
  * Cada abono tiene 7 dias para identificarse; despues pasa a "No identificados" (rojo).
  */
-export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial }: { movs: MovConc[]; modo: "vendedor" | "finanzas" | "direccion"; uid: string; vendedores?: { id: string; nombre: string }[]; inicial?: Ver }) {
+export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, today, almacen }: { movs: MovConc[]; modo: "vendedor" | "finanzas" | "direccion"; uid: string; vendedores?: { id: string; nombre: string }[]; inicial?: Ver; today?: string; almacen?: boolean }) {
   const router = useRouter();
   const [pend, start] = useTransition();
   const [ver, setVer] = useState<Ver>(inicial ?? (modo === "vendedor" ? "libres" : "todos"));
@@ -117,7 +117,7 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial }:
                 {m.moneda === "USD" && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-800">Dólares</span>}
                 <span className="mt-1 flex justify-end gap-2 text-xs">
                   {modo === "vendedor" && !m.tomado_por && abierto !== m.id && (
-                    <button type="button" onClick={() => setAbierto(m.id)} className="rounded-full bg-brand-700 px-3 py-1 font-semibold text-white hover:bg-brand-800">Es mío</button>
+                    <button type="button" onClick={() => setAbierto(m.id)} className="rounded-full bg-brand-700 px-3 py-1 font-semibold text-white hover:bg-brand-800">Identificar</button>
                   )}
                   {modo === "direccion" && !m.tomado_por && abierto !== m.id && (
                     <button type="button" onClick={() => setAbierto(m.id)} className="rounded-full bg-slate-800 px-3 py-1 font-semibold text-white hover:bg-slate-900">Identificar</button>
@@ -127,7 +127,7 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial }:
               </span>
               {abierto === m.id && (
                 <div className="basis-full">
-                  {modo === "direccion" ? <IdentificarPara mov={m} vendedores={vendedores} onClose={() => setAbierto(null)} /> : <TomarPago mov={m} onClose={() => setAbierto(null)} />}
+                  {modo === "direccion" ? <IdentificarPara mov={m} vendedores={vendedores} onClose={() => setAbierto(null)} /> : <TomarPago mov={m} onClose={() => setAbierto(null)} today={today} almacen={almacen} />}
                 </div>
               )}
             </div>

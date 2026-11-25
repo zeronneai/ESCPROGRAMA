@@ -45,7 +45,8 @@ const sumarDias = (fecha: string, dias: number) => {
  * modo "entrega": solo se manda a almacen. modo "venta" (vendedor): se registra la venta, se da de alta o
  * completa el cliente y, si hay articulos del catalogo, tambien se manda a almacen.
  */
-export function FacturaForm({ modo = "entrega", today, cliente = null, almacen = true, por = null }: { modo?: "entrega" | "venta"; today?: string; cliente?: { id: string; nombre: string } | null; almacen?: boolean; por?: { id: string; nombre: string } | null }) {
+/** onGuardada: si se usa dentro de otra pantalla (ej. Conciliaciones), en vez de abrir la venta se avisa con su id y folio. */
+export function FacturaForm({ modo = "entrega", today, cliente = null, almacen = true, por = null, onGuardada }: { modo?: "entrega" | "venta"; today?: string; cliente?: { id: string; nombre: string } | null; almacen?: boolean; por?: { id: string; nombre: string } | null; onGuardada?: (ventaId: string, folio: string) => void }) {
   const venta = modo === "venta";
   const [pdf, setPdf] = useState<File | null>(null);
   const [xml, setXml] = useState<File | null>(null);
@@ -228,6 +229,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
       return ventaDesdeFacturaAction(fd);
     }, (r) => {
       if (!r.ok) return;
+      if (venta && onGuardada) return onGuardada((r as { id: string }).id, v.folio);
       if (venta && por) return router.push(`/ventas/vendedor/${por.id}?nueva=factura`);
       router.push(venta ? `/vendedor/bitacora/venta/${(r as { id: string }).id}?nueva=factura` : `/entregas/${(r as { id: string }).id}?nueva=1`);
     });
