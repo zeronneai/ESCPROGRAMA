@@ -122,13 +122,14 @@ const periodo = z.object({
 /** La jefa elige desde/hasta que dia cuenta el mes (la meta se ajusta en proporcion). */
 export async function guardarPeriodoMetasAction(input: z.input<typeof periodo>): Promise<Result> {
   const u = await requireUser();
-  if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas." };
+  if (u.rol !== "jefe_ventas" && u.rol !== "comprador") return { ok: false, error: "Solo la jefa de ventas o el comprador." };
   const p = periodo.safeParse(input);
   if (!p.success) return { ok: false, error: "Fechas inválidas" };
   if (p.data.desde && p.data.hasta && p.data.hasta < p.data.desde) return { ok: false, error: "La fecha final va después de la inicial." };
   const supabase = await createClient();
-  const { error } = await supabase.from("metas_config").update({ ...p.data, updated_by: u.id, updated_at: new Date().toISOString() }).eq("id", 1);
+  const { data, error } = await supabase.from("metas_config").update({ ...p.data, updated_by: u.id, updated_at: new Date().toISOString() }).eq("id", 1).select("id");
   if (error) return { ok: false, error: /metas_config/.test(error.message) ? "Falta correr la actualización 0081 en la base." : friendlyError(error.message) };
+  if (!data?.length) return { ok: false, error: u.rol === "comprador" ? "Falta correr la actualización 0083 en la base." : "No se pudo guardar." };
   revalidatePath("/ventas/meta-prospeccion");
   revalidatePath("/metas");
   return { ok: true };

@@ -14,8 +14,10 @@ const fecha = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("es-MX
 
 /** Meta diaria de prospeccion: la jefa la configura; gerente y CEO la consultan. */
 export default async function MetaProspeccion() {
-  const u = await requireRoles(["jefe_ventas", "gerente", "ceo"]);
+  const u = await requireRoles(["jefe_ventas", "gerente", "ceo", "comprador"]);
   const edita = u.rol === "jefe_ventas";
+  // El comprador solo cambia el periodo de las metas (desde/hasta que dia cuentan).
+  const editaPeriodo = edita || u.rol === "comprador";
   const supabase = await createClient();
   const [{ data: cfg, error }, { data: av }, { data: metasV, error: errMetas }, { data: usuarios }] = await Promise.all([
     supabase.from("prospeccion_config").select("meta_telemarketing, meta_campo, inicio").eq("id", 1).maybeSingle(),
@@ -32,6 +34,16 @@ export default async function MetaProspeccion() {
       <div className="space-y-4">
         <PageHeader title="Meta de prospección" />
         <EmptyState title="Falta la actualización de la base">Corre <code>0079_meta_prospeccion.sql</code> en el SQL Editor de Supabase.</EmptyState>
+      </div>
+    );
+  if (u.rol === "comprador")
+    return (
+      <div className="space-y-5">
+        <PageHeader title="Periodo de metas" subtitle="Desde y hasta qué día cuentan las metas de venta. La meta del mes se ajusta en proporción a esos días." />
+        <Card className="space-y-3 p-4">
+          {mcfg ? <ConfigPeriodo desde={mcfg.desde} hasta={mcfg.hasta} edita /> : <p className="text-sm text-amber-800">Falta correr <code>0081_metas_periodo_publico.sql</code> y <code>0083_metas_periodo_comprador.sql</code> en Supabase.</p>}
+          <Link href="/metas" className="text-sm font-medium text-brand-700 underline">Ver gráficas →</Link>
+        </Card>
       </div>
     );
   const filas = (av ?? []) as AvanceProspeccion[];
@@ -53,7 +65,7 @@ export default async function MetaProspeccion() {
         ) : (
           <ConfigMetasVenta metas={((metasV ?? []) as MetaFila[]).map((m) => ({ ...m, meta: Number(m.meta) }))} usuarios={(usuarios ?? []) as { id: string; nombre: string }[]} edita={edita} />
         )}
-        {mcfg ? <ConfigPeriodo desde={mcfg.desde} hasta={mcfg.hasta} edita={edita} /> : !errMetas && <p className="text-sm text-amber-800">Para el periodo proporcional y el link de las pantallas falta correr <code>0081_metas_periodo_publico.sql</code>.</p>}
+        {mcfg ? <ConfigPeriodo desde={mcfg.desde} hasta={mcfg.hasta} edita={editaPeriodo} /> : !errMetas && <p className="text-sm text-amber-800">Para el periodo proporcional y el link de las pantallas falta correr <code>0081_metas_periodo_publico.sql</code>.</p>}
         {edita && estimados != null && <LeerSubtotales pendientes={estimados} />}
         <p className="text-xs text-slate-500">El avance es lo registrado en Ventas diarias del mes por ese usuario, sin IVA. Para una meta sin usuario (como José Ortiz), elige quién captura sus ventas: esa persona (y tú) las sube a mano en el menú, Capturar ventas. Una meta en pausa no sale en las gráficas.</p>
       </Card>
