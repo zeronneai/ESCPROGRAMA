@@ -27,7 +27,7 @@ export default async function CapturarPage() {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Capturar ventas" subtitle="Ventas de quien no tiene usuario en el portal. Se capturan SIN IVA (el subtotal de la factura) y suman al momento en las gráficas de Metas." />
+      <PageHeader title="Sumar ventas" subtitle="Lo vendido por quien no tiene usuario en el portal (José Ortiz). Solo pon la cantidad en pesos sin IVA: suma al momento en las gráficas de Metas." />
       <Link href="/metas" className="text-sm font-medium text-brand-700 underline">Ver gráficas de metas →</Link>
       {error ? (
         <EmptyState title="Falta la actualización de la base">Corre <code>0080_metas_ventas.sql</code> en el SQL Editor de Supabase.</EmptyState>
@@ -37,7 +37,7 @@ export default async function CapturarPage() {
         <>
           <CapturarVenta metas={ms} hoy={hoy} />
           <section className="space-y-2">
-            <h2 className="text-base font-semibold">Capturadas este mes</h2>
+            <h2 className="text-base font-semibold">Sumado este mes{lista.length ? `: ${money(lista.filter((c) => !c.cancelada_at).reduce((a, c) => a + Number(c.subtotal), 0))}` : ""}</h2>
             {lista.length ? (
               <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-sm">
                 {lista.map((c) => (
