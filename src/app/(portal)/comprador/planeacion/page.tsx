@@ -70,6 +70,9 @@ export default async function PlaneacionPage({ searchParams }: { searchParams: P
           </>
         }
       />
+      <Link href="/comprador/planeacion/inventario" className="inline-flex items-center gap-2 rounded-lg border border-brand-300 bg-white px-3 py-2 text-sm font-semibold text-brand-800 shadow-sm hover:bg-brand-50">
+        Ver inventario por artículo (con buscador y las ventas que lo descontaron) →
+      </Link>
 
       <div className="space-y-2">
         {(["usa", "china"] as const).map((origen) => (
