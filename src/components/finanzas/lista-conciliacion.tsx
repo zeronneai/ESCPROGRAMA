@@ -26,6 +26,10 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, t
   const [ver, setVer] = useState<Ver>(inicial ?? (modo === "vendedor" ? "libres" : "todos"));
   const vencido = (m: MovConc) => !m.tomado_por && diasRestantes(m.created_at) <= 0;
   const [cuenta, setCuenta] = useState<string>("");
+  // Por vendedor (finanzas, jefa, gerente): a nombre de quien quedo cada pago.
+  const quien = (m: MovConc) => (m.tomado_por ? (m.tomado_para ?? m.tomado_nombre ?? "Otro") : null);
+  const [vend, setVend] = useState<string>("");
+  const vends = useMemo(() => [...new Set(movs.map(quien).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b)), [movs]);
   const [buscar, setBuscar] = useState("");
   const [abierto, setAbierto] = useState<string | null>(null);
   const cuentas = useMemo(() => [...new Map(movs.map((m) => [`${m.banco}|${m.cuenta ?? ""}`, m])).values()], [movs]);
@@ -37,6 +41,7 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, t
     if (ver === "identificados" && !m.tomado_por) return false;
     if (ver === "mios" && m.vendedor_id !== uid) return false;
     if (cuenta && `${m.banco}|${m.cuenta ?? ""}` !== cuenta) return false;
+    if (vend && quien(m) !== vend) return false;
     if (t && !(m.descripcion.toLowerCase().includes(t) || (m.referencia ?? "").toLowerCase().includes(t) || m.facturas.some((f) => f.folio.toLowerCase().includes(t)) || (tn > 0 && Math.abs(m.monto - tn) < 1))) return false;
     return true;
   });
@@ -72,7 +77,19 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, t
             {cuentas.map((c) => <option key={`${c.banco}|${c.cuenta ?? ""}`} value={`${c.banco}|${c.cuenta ?? ""}`}>{c.banco} ···{(c.cuenta ?? "").slice(-4)}{c.moneda === "USD" ? " (USD)" : ""}</option>)}
           </select>
         )}
+        {modo !== "vendedor" && vends.length > 0 && (
+          <select value={vend} onChange={(e) => { setVend(e.target.value); if (e.target.value && ver !== "todos") setVer("identificados"); }} className="rounded-md border border-slate-300 px-2 py-1 text-sm" aria-label="Vendedor">
+            <option value="">Todos los vendedores</option>
+            {vends.map((v) => <option key={v} value={v}>{v}</option>)}
+          </select>
+        )}
       </div>
+      {vend && (
+        <p className="text-sm text-slate-700">
+          <b>{vend}</b>: {lista.length} pago(s) · {lista.reduce((n, m) => n + m.facturas.length, 0)} factura(s) ·{" "}
+          {["MXN", "USD"].map((mon) => { const t2 = lista.filter((m) => m.moneda === mon).reduce((a, m) => a + m.monto, 0); return t2 ? `$${t2.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${mon === "USD" ? " USD" : ""}` : null; }).filter(Boolean).join(" · ")}
+        </p>
+      )}
       <Input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar por nombre, folio o monto (ej. 5962.40)" />
       {lista.length === 0 && <Card className="text-sm text-slate-600">{ver === "libres" ? "No hay abonos sin identificar." : "No hay abonos en esta vista."}</Card>}
       <Card className="divide-y divide-slate-100 p-0">

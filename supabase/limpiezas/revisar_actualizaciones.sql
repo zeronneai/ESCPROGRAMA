@@ -1,4 +1,4 @@
--- Revisa que actualizaciones (0059 a 0084) ya estan corridas en la base.
+-- Revisa que actualizaciones (0059 a 0085) ya estan corridas en la base.
 -- Pegalo en el SQL Editor de Supabase y presiona Run. No cambia nada, solo consulta.
 select actualizacion,
        case when ya then 'Ya está corrida' else 'FALTA correrla' end as estado
@@ -28,6 +28,7 @@ from (values
   ('0081 Metas por periodo y pantalla publica', to_regclass('public.metas_config') is not null),
   ('0082 Tipo de cambio del pago', exists (select 1 from information_schema.columns where table_schema='public' and table_name='ventas' and column_name='tipo_cambio_pago')),
   ('0083 Periodo de metas para el comprador', exists (select 1 from pg_policies where tablename='metas_config' and policyname='metas_config_update' and qual like '%is_buyer%')),
-  ('0084 Periodo de metas para marketplaces', exists (select 1 from pg_policies where tablename='metas_config' and policyname='metas_config_update' and qual like '%is_marketplaces%'))
+  ('0084 Periodo de metas para marketplaces', exists (select 1 from pg_policies where tablename='metas_config' and policyname='metas_config_update' and qual like '%is_marketplaces%')),
+  ('0085 Recepcion gerente y prospectos clientes', exists (select 1 from pg_policies where tablename='factura_recepcion' and policyname='factura_recepcion_select' and qual like '%is_gerente%'))
 ) as x(actualizacion, ya)
 order by actualizacion;

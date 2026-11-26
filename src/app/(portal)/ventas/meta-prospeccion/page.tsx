@@ -86,14 +86,16 @@ export default async function MetaProspeccion() {
         const req = fs.reduce((s, f) => s + f.requeridos, 0);
         const reg = fs.reduce((s, f) => s + f.registrados, 0);
         const falt = fs.reduce((s, f) => s + f.faltan, 0);
+        const conv = fs.reduce((s, f) => s + (f.convertidos ?? 0), 0);
         return (
           <section key={g} className="space-y-3">
             <h2 className="text-base font-semibold">{TIPOS_PROSPECCION[g]} <span className="text-sm font-normal text-slate-500">({fs.length})</span></h2>
             {g !== "sin_meta" && (
-              <div className="grid grid-cols-3 gap-3">
-                <StatCard label="Meta acumulada" value={req} />
-                <StatCard label="Registrados" value={reg} tone={reg >= req ? "green" : "default"} />
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <StatCard label="Deberían llevar" value={req} />
+                <StatCard label="Llevan registrados" value={reg} tone={reg >= req ? "green" : "default"} />
                 <StatCard label="Faltan" value={falt} tone={falt ? "red" : "green"} />
+                <StatCard label="Ya son clientes" value={conv} tone={conv ? "green" : "default"} hint={reg ? `${Math.round((conv / reg) * 100)}% de los registrados` : undefined} />
               </div>
             )}
             <Card className="overflow-x-auto p-0">
@@ -102,10 +104,11 @@ export default async function MetaProspeccion() {
                   <tr>
                     <th className="px-4 py-2.5">Vendedor</th>
                     <th className="px-3 py-2.5 text-right">Hoy</th>
-                    <th className="px-3 py-2.5 text-right">Registrados</th>
-                    <th className="px-3 py-2.5 text-right">Meta acumulada</th>
+                    <th className="px-3 py-2.5 text-right">Debería llevar</th>
+                    <th className="px-3 py-2.5 text-right">Lleva registrados</th>
                     <th className="px-3 py-2.5 text-right">Faltan</th>
                     <th className="px-3 py-2.5 text-right">Avance</th>
+                    <th className="px-3 py-2.5 text-right" title="De los prospectos que registró desde el inicio, cuántos ya compraron (subieron factura)">Ya son clientes</th>
                     <th className="px-4 py-2.5">Tipo</th>
                   </tr>
                 </thead>
@@ -116,8 +119,8 @@ export default async function MetaProspeccion() {
                       <tr key={f.vendedor_id}>
                         <td className="px-4 py-2.5 font-medium">{f.nombre}</td>
                         <td className={`px-3 py-2.5 text-right tabular-nums ${f.meta_hoy && f.hoy < f.meta_hoy ? "text-red-700" : ""}`}>{f.meta_hoy ? `${f.hoy} / ${f.meta_hoy}` : f.hoy}</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">{f.registrados}</td>
                         <td className="px-3 py-2.5 text-right tabular-nums">{g === "sin_meta" ? "-" : f.requeridos}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">{f.registrados}</td>
                         <td className={`px-3 py-2.5 text-right tabular-nums font-semibold ${f.faltan ? "text-red-700" : "text-green-700"}`}>{g === "sin_meta" ? "-" : f.faltan}</td>
                         <td className="px-3 py-2.5 text-right">
                           {pct === null ? "-" : (
@@ -126,6 +129,10 @@ export default async function MetaProspeccion() {
                               <span className="inline-block h-2 w-20 overflow-hidden rounded-full bg-slate-200"><span className={`block h-2 ${pct >= 100 ? "bg-green-600" : "bg-red-500"}`} style={{ width: `${pct}%` }} /></span>
                             </span>
                           )}
+                        </td>
+                        <td className={`px-3 py-2.5 text-right tabular-nums ${f.convertidos ? "font-semibold text-green-700" : ""}`}>
+                          {f.convertidos ?? "-"}
+                          {f.convertidos != null && f.registrados > 0 && <span className="ml-1 text-xs font-normal text-slate-500">({Math.round((f.convertidos / f.registrados) * 100)}%)</span>}
                         </td>
                         <td className="px-4 py-2.5">{edita ? <TipoVendedor id={f.vendedor_id} tipo={f.tipo} /> : TIPOS_PROSPECCION[f.tipo]}</td>
                       </tr>
@@ -138,7 +145,7 @@ export default async function MetaProspeccion() {
         );
       })}
       {!filas.length && <EmptyState title="No hay vendedores activos" />}
-      <p className="text-xs text-slate-500">Cuentan los prospectos que el vendedor registró en Prospección desde la fecha de inicio (aunque después se cierren o archiven). Los que llegan del sitio web no cuentan. Sábados y domingos no suman meta.</p>
+      <p className="text-xs text-slate-500">Cuentan los prospectos que el vendedor registró en Prospección desde la fecha de inicio (aunque después se cierren o archiven). "Ya son clientes" son los de esos que ya compraron (subieron su factura). Los que llegan del sitio web no cuentan. Sábados y domingos no suman meta.</p>
     </div>
   );
 }

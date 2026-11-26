@@ -94,6 +94,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 77 | `0082_tipo_cambio_pago.sql` | **Tipo de cambio del pago**: al marcar pagada una venta en dólares se pide el tipo de cambio del día del pago (propone el de Banxico); si la marca Conciliaciones se pone el de Banxico. |
 | 78 | `0083_metas_periodo_comprador.sql` | **Periodo de metas también para el comprador**: puede cambiar desde/hasta qué día cuentan las metas. |
 | 79 | `0084_metas_periodo_marketplaces.sql` | **Periodo de metas también para marketplaces**. |
+| 80 | `0085_recepcion_gerente_prospectos_clientes.sql` | **Recepción para gerente y CEO, y prospectos que ya son clientes**: la gerente y el CEO ven Recepción de facturas por vendedor (solo consulta); la meta de prospección muestra cuántos de los registrados ya compraron. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

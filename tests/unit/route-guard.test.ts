@@ -188,6 +188,6 @@ describe("comisiones", () => {
     expect(d("/finanzas/conciliaciones", "vendedor")).toEqual({ type: "redirect", to: "/inicio" });
     expect(d("/finanzas/conciliaciones", "gerente")).toEqual({ type: "next" });
     expect(d("/finanzas/conciliaciones/x", "ceo")).toEqual({ type: "next" });
-    expect(d("/finanzas/recepcion", "gerente")).toEqual({ type: "redirect", to: "/inicio" });
+    expect(d("/finanzas/recepcion", "gerente")).toEqual({ type: "next" });
   });
 });

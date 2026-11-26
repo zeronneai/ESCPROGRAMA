@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 
 /** Recepcion de facturas (finanzas): vendedores con facturas fisicas por recibir. */
 export default async function RecepcionFinanzas() {
-  await requireRoles(["aux_finanzas", "supervisor_finanzas", "jefe_ventas"]);
+  await requireRoles(["aux_finanzas", "supervisor_finanzas", "jefe_ventas", "gerente", "ceo"]);
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("finanzas_vendedores");
   const rows = (data ?? []) as { id: string; nombre: string; por_revisar: number; recibidas: number; rechazadas: number; ultima: string | null }[];

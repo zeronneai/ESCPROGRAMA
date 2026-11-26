@@ -27,7 +27,11 @@ export function metaProspeccionSuite() {
       const dias = (await q("postgres", "select public.dias_habiles('2026-11-16', public.local_today()) as d")).rows[0].d as number;
       const mio = (await q(w.seller1, "select * from public.prospeccion_avance()")).rows;
       expect(mio).toHaveLength(1);
-      expect(mio[0]).toMatchObject({ tipo: "telemarketing", meta_diaria: 8, dias, requeridos: 8 * dias, registrados: 3, faltan: Math.max(8 * dias - 3, 0), hoy: 3 });
+      expect(mio[0]).toMatchObject({ tipo: "telemarketing", meta_diaria: 8, dias, requeridos: 8 * dias, registrados: 3, faltan: Math.max(8 * dias - 3, 0), hoy: 3, convertidos: 0 });
+      await q("postgres", "update public.bitacora set resultado='ganada' where id = (select id from public.bitacora where vendedor_id=$1 and origen='vendedor' order by created_at desc limit 1)", [s1]);
+      const ger = await persona("gerente", "Gerente Prosp");
+      const g = (await q(ger, "select * from public.prospeccion_avance()")).rows.find((r) => r.vendedor_id === s1)!;
+      expect(g.convertidos).toBe(1);
       const todos = (await q(jefa, "select * from public.prospeccion_avance()")).rows;
       expect(todos.find((r) => r.vendedor_id === s2)).toMatchObject({ tipo: "campo", meta_diaria: 2, requeridos: 2 * dias });
       expect((await q("postgres", "select public.dias_habiles('2026-11-16','2026-11-25') as d")).rows[0].d).toBe(8);

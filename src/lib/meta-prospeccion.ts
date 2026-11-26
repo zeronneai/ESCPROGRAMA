@@ -14,4 +14,6 @@ export interface AvanceProspeccion {
   faltan: number;
   hoy: number;
   meta_hoy: number;
+  /** De los registrados desde el inicio, cuantos ya se hicieron clientes (0085). */
+  convertidos?: number;
 }

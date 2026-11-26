@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 
 /** Recepcion de facturas de un vendedor: buscar por folio, palomear recibida o rechazar, anotar. */
 export default async function RecepcionVendedor({ params }: { params: Promise<{ id: string }> }) {
-  const u = await requireRoles(["aux_finanzas", "supervisor_finanzas", "jefe_ventas"]);
+  const u = await requireRoles(["aux_finanzas", "supervisor_finanzas", "jefe_ventas", "gerente", "ceo"]);
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const supabase = await createClient();

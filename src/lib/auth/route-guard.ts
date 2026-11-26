@@ -107,7 +107,7 @@ export function decideRoute(input: {
   }
   // Recepcion de facturas fisicas: finanzas las recibe; la jefa de ventas lo consulta.
   // La gerente y el CEO ven (e identifican) las conciliaciones.
-  if (under("/finanzas") && !["aux_finanzas", "supervisor_finanzas", "jefe_ventas"].includes(profile.rol) && !(under("/finanzas/conciliaciones") && ["gerente", "ceo"].includes(profile.rol))) {
+  if (under("/finanzas") && !["aux_finanzas", "supervisor_finanzas", "jefe_ventas"].includes(profile.rol) && !((under("/finanzas/conciliaciones") || under("/finanzas/recepcion")) && ["gerente", "ceo"].includes(profile.rol))) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
   // Metas de venta en vivo: ventas, gerente y CEO.
