@@ -287,6 +287,8 @@ export async function ventaDesdeFacturaAction(fd: FormData): Promise<Result<{ id
   if (p.data.moneda === "USD" && p.data.tipo_cambio) await supabase.rpc("venta_tipo_cambio_factura", { p_venta: r.venta_id, p_tc: p.data.tipo_cambio });
   // Subtotal sin IVA de la factura (metas y resumen de ventas van sin IVA). Sin el, la base lo estima.
   if (p.data.subtotal && p.data.subtotal <= p.data.total) await supabase.rpc("venta_subtotal_factura", { p_venta: r.venta_id, p_subtotal: p.data.subtotal });
+  // Vendedor que dice la factura (ej. CASA LOCAL): las metas lo usan para saber a quien contarle la venta.
+  if (p.data.vendedor_factura) await supabase.rpc("venta_vendedor_factura", { p_venta: r.venta_id, p_nombre: p.data.vendedor_factura });
   revalidatePath("/vendedor/bitacora");
   revalidatePath("/entregas");
   return { ok: true, id: r.venta_id };

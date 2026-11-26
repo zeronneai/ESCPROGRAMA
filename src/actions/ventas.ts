@@ -244,22 +244,31 @@ export async function cobrarConComisionAction(ventaId: string, fechaCobro: strin
   return r;
 }
 
-/** Jefa: ventas con factura cuyo subtotal sin IVA todavia es estimado (para volver a leerlo de la factura). */
-export async function ventasSubtotalEstimadoAction(): Promise<Result<{ ventas: { id: string; factura: string | null; pdf: boolean; xml: boolean; monto: number }[] }>> {
+/** Jefa: ventas con factura a las que les falta leer el subtotal exacto o el vendedor que dice la factura. */
+export async function ventasSubtotalEstimadoAction(): Promise<Result<{ ventas: { id: string; factura: string | null; pdf: boolean; xml: boolean; monto: number; sub: boolean; vend: boolean }[] }>> {
   const u = await requireUser();
   if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas." };
   const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("ventas")
-    .select("id, factura, factura_path, xml_path, monto")
-    .eq("subtotal_estimado", true)
-    .is("cancelada_at", null)
-    .or("factura_path.not.is.null,xml_path.not.is.null")
-    .order("fecha", { ascending: false })
-    .limit(5000);
+  const base = (cols: string, filtro: string) =>
+    supabase.from("ventas").select(cols).is("cancelada_at", null).or("factura_path.not.is.null,xml_path.not.is.null").or(filtro).order("fecha", { ascending: false }).limit(5000);
+  let { data, error } = await base("id, factura, factura_path, xml_path, monto, subtotal_estimado, vendedor_factura", "subtotal_estimado.eq.true,vendedor_factura.is.null");
+  if (error && /vendedor_factura/.test(error.message)) ({ data, error } = await base("id, factura, factura_path, xml_path, monto, subtotal_estimado", "subtotal_estimado.eq.true"));
   if (error) return { ok: false, error: /subtotal/.test(error.message) ? "Falta correr la actualización 0080 en la base." : friendlyError(error.message) };
-  type R = { id: string; factura: string | null; factura_path: string | null; xml_path: string | null; monto: string | null };
-  return { ok: true, ventas: ((data ?? []) as R[]).map((v) => ({ id: v.id, factura: v.factura, pdf: !!v.factura_path, xml: !!v.xml_path, monto: Number(v.monto ?? 0) })) };
+  type R = { id: string; factura: string | null; factura_path: string | null; xml_path: string | null; monto: string | null; subtotal_estimado: boolean; vendedor_factura?: string | null };
+  return {
+    ok: true,
+    ventas: ((data ?? []) as unknown as R[]).map((v) => ({ id: v.id, factura: v.factura, pdf: !!v.factura_path, xml: !!v.xml_path, monto: Number(v.monto ?? 0), sub: v.subtotal_estimado, vend: "vendedor_factura" in v && !v.vendedor_factura })),
+  };
+}
+
+/** Guarda el vendedor que dice la factura. */
+export async function guardarVendedorFacturaAction(ventaId: string, nombre: string): Promise<Result> {
+  const u = await requireUser();
+  if (u.rol !== "jefe_ventas" && u.rol !== "vendedor") return { ok: false, error: "No autorizado." };
+  if (!uuid.safeParse(ventaId).success || !nombre.trim()) return { ok: false, error: "Dato inválido" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("venta_vendedor_factura", { p_venta: ventaId, p_nombre: nombre.trim().slice(0, 150) });
+  return error ? { ok: false, error: friendlyError(error.message) } : { ok: true };
 }
 
 /** Guarda el subtotal sin IVA leido de la factura. */

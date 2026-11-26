@@ -43,6 +43,7 @@ const metaVenta = z.object({
   nombre: z.string().trim().min(1, "Pon el nombre.").max(120),
   vendedor_id: z.string().uuid().nullable(),
   capturista_id: z.string().uuid().nullable().optional(),
+  alias_factura: z.string().trim().max(150).nullable().optional(),
   meta: z.number({ error: "Pon la meta." }).positive("La meta debe ser mayor a 0.").max(1e10),
   estado: z.enum(["activa", "pausada"]),
 });

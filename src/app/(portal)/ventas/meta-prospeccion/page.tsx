@@ -22,12 +22,15 @@ export default async function MetaProspeccion() {
   const [{ data: cfg, error }, { data: av }, { data: metasV, error: errMetas }, { data: usuarios }] = await Promise.all([
     supabase.from("prospeccion_config").select("meta_telemarketing, meta_campo, inicio").eq("id", 1).maybeSingle(),
     supabase.rpc("prospeccion_avance"),
-    supabase.from("metas_venta").select("id, nombre, vendedor_id, capturista_id, meta, estado").order("orden").order("nombre"),
+    supabase.from("metas_venta").select("*").order("orden").order("nombre"),
     supabase.from("profiles").select("id, nombre, rol").in("rol", ["vendedor", "jefe_ventas", "marketplaces"]).eq("activo", true).order("nombre"),
   ]);
   const { data: mcfg } = await supabase.from("metas_config").select("desde, hasta").eq("id", 1).maybeSingle();
   const { count: estimados } = edita
     ? await supabase.from("ventas").select("id", { count: "exact", head: true }).eq("subtotal_estimado", true).is("cancelada_at", null).or("factura_path.not.is.null,xml_path.not.is.null")
+    : { count: null };
+  const { count: sinVendedor } = edita
+    ? await supabase.from("ventas").select("id", { count: "exact", head: true }).is("vendedor_factura", null).is("cancelada_at", null).or("factura_path.not.is.null,xml_path.not.is.null")
     : { count: null };
   if (error || !cfg)
     return (
@@ -66,8 +69,8 @@ export default async function MetaProspeccion() {
           <ConfigMetasVenta metas={((metasV ?? []) as MetaFila[]).map((m) => ({ ...m, meta: Number(m.meta) }))} usuarios={(usuarios ?? []) as { id: string; nombre: string; rol: string }[]} edita={edita} />
         )}
         {mcfg ? <ConfigPeriodo desde={mcfg.desde} hasta={mcfg.hasta} edita={editaPeriodo} /> : !errMetas && <p className="text-sm text-amber-800">Para el periodo proporcional y el link de las pantallas falta correr <code>0081_metas_periodo_publico.sql</code>.</p>}
-        {edita && estimados != null && <LeerSubtotales pendientes={estimados} />}
-        <p className="text-xs text-slate-500">El avance es lo registrado en Ventas diarias del mes por ese usuario, sin IVA. Para una meta sin usuario (como José Ortiz), elige quién captura sus ventas: esa persona (y tú) las sube a mano en el menú, Capturar ventas. Una meta en pausa no sale en las gráficas.</p>
+        {edita && estimados != null && <LeerSubtotales pendientes={estimados} sinVendedor={sinVendedor ?? 0} />}
+        <p className="text-xs text-slate-500">El avance es lo registrado en Ventas diarias del mes, sin IVA. Cada factura cuenta para el vendedor que viene impreso en ella (por ejemplo CASA LOCAL), aunque la haya subido otra persona; si el nombre de la factura es distinto al de la meta, escríbelo abajo del nombre. Para una meta sin usuario (como José Ortiz), elige quién captura sus ventas: esa persona (y tú) las sube a mano en el menú, Capturar ventas. Una meta en pausa no sale en las gráficas.</p>
       </Card>
 
       <Card className="space-y-3 p-4">

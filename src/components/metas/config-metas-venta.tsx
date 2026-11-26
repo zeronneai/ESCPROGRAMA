@@ -6,7 +6,7 @@ import { borrarMetaVentaAction, guardarMetaVentaAction } from "@/actions/meta-pr
 import { toast } from "@/components/feedback-global";
 import { Button } from "@/components/ui";
 
-export type MetaFila = { id: string | null; nombre: string; vendedor_id: string | null; capturista_id: string | null; meta: number; estado: "activa" | "pausada" };
+export type MetaFila = { id: string | null; nombre: string; vendedor_id: string | null; capturista_id: string | null; meta: number; estado: "activa" | "pausada"; alias_factura?: string | null };
 type Usuario = { id: string; nombre: string; rol?: string };
 
 function Fila({ m, usuarios, edita, nueva, alTerminar }: { m: MetaFila; usuarios: Usuario[]; edita: boolean; nueva?: boolean; alTerminar?: () => void }) {
@@ -15,13 +15,15 @@ function Fila({ m, usuarios, edita, nueva, alTerminar }: { m: MetaFila; usuarios
   const [nombre, setNombre] = useState(m.nombre);
   const [vend, setVend] = useState(m.vendedor_id ?? "");
   const [capt, setCapt] = useState(m.capturista_id ?? "");
+  const conAlias = m.alias_factura !== undefined;
+  const [alias, setAlias] = useState(m.alias_factura ?? "");
   const [meta, setMeta] = useState(m.meta ? String(m.meta) : "");
   const [estado, setEstado] = useState(m.estado);
-  const cambio = nueva || nombre !== m.nombre || vend !== (m.vendedor_id ?? "") || capt !== (m.capturista_id ?? "") || Number(meta) !== m.meta || estado !== m.estado;
+  const cambio = nueva || nombre !== m.nombre || vend !== (m.vendedor_id ?? "") || capt !== (m.capturista_id ?? "") || (conAlias && alias !== (m.alias_factura ?? "")) || Number(meta) !== m.meta || estado !== m.estado;
   const inp = "w-full rounded-md border border-slate-300 px-2 py-1 text-sm disabled:bg-slate-50";
   const guardar = () =>
     start(async () => {
-      const r = await guardarMetaVentaAction({ id: m.id, nombre, vendedor_id: vend || null, capturista_id: vend ? null : capt || null, meta: Number(String(meta).replace(/[,$\s]/g, "")), estado });
+      const r = await guardarMetaVentaAction({ id: m.id, nombre, vendedor_id: vend || null, capturista_id: vend ? null : capt || null, ...(conAlias || nueva ? { alias_factura: alias.trim() || null } : {}), meta: Number(String(meta).replace(/[,$\s]/g, "")), estado });
       if (!r.ok) return toast(r.error, "error");
       toast("Meta guardada", "success");
       alTerminar?.();
@@ -29,7 +31,12 @@ function Fila({ m, usuarios, edita, nueva, alTerminar }: { m: MetaFila; usuarios
     });
   return (
     <tr className="align-middle">
-      <td className="px-3 py-2"><input className={inp} value={nombre} onChange={(e) => setNombre(e.target.value)} disabled={!edita} maxLength={120} aria-label="Nombre" /></td>
+      <td className="px-3 py-2">
+        <input className={inp} value={nombre} onChange={(e) => setNombre(e.target.value)} disabled={!edita} maxLength={120} aria-label="Nombre" />
+        {(conAlias || nueva) && (
+          <input className={`${inp} mt-1 text-xs`} value={alias} onChange={(e) => setAlias(e.target.value)} disabled={!edita} maxLength={150} placeholder="Como sale en la factura (si es distinto)" aria-label="Nombre en la factura" title="Vendedor como viene impreso en la factura de Microsip, ej. CASA LOCAL" />
+        )}
+      </td>
       <td className="px-3 py-2">
         <select className={inp} value={vend} onChange={(e) => { setVend(e.target.value); if (!nombre) setNombre(usuarios.find((u) => u.id === e.target.value)?.nombre ?? ""); }} disabled={!edita} aria-label="Usuario">
           <option value="">Sin usuario</option>
