@@ -50,7 +50,7 @@ export function CobrarVenta({ ventaId, fechaVenta, today, moneda, onClose }: { v
       </div>
       <label className="flex flex-wrap items-center gap-2 text-xs font-medium text-slate-700">
         ¿Cuándo te pagaron? *
-        <input type="date" value={fecha} max={today} min={fechaVenta} onChange={(e) => setFecha(e.target.value)} className={`rounded border px-2 py-1 text-sm ${fecha ? "border-slate-300" : "border-amber-400 bg-amber-50"}`} />
+        <input type="date" value={fecha} max={today} onChange={(e) => setFecha(e.target.value)} className={`rounded border px-2 py-1 text-sm ${fecha ? "border-slate-300" : "border-amber-400 bg-amber-50"}`} />
       </label>
       {usd && <TcPago fecha={fecha} valor={tc} setValor={setTc} />}
       {error && <p className="text-red-700">{error}</p>}

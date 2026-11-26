@@ -229,7 +229,6 @@ export function VentaForm({
                   type="date"
                   value={v.fecha_cobro}
                   max={today}
-                  min={v.fecha}
                   disabled={ro}
                   onChange={(e) => setV((s) => ({ ...s, fecha_cobro: e.target.value }))}
                   className={`rounded border px-2 py-1 text-sm ${v.fecha_cobro ? "border-slate-300" : "border-amber-400 bg-amber-50"}`}

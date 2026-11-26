@@ -88,7 +88,9 @@ export function ventasSuite() {
       // Sin fecha de pago no se marca pagada
       expect(await failure(q(w.seller1, "update public.ventas set porcentaje_cobrado=100 where id=$1", [v.id]))).toMatch(/FECHA_PAGO_FALTA/);
       expect(await failure(q(w.seller1, "update public.ventas set porcentaje_cobrado=100, fecha_cobro=public.local_today() + 3 where id=$1", [v.id]))).toMatch(/no puede ser futura/);
-      await q(w.seller1, "update public.ventas set entregado=true, porcentaje_cobrado=100, fecha_cobro=public.local_today() where id=$1", [v.id]);
+      // Puede ser antes de la fecha de la factura (a veces se factura despues de que pagan)
+      await q(w.seller1, "update public.ventas set entregado=true, porcentaje_cobrado=100, fecha_cobro=(select fecha from public.ventas where id=$1) - 10 where id=$1", [v.id]);
+      await q(w.seller1, "update public.ventas set fecha_cobro=public.local_today() where id=$1", [v.id]);
       // Editar otra cosa conserva la fecha de pago
       await q(w.seller1, "update public.ventas set comentarios='ok' where id=$1", [v.id]);
       expect((await q(w.seller1, "select fecha_entrega is not null as e, fecha_cobro is not null as c from public.ventas where id=$1", [v.id])).rows[0]).toEqual({ e: true, c: true });
