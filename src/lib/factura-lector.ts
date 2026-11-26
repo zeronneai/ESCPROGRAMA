@@ -146,17 +146,20 @@ export function leerFacturaTexto(renglones: string[], filas?: Celda[][]): Factur
     if (cand && /^[A-ZÁÉÍÓÚÑ .]{3,40}$/.test(cand)) vendedor = cand;
   }
 
-  // Orden de compra (columna de la derecha, abajo de "Condiciones"): el valor va en el renglon siguiente.
+  // Orden de compra (columna de la derecha, abajo de "Condiciones"): el valor va en uno de los renglones
+  // siguientes, en la misma columna. pdf.js a veces parte la etiqueta ("Orden de" + "compra").
   let ordenCompra: string | null = null;
   const OC_RE = /^[A-Z0-9][A-Z0-9\-/]{3,29}$/i;
-  const oi = lines.findIndex((l) => /Orden de compra/i.test(l));
+  const oi = lines.findIndex((l) => /Orden\s+de\s+compra/i.test(l));
   if (oi >= 0) {
-    const mismo = lines[oi].match(/Orden de compra\s*:?\s*([A-Z0-9][A-Z0-9\-/]{3,29})\s*$/i)?.[1];
+    const mismo = lines[oi].match(/Orden\s+de\s+compra\s*:?\s*([A-Z0-9][A-Z0-9\-/]{3,29})\s*$/i)?.[1];
     if (mismo && /\d/.test(mismo)) ordenCompra = mismo;
-    const xo = celdas[oi]?.find((k) => /Orden de compra/i.test(k.s))?.x;
-    for (let i = oi + 1; i <= oi + 2 && !ordenCompra && i < lines.length; i++) {
-      const c = xo !== undefined ? celdas[i]?.find((k) => Math.abs(k.x - xo) < 60)?.s.trim() : lines[i].trim().split(/\s{2,}/).pop()?.trim();
-      if (c && OC_RE.test(c) && /\d/.test(c) && !/^\d{8}$/.test(c) && !/^(Clave|Precio|Importe)/i.test(c)) ordenCompra = c;
+    const xo = celdas[oi]?.find((k) => /^Orden\b/i.test(k.s))?.x;
+    for (let i = oi + 1; i <= oi + 5 && !ordenCompra && i < lines.length; i++) {
+      if (/^\s*Clave SAT/i.test(lines[i]) || /^\d{8}\b/.test(lines[i].trim())) break;
+      const cands = xo !== undefined ? (celdas[i] ?? []).filter((k) => Math.abs(k.x - xo) < 90).map((k) => k.s.trim()) : [lines[i].trim().split(/\s{2,}/).pop()?.trim() ?? ""];
+      const c = cands.find((t) => OC_RE.test(t) && /\d/.test(t) && !/^\d{8}$/.test(t));
+      if (c) ordenCompra = c;
     }
   }
 

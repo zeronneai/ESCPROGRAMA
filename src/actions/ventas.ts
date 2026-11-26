@@ -262,7 +262,7 @@ export async function ventasSubtotalEstimadoAction(): Promise<Result<{ ventas: {
     .select("id, factura, factura_path, monto, customers!inner(nombre)")
     .is("cancelada_at", null)
     .is("orden_compra", null)
-    .is("pedido", null)
+    .or("pedido.is.null,pedido.eq.")
     .not("factura_path", "is", null)
     .ilike("customers.nombre", "%pegatron%")
     .limit(2000);

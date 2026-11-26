@@ -76,7 +76,7 @@ export function LeerSubtotales({ pendientes, sinVendedor = 0 }: { pendientes: nu
             const r = await guardarOrdenCompraAction(v.id, oc);
             if (r.ok) bien = true;
             else fallo.push(r.error);
-          }
+          } else fallo.push("no encontré la orden de compra");
         }
         if (bien) ok++;
         if (fallo.length) malas.push(`${v.factura ?? "Venta"}: ${fallo.join(", ")}`);
