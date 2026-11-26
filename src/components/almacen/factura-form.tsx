@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { clienteFacturaAction, crearSalidaAction, folioUsadoAction, ventaDesdeFacturaAction, verificarClavesAction, type ClienteFactura, type FolioUsado } from "@/actions/almacen";
+import { buscarPoPegatronAction, clienteFacturaAction, crearSalidaAction, folioUsadoAction, ventaDesdeFacturaAction, verificarClavesAction, type ClienteFactura, type FolioUsado } from "@/actions/almacen";
 import { CustomerLookup, useRun } from "@/components/ops-ui";
 import { Alert, Button, Card, Field, Input, Select, Spinner } from "@/components/ui";
 import { leerFacturaXml, type FacturaLeida } from "@/lib/factura-lector";
@@ -120,7 +120,7 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
   }
 
   async function aplicar(f: FacturaLeida, fuente: string) {
-    setV((s) => ({ ...s, folio: f.folio ?? s.folio, fecha: f.fecha ?? s.fecha, cliente: f.cliente ?? s.cliente, vendedor: f.vendedor ?? s.vendedor, uuid: f.uuid ?? s.uuid }));
+    setV((s) => ({ ...s, folio: f.folio ?? s.folio, fecha: f.fecha ?? s.fecha, cliente: f.cliente ?? s.cliente, vendedor: f.vendedor ?? s.vendedor, uuid: f.uuid ?? s.uuid, pedido: s.pedido || f.ordenCompra || "" }));
     const ls = f.lineas.map((l) => ({ clave: l.clave ?? "", descripcion: l.descripcion, unidad: l.unidad ?? "", cantidad: l.cantidad != null ? String(l.cantidad) : "", precio: l.precio ?? null, descuentoPct: l.descuentoPct ?? null, importe: l.importe ?? null }));
     setLineas(ls);
     setAvisos(f.avisos.map((a) => `${fuente}: ${a}`));
@@ -460,7 +460,10 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
                   Cuando te paguen, márcala como Cobrada en tus ventas.
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="Pedido / OC del cliente (opcional)"><Input value={v.pedido} onChange={(e) => setV((s) => ({ ...s, pedido: e.target.value }))} /></Field>
+                  <Field label="Pedido / OC del cliente (opcional)">
+                    <Input value={v.pedido} onChange={(e) => setV((s) => ({ ...s, pedido: e.target.value }))} />
+                    <PoPegatron po={v.pedido} />
+                  </Field>
                   <Field label="Comentarios (opcional)"><Input value={v.comentarios} onChange={(e) => setV((s) => ({ ...s, comentarios: e.target.value }))} /></Field>
                 </div>
               </Card>
@@ -482,4 +485,20 @@ export function FacturaForm({ modo = "entrega", today, cliente = null, almacen =
       )}
     </div>
   );
+}
+
+/** Si la orden de compra es una P/O de Pegatron que subio la jefa, lo avisa. */
+function PoPegatron({ po }: { po: string }) {
+  const [hit, setHit] = useState<{ folio: string; po_numero: string } | null>(null);
+  useEffect(() => {
+    const t = po.trim();
+    if (t.length < 4) return setHit(null);
+    let vivo = true;
+    const id = window.setTimeout(() => {
+      buscarPoPegatronAction(t).then((r) => vivo && setHit(r));
+    }, 300);
+    return () => { vivo = false; window.clearTimeout(id); };
+  }, [po]);
+  if (!hit) return null;
+  return <p className="mt-1 text-xs font-medium text-green-700">✓ Pedido Pegatron P/O {hit.po_numero} ({hit.folio}): al guardar, compras verá que ya se facturó.</p>;
 }

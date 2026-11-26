@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { guardarSubtotalAction, guardarVendedorFacturaAction, ventasSubtotalEstimadoAction } from "@/actions/ventas";
+import { guardarOrdenCompraAction, guardarSubtotalAction, guardarVendedorFacturaAction, ventasSubtotalEstimadoAction } from "@/actions/ventas";
 import { Button } from "@/components/ui";
 import { leerFacturaXml, type FacturaLeida } from "@/lib/factura-lector";
 import { leerFacturaPdf } from "@/lib/pdf-cliente";
@@ -65,6 +65,19 @@ export function LeerSubtotales({ pendientes, sinVendedor = 0 }: { pendientes: nu
             else fallo.push(r.error);
           } else if (!v.sub) fallo.push("no trae el vendedor");
         }
+        if (v.oc) {
+          // La orden de compra solo viene en el PDF.
+          let oc = f?.ordenCompra ?? null;
+          if (!oc && v.xml && v.pdf) {
+            const r = await fetch(`/api/ventas/${v.id}/factura`);
+            if (r.ok) oc = (await leerFacturaPdf(new File([await r.blob()], "factura.pdf", { type: "application/pdf" }))).ordenCompra ?? null;
+          }
+          if (oc) {
+            const r = await guardarOrdenCompraAction(v.id, oc);
+            if (r.ok) bien = true;
+            else fallo.push(r.error);
+          }
+        }
         if (bien) ok++;
         if (fallo.length) malas.push(`${v.factura ?? "Venta"}: ${fallo.join(", ")}`);
       } catch {
@@ -87,8 +100,10 @@ export function LeerSubtotales({ pendientes, sinVendedor = 0 }: { pendientes: nu
             Léelas de las facturas para que las metas cuenten exacto.
           </>
         ) : "Todas las ventas con factura ya tienen su subtotal exacto y su vendedor."}
+        {" "}También lee la orden de compra de las facturas de Pegatron.
       </p>
-      {(pendientes > 0 || sinVendedor > 0 || estado !== "listo") && (
+      {(
+
         <Button type="button" variant="secondary" onClick={correr} loading={estado === "leyendo"} disabled={estado === "leyendo"}>
           Leer datos de las facturas
         </Button>

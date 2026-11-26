@@ -289,7 +289,20 @@ export async function ventaDesdeFacturaAction(fd: FormData): Promise<Result<{ id
   if (p.data.subtotal && p.data.subtotal <= p.data.total) await supabase.rpc("venta_subtotal_factura", { p_venta: r.venta_id, p_subtotal: p.data.subtotal });
   // Vendedor que dice la factura (ej. CASA LOCAL): las metas lo usan para saber a quien contarle la venta.
   if (p.data.vendedor_factura) await supabase.rpc("venta_vendedor_factura", { p_venta: r.venta_id, p_nombre: p.data.vendedor_factura });
+  // Orden de compra del cliente (ej. P/O de Pegatron): asi compras ve que ya se facturo.
+  if (p.data.pedido) await supabase.rpc("venta_orden_compra", { p_venta: r.venta_id, p_oc: p.data.pedido.slice(0, 40) });
   revalidatePath("/vendedor/bitacora");
   revalidatePath("/entregas");
   return { ok: true, id: r.venta_id };
+}
+
+/** Busca una P/O de Pegatron (para avisar al subir la factura). */
+export async function buscarPoPegatronAction(po: string): Promise<{ folio: string; po_numero: string } | null> {
+  await requireUser();
+  const t = String(po ?? "").trim().slice(0, 40);
+  if (t.length < 4) return null;
+  const supabase = await createClient();
+  const { data } = await supabase.rpc("pegatron_buscar_po", { p_po: t });
+  const r = (Array.isArray(data) ? data[0] : data) as { folio: string; po_numero: string } | undefined;
+  return r ?? null;
 }

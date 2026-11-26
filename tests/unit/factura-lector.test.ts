@@ -151,6 +151,10 @@ describe("datos de cliente y cobranza", () => {
       [{ x: 40, s: "ESC-GNPFGGBK-S" }],
     ];
     const f = leerFacturaTexto(G.map((r) => r.map((c) => c.s).join("  ")), G);
+    expect(f.ordenCompra).toBeNull();
+    // Pegatron: la orden de compra viene abajo de "Orden de compra"
+    const P = G.map((r) => (r.some((c) => c.s === "RFC: SADE9212152G9") ? [...r, { x: 525, s: "0900512429" }] : r));
+    expect(leerFacturaTexto(P.map((r) => r.map((c) => c.s).join("  ")), P).ordenCompra).toBe("0900512429");
     expect(f).toMatchObject({
       razonSocial: "JOSE EDUARDO SALDAÑA DURAN", nombreComercial: null, rfc: "SADE9212152G9", vendedor: "DIANA PEREZ",
       direccion: "MARIANO GUILLEN No. 9021, COL. LOS PINOS, CHIHUAHUA, CHIH. CP: 31416",

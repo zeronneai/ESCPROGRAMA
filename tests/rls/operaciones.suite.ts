@@ -98,6 +98,13 @@ export function operacionesSuite() {
       expect(await failure(q(A("jefa"), "select public.pegatron_crear($1::jsonb)", [datos({ lineas: [{ descripcion: "X", cantidad: 1, articulo_esc: "" }] })]))).toMatch(/articulo ESC/);
       const id = (await q(A("jefa"), "select public.pegatron_crear($1::jsonb) as id", [datos()])).rows[0].id;
       expect(await failure(q(A("jefa"), "select public.pegatron_crear($1::jsonb)", [datos()]))).toMatch(/ya se subio/);
+      // La factura trae la P/O (con o sin ceros): el comprador ve que ya se facturo
+      const vid = (await q(w.seller1, "insert into public.ventas (customer_id, monto, moneda, pago, factura) values ($1, 175.16, 'USD', 'credito', 'FD2569') returning id", [w.customerId])).rows[0].id;
+      await q(w.seller1, "select public.venta_orden_compra($1, $2)", [vid, "0" + po]);
+      expect((await q(w.buyer1, "select * from public.pegatron_buscar_po($1)", [po])).rows[0].id).toBe(id);
+      const fact = (await q(w.buyer1, "select * from public.pegatron_facturado() where oc_id=$1", [id])).rows;
+      expect(fact.map((x) => x.factura)).toEqual(["FD2569"]);
+      expect((await q(w.seller2, "select * from public.pegatron_facturado() where oc_id=$1", [id])).rowCount).toBe(0);
       expect(await notif(w.ids.b1, "pegatron_oc", id)).toBe(1);
       const ls = (await q(w.buyer1, "select id, articulo_esc, descripcion, cantidad from public.pegatron_oc_lineas where oc_id=$1 order by posicion", [id])).rows;
       expect(ls).toHaveLength(2);

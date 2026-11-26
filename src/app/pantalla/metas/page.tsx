@@ -12,7 +12,7 @@ export default async function PantallaMetas() {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("metas_ventas_publico");
   return (
-    <main className="min-h-screen bg-[#eef3fb] px-4 py-5 sm:px-8 sm:py-8">
+    <main className="min-h-screen bg-[#eef3fb] px-4 pb-44 pt-5 sm:px-8 sm:pt-8">
       <div className="mx-auto max-w-[1800px] space-y-4">
         <Logo className="h-9" />
         {error ? (

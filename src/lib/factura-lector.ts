@@ -21,6 +21,8 @@ export interface FacturaLeida {
   fecha: string | null;
   cliente: string | null;
   vendedor: string | null;
+  /** Orden de compra del cliente impresa en la factura (ej. P/O de Pegatron). */
+  ordenCompra?: string | null;
   lineas: LineaFactura[];
   avisos: string[];
   /** Datos para registrar la venta y dar de alta al cliente (lo que se pudo leer). */
@@ -144,6 +146,20 @@ export function leerFacturaTexto(renglones: string[], filas?: Celda[][]): Factur
     if (cand && /^[A-ZÁÉÍÓÚÑ .]{3,40}$/.test(cand)) vendedor = cand;
   }
 
+  // Orden de compra (columna de la derecha, abajo de "Condiciones"): el valor va en el renglon siguiente.
+  let ordenCompra: string | null = null;
+  const OC_RE = /^[A-Z0-9][A-Z0-9\-/]{3,29}$/i;
+  const oi = lines.findIndex((l) => /Orden de compra/i.test(l));
+  if (oi >= 0) {
+    const mismo = lines[oi].match(/Orden de compra\s*:?\s*([A-Z0-9][A-Z0-9\-/]{3,29})\s*$/i)?.[1];
+    if (mismo && /\d/.test(mismo)) ordenCompra = mismo;
+    const xo = celdas[oi]?.find((k) => /Orden de compra/i.test(k.s))?.x;
+    for (let i = oi + 1; i <= oi + 2 && !ordenCompra && i < lines.length; i++) {
+      const c = xo !== undefined ? celdas[i]?.find((k) => Math.abs(k.x - xo) < 60)?.s.trim() : lines[i].trim().split(/\s{2,}/).pop()?.trim();
+      if (c && OC_RE.test(c) && /\d/.test(c) && !/^\d{8}$/.test(c) && !/^(Clave|Precio|Importe)/i.test(c)) ordenCompra = c;
+    }
+  }
+
   const lineas: LineaFactura[] = [];
   for (let i = 0; i < lines.length; i++) {
     const tokens = lines[i].trim().split(/\s{2,}/);
@@ -250,7 +266,7 @@ export function leerFacturaTexto(renglones: string[], filas?: Celda[][]): Factur
   const { pago, dias } = pagoDe(metodo, condiciones, fecha, vence);
 
   return {
-    folio: folio ? folio.toUpperCase() : null, fecha, cliente, vendedor, lineas, avisos,
+    folio: folio ? folio.toUpperCase() : null, fecha, cliente, vendedor, ordenCompra, lineas, avisos,
     uuid, rfc, razonSocial, nombreComercial: entrega ? null : nombreComercial, direccion, entrega, telefono, moneda, metodo, condiciones, pago, diasCredito: dias, vence, subtotal, total, tipoCambio,
   };
 }

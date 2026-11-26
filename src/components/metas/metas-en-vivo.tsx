@@ -1,5 +1,6 @@
 "use client";
 
+import { MascotaMetas } from "./mascota";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { EVENTO_CAMBIO } from "@/components/realtime-sync";
 import { colorAvance, normalizarAvance, ritmoDe, type AvanceMeta } from "@/lib/metas-venta";
@@ -225,6 +226,21 @@ export function MetasEnVivo({ inicial, publico: token }: { inicial: AvanceMeta[]
       {filas.some((f) => f.usd_sin_tc) && <p className="text-xs text-amber-700">Hay ventas en dólares sin tipo de cambio: todavía no suman.</p>}
       <p className="text-xs text-slate-500">Todo es sin IVA. Cuenta lo registrado en Ventas diarias del mes (sin canceladas) y lo capturado a mano para quien no tiene usuario. Las ventas en dólares se pasan a pesos con el tipo de cambio de su factura (o el de Banxico de ese día).</p>
 
+      {token && (
+        <MascotaMetas
+          mensajes={[
+            orden[0] ? `🏆 ${orden[0].nombre} va en primer lugar con ${pctTxt(orden[0].pct)}` : "",
+            `El equipo lleva ${pctTxt(equipo)} de la meta`,
+            `Vamos en el día ${f0.dia} de ${f0.dias_mes}: el ritmo es ${pctTxt(ritmo)}`,
+            ...orden.filter((f) => f.pct >= ritmo && f.pct > 0).slice(0, 4).map((f) => `💪 ${f.nombre} va arriba del ritmo (${pctTxt(f.pct)})`),
+            ...orden.filter((f) => f.pct >= 100).map((f) => `🎉 ¡${f.nombre} ya llegó a su meta!`),
+            casa ? `🏠 Casa Local va en ${pctTxt(casa.pct)}` : "",
+            "Cada factura cuenta: ¡súbela a Ventas diarias!",
+            "¡Una venta más y subimos en la gráfica! 🚀",
+            "Hoy es buen día para cerrar ese prospecto 📞",
+          ].filter(Boolean)}
+        />
+      )}
       {festejo && (
         <div className="toast-in fixed bottom-24 left-1/2 z-[70] -translate-x-1/2 rounded-2xl bg-green-600 px-5 py-3 text-center text-white shadow-2xl sm:bottom-8">
           <p className="text-sm">🎉 Nueva venta</p>

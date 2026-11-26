@@ -4,6 +4,7 @@ import { Alert, Card, EmptyState, FilterChip, PageHeader } from "@/components/ui
 import { requireRoles } from "@/lib/auth/sales";
 import { RecuentoPegatron } from "@/components/pegatron/recuento";
 import { recuentoPorArticulo } from "@/lib/pegatron-recuento";
+import { facturasPorOc, fechaCorta } from "@/lib/pegatron-facturas";
 import { createClient } from "@/lib/supabase/server";
 
 type Linea = { id: string; articulo_esc: string; descripcion: string; cantidad: number | string; unidad: string | null; entrega?: string | null; pedido_at: string | null };
@@ -22,6 +23,7 @@ export default async function PedidosPegatron({ searchParams }: { searchParams: 
   // Sin la 0064 todavia no hay secciones: todo cuenta como de linea.
   if (error && /tipo/.test(error.message)) ({ data, error } = await consulta("id, folio, po_numero, fecha, autor_nombre, created_at"));
   const todas = ((data ?? []) as unknown as Oc[]).map((o) => ({ ...o, tipo: o.tipo === "sobrepedido" ? "sobrepedido" : "linea", pend: o.pegatron_oc_lineas.filter((l) => !l.pedido_at).length }));
+  const facturas = await facturasPorOc(supabase);
   const ocs = todas.filter((o) => o.tipo === seccion);
   const filas = ocs.filter((o) => (ver === "todas" ? true : ver === "pedidas" ? o.pend === 0 : o.pend > 0));
   const jefa = u.rol === "jefe_ventas";
@@ -80,9 +82,18 @@ export default async function PedidosPegatron({ searchParams }: { searchParams: 
                       <p className="text-xs text-slate-500">Pegatron{o.autor_nombre ? ` · subió ${o.autor_nombre}` : ""}</p>
                       <div className="mt-1.5"><FechasOc subida={o.created_at} fechaOc={o.fecha} entrega={entregaMasProxima(o.pegatron_oc_lineas)} /></div>
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${o.pend === 0 ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-900"}`}>
-                      {o.pend === 0 ? "Todo pedido" : `${total - o.pend} de ${total} pedidos`}
-                    </span>
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`rounded-full px-3 py-1 text-xs font-semibold ${o.pend === 0 ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-900"}`}>
+                        {o.pend === 0 ? "Todo pedido" : `${total - o.pend} de ${total} pedidos`}
+                      </span>
+                      {facturas.get(o.id)?.length ? (
+                        <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-800">
+                          Facturado: {facturas.get(o.id)!.map((f) => `${f.factura ?? "s/folio"} (${fechaCorta(f.fecha)})`).join(", ")}
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">Sin facturar</span>
+                      )}
+                    </div>
                   </div>
                   <ul className="divide-y divide-slate-100 text-sm">
                     {o.pegatron_oc_lineas.slice(0, 5).map((l) => (

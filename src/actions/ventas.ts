@@ -245,7 +245,7 @@ export async function cobrarConComisionAction(ventaId: string, fechaCobro: strin
 }
 
 /** Jefa: ventas con factura a las que les falta leer el subtotal exacto o el vendedor que dice la factura. */
-export async function ventasSubtotalEstimadoAction(): Promise<Result<{ ventas: { id: string; factura: string | null; pdf: boolean; xml: boolean; monto: number; sub: boolean; vend: boolean }[] }>> {
+export async function ventasSubtotalEstimadoAction(): Promise<Result<{ ventas: { id: string; factura: string | null; pdf: boolean; xml: boolean; monto: number; sub: boolean; vend: boolean; oc?: boolean }[] }>> {
   const u = await requireUser();
   if (u.rol !== "jefe_ventas" && u.rol !== "comprador") return { ok: false, error: "Solo la jefa de ventas o el comprador." };
   const supabase = await createClient();
@@ -255,10 +255,23 @@ export async function ventasSubtotalEstimadoAction(): Promise<Result<{ ventas: {
   if (error && /vendedor_factura/.test(error.message)) ({ data, error } = await base("id, factura, factura_path, xml_path, monto, subtotal_estimado", "subtotal_estimado.eq.true"));
   if (error) return { ok: false, error: /subtotal/.test(error.message) ? "Falta correr la actualización 0080 en la base." : friendlyError(error.message) };
   type R = { id: string; factura: string | null; factura_path: string | null; xml_path: string | null; monto: string | null; subtotal_estimado: boolean; vendedor_factura?: string | null };
-  return {
-    ok: true,
-    ventas: ((data ?? []) as unknown as R[]).map((v) => ({ id: v.id, factura: v.factura, pdf: !!v.factura_path, xml: !!v.xml_path, monto: Number(v.monto ?? 0), sub: v.subtotal_estimado, vend: "vendedor_factura" in v && !v.vendedor_factura })),
-  };
+  const lista = ((data ?? []) as unknown as R[]).map((v) => ({ id: v.id, factura: v.factura, pdf: !!v.factura_path, xml: !!v.xml_path, monto: Number(v.monto ?? 0), sub: v.subtotal_estimado, vend: "vendedor_factura" in v && !v.vendedor_factura, oc: false }));
+  // Facturas de Pegatron sin orden de compra leida (para Pedidos Pegatron).
+  const { data: peg } = await supabase
+    .from("ventas")
+    .select("id, factura, factura_path, monto, customers!inner(nombre)")
+    .is("cancelada_at", null)
+    .is("orden_compra", null)
+    .is("pedido", null)
+    .not("factura_path", "is", null)
+    .ilike("customers.nombre", "%pegatron%")
+    .limit(2000);
+  for (const v of (peg ?? []) as unknown as { id: string; factura: string | null; factura_path: string | null; monto: string | null }[]) {
+    const ya = lista.find((x) => x.id === v.id);
+    if (ya) ya.oc = true;
+    else lista.push({ id: v.id, factura: v.factura, pdf: true, xml: false, monto: Number(v.monto ?? 0), sub: false, vend: false, oc: true });
+  }
+  return { ok: true, ventas: lista };
 }
 
 /** Guarda el vendedor que dice la factura. */
@@ -289,4 +302,14 @@ export async function tipoCambioDiaAction(fecha: string): Promise<number | null>
   const { data } = await supabase.rpc("tipo_cambio_para", { p_fecha: fecha });
   const r = (Array.isArray(data) ? data[0] : data) as { usd_mxn: number | string } | null;
   return r?.usd_mxn != null ? Number(r.usd_mxn) : null;
+}
+
+/** Guarda la orden de compra del cliente leida de la factura (ej. P/O de Pegatron). */
+export async function guardarOrdenCompraAction(ventaId: string, oc: string): Promise<Result> {
+  const u = await requireUser();
+  if (!["jefe_ventas", "vendedor", "comprador"].includes(u.rol)) return { ok: false, error: "No autorizado." };
+  if (!uuid.safeParse(ventaId).success || !oc.trim()) return { ok: false, error: "Dato inválido" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("venta_orden_compra", { p_venta: ventaId, p_oc: oc.trim().slice(0, 40) });
+  return error ? { ok: false, error: friendlyError(error.message) } : { ok: true };
 }
