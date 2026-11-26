@@ -148,8 +148,8 @@ export function EntregasHistorial({ entregas, modo, demo }: { entregas: EntregaR
                           <span className="shrink-0 tabular-nums text-sm text-slate-700">{money(f.monto, f.moneda)}</span>
                           {finanzas && f.estado === "por_revisar" ? (
                             <span className="flex shrink-0 gap-1.5">
-                              <button type="button" disabled={pend && ocupado === f.id} onClick={() => revisar(f, "recibida")} className="rounded-lg bg-green-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-green-700 disabled:opacity-50">✓ Recibida</button>
-                              <Button type="button" variant="secondary" className="px-3 text-xs text-red-700" onClick={() => setRechazo({ id: f.id, motivo: "" })}>Rechazar</Button>
+                              <button type="button" disabled={pend && ocupado === f.id} onClick={() => revisar(f, "recibida")} className="rounded-lg border border-green-600 bg-white px-3 py-2 text-xs font-semibold text-green-700 shadow-sm hover:bg-green-50 disabled:opacity-50">✓ Aceptar</button>
+                              <button type="button" disabled={pend && ocupado === f.id} onClick={() => setRechazo({ id: f.id, motivo: "" })} className="rounded-lg border border-red-500 bg-white px-3 py-2 text-xs font-semibold text-red-700 shadow-sm hover:bg-red-50 disabled:opacity-50">✗ Rechazar</button>
                             </span>
                           ) : (
                             <span className="flex shrink-0 items-center gap-2">
