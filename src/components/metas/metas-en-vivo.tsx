@@ -112,7 +112,10 @@ export function MetasEnVivo({ inicial, publico: token }: { inicial: AvanceMeta[]
   const totVend = filas.reduce((s, f) => s + (f.vendido ?? 0), 0);
   const totMeta = filas.reduce((s, f) => s + (f.meta ?? 0), 0);
   const seg = Math.round((ahora - act) / 1000);
-  const orden = [...filas].sort((a, b) => b.pct - a.pct);
+  // Casa Local no es un vendedor: va junto a la meta del equipo, fuera del ranking.
+  const esCasa = (f: AvanceMeta) => /casa\s*local/i.test(f.nombre);
+  const casa = filas.find(esCasa) ?? null;
+  const orden = filas.filter((f) => !esCasa(f)).sort((a, b) => b.pct - a.pct);
 
   return (
     <div ref={caja} className="space-y-5 bg-[#eef3fb] [&:fullscreen]:overflow-y-auto [&:fullscreen]:p-6">
@@ -133,7 +136,8 @@ export function MetasEnVivo({ inicial, publico: token }: { inicial: AvanceMeta[]
         </div>
       </div>
 
-      {/* Equipo */}
+      {/* Equipo (y Casa Local en el mismo renglon) */}
+      <div className={`grid grid-cols-1 gap-3 ${casa ? "lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]" : ""}`}>
       <div className="flex flex-col items-center gap-5 rounded-2xl bg-white p-5 shadow-sm sm:flex-row sm:gap-8">
         <Anillo pct={equipo} ritmo={ritmo} tam={190} grosor={18}>
           <span className="text-4xl font-extrabold tabular-nums text-slate-900">{pctTxt(equipo)}</span>
@@ -158,6 +162,21 @@ export function MetasEnVivo({ inicial, publico: token }: { inicial: AvanceMeta[]
             <span className="flex items-center gap-1"><i className="h-2.5 w-2.5 rounded-full bg-red-600" /> Atrasado</span>
           </div>
         </div>
+      </div>
+
+      {casa && (() => {
+        const c = COLORES[colorAvance(casa.pct, ritmo)];
+        return (
+          <div className={`flex flex-col items-center justify-center gap-2 rounded-2xl bg-white p-5 shadow-sm transition-all duration-700 ${brillo.has(casa.id) ? "scale-[1.02] ring-4 ring-green-300" : ""}`}>
+            <Anillo pct={casa.pct} ritmo={ritmo} tam={170} grosor={16}>
+              <span className={`text-3xl font-extrabold tabular-nums ${c.texto}`}>{pctTxt(casa.pct)}</span>
+              {casa.pct >= 100 && <span className="text-xs font-semibold text-green-700">¡Meta!</span>}
+            </Anillo>
+            <p className="text-center text-base font-bold text-slate-900">{casa.nombre}</p>
+            {casa.meta != null && casa.vendido != null && <p className="text-center text-xs tabular-nums text-slate-500">{pesos(casa.vendido)} de {pesos(casa.meta)}</p>}
+          </div>
+        );
+      })()}
       </div>
 
       {/* Por vendedor */}
