@@ -27,7 +27,8 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, t
   const vencido = (m: MovConc) => !m.tomado_por && diasRestantes(m.created_at) <= 0;
   const [cuenta, setCuenta] = useState<string>("");
   // Por vendedor (finanzas, jefa, gerente): a nombre de quien quedo cada pago.
-  const quien = (m: MovConc) => (m.previo ? (m.tomado_para ?? "Antes del portal") : m.tomado_por ? (m.tomado_para ?? m.tomado_nombre ?? "Otro") : null);
+  const quienPrevio = (m: MovConc) => m.tomado_para ?? (m.tomado_nombre && m.tomado_nombre !== "Identificado antes del portal" ? m.tomado_nombre : null);
+  const quien = (m: MovConc) => (m.previo ? (quienPrevio(m) ?? "Antes del portal") : m.tomado_por ? (m.tomado_para ?? m.tomado_nombre ?? "Otro") : null);
   const [previoAbierto, setPrevioAbierto] = useState<string | null>(null);
   const [vend, setVend] = useState<string>("");
   const vends = useMemo(() => [...new Set(movs.map(quien).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b)), [movs]);
@@ -121,7 +122,7 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, t
                 {m.previo && (
                   <span className="mt-1 block space-y-1 text-xs">
                     <span className="flex flex-wrap items-center gap-1.5">
-                      <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-semibold text-indigo-800">Identificado antes del portal{m.tomado_para ? ` · ${m.tomado_para}` : ""}</span>
+                      <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-semibold text-indigo-800">Identificado antes del portal{quienPrevio(m) ? ` · ${quienPrevio(m)}` : ""}</span>
                       {m.facturas.length > 0 && <span className="text-slate-500">{m.facturas.length} factura(s):</span>}
                       {m.facturas.slice(0, 60).map((f) => <span key={f.id} className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-700">{f.folio}</span>)}
                       {m.facturas.length > 60 && <span className="text-slate-500">y {m.facturas.length - 60} más</span>}

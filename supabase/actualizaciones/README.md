@@ -98,6 +98,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 81 | `0086_metas_vendedor_factura.sql` | **Metas por el vendedor de la factura**: cada venta guarda el vendedor impreso en la factura (ej. CASA LOCAL) y en las metas cuenta para ese vendedor aunque la haya subido otra persona; Casa Local se activa. |
 | 82 | `0087_conciliacion_previo.sql` | **Pagos identificados antes del portal**: la jefa, gerente, CEO o comprador marcan un abono como ya identificado a mano, con sus folios aunque las facturas no estén subidas; nadie más lo puede tomar ni cambiar. |
 | 83 | `0088_previo_recepcion.sql` | **Pagos previos = facturas ya entregadas**: las facturas subidas de un pago identificado antes del portal quedan recibidas en Recepción y pagadas con la fecha del abono (si tienen comisión). |
+| 84 | `0089_previo_conservar.sql` | **Pagos previos ya identificados por un vendedor**: pasan a "antes del portal" sin perder a su vendedor ni sus facturas, y sus facturas salen de la bandeja de revisión de finanzas (quedan recibidas). |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

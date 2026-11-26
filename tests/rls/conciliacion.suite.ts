@@ -155,5 +155,23 @@ export function conciliacionSuite() {
       await q(jefa, "select public.conciliacion_quitar_previo($1)", [m]);
       expect((await q("postgres", "select previo, tomado_por from public.conciliacion_movimientos where id=$1", [m])).rows[0]).toEqual({ previo: false, tomado_por: null });
     });
+
+    it("pasar a previo un pago que ya identifico un vendedor: conserva su nombre y sale de la bandeja de finanzas", async () => {
+      const tag = randomUUID().slice(0, 6).toUpperCase();
+      await q(aux, "select public.conciliacion_subir($1::jsonb)", [JSON.stringify({ banco: "BBVA", cuenta: "0164" + tag, moneda: "MXN", abonos: [{ fecha: "2026-11-18", descripcion: `SPEI ${tag}`, monto: 1160 }] })]);
+      const m = (await q(jefa, "select id from public.conciliacion_movimientos where descripcion=$1", [`SPEI ${tag}`])).rows[0].id;
+      const folio = `F${tag}C`;
+      const v = (await q(w.seller1, "insert into public.ventas (customer_id, monto, pago, factura, fecha) values ($1, 1160, 'contado', $2, '2026-11-10') returning id", [w.customerId, folio])).rows[0].id;
+      const l = (await q(w.seller1, "insert into public.venta_lineas (venta_id, descripcion, cantidad) values ($1,'Guante',1) returning id", [v])).rows[0].id;
+      await q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [v, JSON.stringify([{ id: l, importe: 1000, comision_pct: 3 }])]);
+      await q(w.seller1, "select public.conciliacion_tomar($1, $2)", [m, [folio]]);
+      // La entrega a finanzas (por revisar)
+      await q(w.seller1, "select public.facturas_entregar($1::jsonb)", [JSON.stringify({ pagos: [{ fecha: "2026-11-18", monto: 1160, moneda: "MXN", forma: "transferencia", ventas: [v] }] })]);
+      expect((await q("postgres", "select estado from public.factura_recepcion where venta_id=$1", [v])).rows[0].estado).toBe("por_revisar");
+      await q("postgres", "select public.conciliacion_previo_conservar($1, 'limpieza', null)", [m]);
+      const mv = (await q("postgres", "select previo, vendedor_id, tomado_por from public.conciliacion_movimientos where id=$1", [m])).rows[0];
+      expect(mv).toEqual({ previo: true, vendedor_id: w.ids.s1, tomado_por: w.ids.s1 });
+      expect((await q("postgres", "select estado from public.factura_recepcion where venta_id=$1", [v])).rows[0].estado).toBe("recibida");
+    });
   });
 }
