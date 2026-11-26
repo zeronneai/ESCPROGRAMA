@@ -139,7 +139,19 @@ export function conciliacionSuite() {
       // Nadie lo toma ni lo suelta (finanzas tampoco)
       expect(await failure(q(w.seller1, "select public.conciliacion_tomar($1, $2)", [m, ["X1"]]))).toMatch(/ya lo tomo|antes del portal/);
       expect(await failure(q(aux, "select public.conciliacion_soltar($1)", [m]))).toMatch(/antes del portal/);
-      // Se puede deshacer
+      // Con facturas subidas al portal: quedan entregadas y recibidas; pagadas si tienen comision.
+      await q(jefa, "select public.conciliacion_quitar_previo($1)", [m]);
+      const fA = `F${tag}A`, fB = `F${tag}B`;
+      const vA = (await q(w.seller1, "insert into public.ventas (customer_id, monto, pago, factura, fecha) values ($1, 1160, 'credito', $2, '2026-11-01') returning id", [w.customerId, fA])).rows[0].id;
+      const lA = (await q(w.seller1, "insert into public.venta_lineas (venta_id, descripcion, cantidad) values ($1,'Guante',1) returning id", [vA])).rows[0].id;
+      await q(w.seller1, "select public.venta_comisiones($1, $2::jsonb)", [vA, JSON.stringify([{ id: lA, importe: 1000, comision_pct: 3 }])]);
+      const vB = (await q(w.seller1, "insert into public.ventas (customer_id, monto, pago, factura, fecha) values ($1, 500, 'credito', $2, '2026-11-01') returning id", [w.customerId, fB])).rows[0].id;
+      await q(w.seller1, "insert into public.venta_lineas (venta_id, descripcion, cantidad) values ($1,'Bata',1)", [vB]);
+      await q(jefa, "select public.conciliacion_marcar_previo($1, $2)", [m, [fA, fB, "F999999"]]);
+      const est = (await q("postgres", "select v.id, v.porcentaje_cobrado::int p, v.fecha_cobro::text fc, r.estado from public.ventas v left join public.factura_recepcion r on r.venta_id = v.id where v.id in ($1,$2)", [vA, vB])).rows;
+      expect(est.find((x) => x.id === vA)).toMatchObject({ p: 100, fc: "2026-11-19", estado: "recibida" });
+      expect(est.find((x) => x.id === vB)).toMatchObject({ p: 0, estado: "recibida" });
+      // Se puede deshacer (la recepcion se queda: control ISO)
       await q(jefa, "select public.conciliacion_quitar_previo($1)", [m]);
       expect((await q("postgres", "select previo, tomado_por from public.conciliacion_movimientos where id=$1", [m])).rows[0]).toEqual({ previo: false, tomado_por: null });
     });

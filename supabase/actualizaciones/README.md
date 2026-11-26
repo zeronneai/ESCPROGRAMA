@@ -97,6 +97,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 80 | `0085_recepcion_gerente_prospectos_clientes.sql` | **Recepción para gerente y CEO, y prospectos que ya son clientes**: la gerente y el CEO ven Recepción de facturas por vendedor (solo consulta); la meta de prospección muestra cuántos de los registrados ya compraron. |
 | 81 | `0086_metas_vendedor_factura.sql` | **Metas por el vendedor de la factura**: cada venta guarda el vendedor impreso en la factura (ej. CASA LOCAL) y en las metas cuenta para ese vendedor aunque la haya subido otra persona; Casa Local se activa. |
 | 82 | `0087_conciliacion_previo.sql` | **Pagos identificados antes del portal**: la jefa, gerente, CEO o comprador marcan un abono como ya identificado a mano, con sus folios aunque las facturas no estén subidas; nadie más lo puede tomar ni cambiar. |
+| 83 | `0088_previo_recepcion.sql` | **Pagos previos = facturas ya entregadas**: las facturas subidas de un pago identificado antes del portal quedan recibidas en Recepción y pagadas con la fecha del abono (si tienen comisión). |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 
