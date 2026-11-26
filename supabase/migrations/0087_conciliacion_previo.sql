@@ -72,7 +72,9 @@ begin
   update public.conciliacion_movimientos
      set previo = true, previo_nota = nullif(left(trim(coalesce(p_nota, '')), 1000), ''), previo_por = v_quien, previo_at = now(),
          tomado_por = v_quien, tomado_at = now(), tomado_nombre = 'Identificado antes del portal',
-         tomado_para = nullif(left(trim(coalesce(p_para, '')), 120), ''), vendedor_id = null, tardio = false
+         tomado_para = nullif(left(trim(coalesce(p_para, '')), 120), ''), tardio = false,
+         -- Si el asesor es un vendedor del portal, el pago le sale en "Los mios".
+         vendedor_id = (select p.id from public.profiles p where p_para is not null and lower(trim(p.nombre)) = lower(trim(p_para)) and p.activo limit 1)
    where id = m.id;
   foreach f in array coalesce(p_folios, '{}') loop
     f := upper(regexp_replace(trim(f), '\s+', '', 'g'));
