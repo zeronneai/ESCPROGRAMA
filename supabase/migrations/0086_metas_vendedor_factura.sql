@@ -9,6 +9,7 @@
 --  * Las facturas que ya estaban: se toma el vendedor de almacen cuando se registro ahi; las demas se leen
 --    con el boton "Leer datos de las facturas" en Configurar metas.
 --  * Solo cambia las metas: el resto del portal sigue por quien subio la venta.
+--  * El comprador tambien puede usar "Leer datos de las facturas".
 -- Como aplicarlo: pega este archivo COMPLETO en SQL Editor y presiona Run.
 -- =============================================================================
 begin;
@@ -29,11 +30,24 @@ declare v public.ventas;
 begin
   select * into v from public.ventas where id = p_venta;
   if v.id is null then raise exception 'Venta no encontrada'; end if;
-  if not (v.vendedor_id = auth.uid() or public.is_sales_manager()) then raise exception 'No autorizado' using errcode = '42501'; end if;
+  if not (v.vendedor_id = auth.uid() or public.is_sales_manager() or public.is_buyer()) then raise exception 'No autorizado' using errcode = '42501'; end if;
   update public.ventas set vendedor_factura = nullif(left(trim(coalesce(p_nombre, '')), 150), '') where id = p_venta;
 end;
 $$;
 revoke all on function public.venta_vendedor_factura(uuid, text) from public, anon;
+
+-- El comprador tambien puede leer el subtotal exacto de las facturas ya subidas.
+create or replace function public.venta_subtotal_factura(p_venta uuid, p_subtotal numeric) returns void
+language plpgsql security definer set search_path = public as $$
+declare v public.ventas;
+begin
+  select * into v from public.ventas where id = p_venta;
+  if v.id is null then raise exception 'Venta no encontrada'; end if;
+  if not (v.vendedor_id = auth.uid() or public.is_sales_manager() or public.is_buyer()) then raise exception 'No autorizado' using errcode = '42501'; end if;
+  if p_subtotal is null or p_subtotal <= 0 then raise exception 'Subtotal invalido'; end if;
+  update public.ventas set subtotal = round(p_subtotal, 2), subtotal_estimado = false where id = p_venta;
+end;
+$$;
 grant execute on function public.venta_vendedor_factura(uuid, text) to authenticated;
 
 -- Las que ya estaban y pasaron por almacen: su vendedor de la factura.

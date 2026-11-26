@@ -247,7 +247,7 @@ export async function cobrarConComisionAction(ventaId: string, fechaCobro: strin
 /** Jefa: ventas con factura a las que les falta leer el subtotal exacto o el vendedor que dice la factura. */
 export async function ventasSubtotalEstimadoAction(): Promise<Result<{ ventas: { id: string; factura: string | null; pdf: boolean; xml: boolean; monto: number; sub: boolean; vend: boolean }[] }>> {
   const u = await requireUser();
-  if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas." };
+  if (u.rol !== "jefe_ventas" && u.rol !== "comprador") return { ok: false, error: "Solo la jefa de ventas o el comprador." };
   const supabase = await createClient();
   const base = (cols: string, filtro: string) =>
     supabase.from("ventas").select(cols).is("cancelada_at", null).or("factura_path.not.is.null,xml_path.not.is.null").or(filtro).order("fecha", { ascending: false }).limit(5000);
@@ -264,7 +264,7 @@ export async function ventasSubtotalEstimadoAction(): Promise<Result<{ ventas: {
 /** Guarda el vendedor que dice la factura. */
 export async function guardarVendedorFacturaAction(ventaId: string, nombre: string): Promise<Result> {
   const u = await requireUser();
-  if (u.rol !== "jefe_ventas" && u.rol !== "vendedor") return { ok: false, error: "No autorizado." };
+  if (!["jefe_ventas", "vendedor", "comprador"].includes(u.rol)) return { ok: false, error: "No autorizado." };
   if (!uuid.safeParse(ventaId).success || !nombre.trim()) return { ok: false, error: "Dato inválido" };
   const supabase = await createClient();
   const { error } = await supabase.rpc("venta_vendedor_factura", { p_venta: ventaId, p_nombre: nombre.trim().slice(0, 150) });
@@ -274,7 +274,7 @@ export async function guardarVendedorFacturaAction(ventaId: string, nombre: stri
 /** Guarda el subtotal sin IVA leido de la factura. */
 export async function guardarSubtotalAction(ventaId: string, subtotal: number): Promise<Result> {
   const u = await requireUser();
-  if (u.rol !== "jefe_ventas" && u.rol !== "vendedor") return { ok: false, error: "No autorizado." };
+  if (!["jefe_ventas", "vendedor", "comprador"].includes(u.rol)) return { ok: false, error: "No autorizado." };
   if (!uuid.safeParse(ventaId).success || !(subtotal > 0)) return { ok: false, error: "Dato inválido" };
   const supabase = await createClient();
   const { error } = await supabase.rpc("venta_subtotal_factura", { p_venta: ventaId, p_subtotal: subtotal });
