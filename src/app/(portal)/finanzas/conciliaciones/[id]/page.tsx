@@ -9,7 +9,7 @@ import { money2 } from "@/lib/ventas";
 
 /** Un estado de cuenta subido: sus abonos y quien identifico cada uno. */
 export default async function ConciliacionDetalle({ params }: { params: Promise<{ id: string }> }) {
-  const u = await requireRoles(["aux_finanzas", "supervisor_finanzas", "jefe_ventas", "gerente", "ceo"]);
+  const u = await requireRoles(["aux_finanzas", "supervisor_finanzas", "jefe_ventas", "gerente", "ceo", "comprador"]);
   const finanzas = u.rol === "aux_finanzas" || u.rol === "supervisor_finanzas";
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
@@ -33,7 +33,7 @@ export default async function ConciliacionDetalle({ params }: { params: Promise<
         <StatCard label="Sin identificar" value={libres.length} tone={libres.length ? "amber" : "default"} />
         <StatCard label="Monto sin identificar" value={money2(libres.reduce((a, m) => a + m.monto, 0), c.moneda as string)} />
       </div>
-      <ListaConciliacion movs={movs} modo={finanzas ? "finanzas" : "direccion"} uid={u.id} vendedores={(vends ?? []) as { id: string; nombre: string }[]} />
+      <ListaConciliacion movs={movs} modo={finanzas ? "finanzas" : "direccion"} uid={u.id} vendedores={(vends ?? []) as { id: string; nombre: string }[]} puedePrevio={["jefe_ventas", "gerente", "ceo", "comprador"].includes(u.rol)} />
     </div>
   );
 }

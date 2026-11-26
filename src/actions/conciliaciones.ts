@@ -155,3 +155,30 @@ export async function marcarPagadaConciliacionAction(filaId: string): Promise<Re
   revalidar();
   return { ok: true };
 }
+
+/** Jefa, gerente, CEO o comprador: el pago ya se habia identificado antes del portal (con sus folios). */
+export async function marcarPrevioAction(movId: string, folios: string, nota: string, para: string): Promise<Result<{ n: number }>> {
+  const u = await requireUser();
+  if (!["jefe_ventas", "gerente", "ceo", "comprador"].includes(u.rol)) return { ok: false, error: "Solo la jefa de ventas, la gerente, el CEO o el comprador." };
+  if (!z.string().uuid().safeParse(movId).success) return { ok: false, error: "Pago inválido" };
+  const lista = [...new Set(String(folios ?? "").toUpperCase().split(/[\s,;]+/).map((f) => f.trim()).filter(Boolean))].slice(0, 500);
+  if (!lista.length && !nota.trim()) return { ok: false, error: "Pon los folios de las facturas o una nota." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("conciliacion_marcar_previo", { p_mov: movId, p_folios: lista, p_nota: nota.trim() || null, p_para: para.trim() || null });
+  if (error) return { ok: false, error: /conciliacion_marcar_previo/.test(error.message) ? "Falta correr la actualización 0087 en la base." : friendlyError(error.message) };
+  revalidatePath("/finanzas/conciliaciones");
+  revalidatePath("/vendedor/conciliaciones");
+  return { ok: true, n: Number(data ?? 0) };
+}
+
+export async function quitarPrevioAction(movId: string): Promise<Result> {
+  const u = await requireUser();
+  if (!["jefe_ventas", "gerente", "ceo", "comprador"].includes(u.rol)) return { ok: false, error: "No autorizado." };
+  if (!z.string().uuid().safeParse(movId).success) return { ok: false, error: "Pago inválido" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("conciliacion_quitar_previo", { p_mov: movId });
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/finanzas/conciliaciones");
+  revalidatePath("/vendedor/conciliaciones");
+  return { ok: true };
+}

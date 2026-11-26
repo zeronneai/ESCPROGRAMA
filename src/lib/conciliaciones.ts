@@ -29,6 +29,9 @@ export interface MovConc {
   tomado_para: string | null;
   /** El vendedor dueno del pago (si lo identifico la direccion a su nombre, no es quien lo tomo). */
   vendedor_id: string | null;
+  /** Se identifico antes del portal (a mano): ya no se toca. */
+  previo?: boolean;
+  previo_nota?: string | null;
   facturas: FacturaConc[];
 }
 
@@ -45,7 +48,8 @@ export async function cargarMovimientos(supabase: SupabaseClient, opts: { concil
   };
   const base = "id, conciliacion_id, banco, cuenta, moneda, fecha, descripcion, referencia, monto, tomado_por, tomado_nombre, tomado_at, created_at";
   // Sin la actualizacion 0077 todavia no hay plazo ni identificacion a nombre de otro.
-  let r = await armar(`${base}, tardio, tomado_para, vendedor_id`);
+  let r = await armar(`${base}, tardio, tomado_para, vendedor_id, previo, previo_nota`);
+  if (r.error && /previo/.test(r.error.message)) r = await armar(`${base}, tardio, tomado_para, vendedor_id`);
   if (r.error && /tardio|tomado_para|vendedor_id/.test(r.error.message)) r = await armar(base);
   const { error } = r;
   const data = (r.data ?? []) as unknown as Record<string, unknown>[];
@@ -65,7 +69,7 @@ export async function cargarMovimientos(supabase: SupabaseClient, opts: { concil
     }
   }
   return {
-    movs: data.map((m) => ({ ...(m as unknown as Omit<MovConc, "monto" | "facturas" | "tardio" | "tomado_para" | "vendedor_id">), tardio: !!m.tardio, tomado_para: (m.tomado_para as string | null) ?? null, vendedor_id: (m.vendedor_id as string | null) ?? (m.tomado_para ? null : (m.tomado_por as string | null)), monto: Number(m.monto), facturas: facts.get(m.id as string) ?? [] })),
+    movs: data.map((m) => ({ ...(m as unknown as Omit<MovConc, "monto" | "facturas" | "tardio" | "tomado_para" | "vendedor_id">), tardio: !!m.tardio, tomado_para: (m.tomado_para as string | null) ?? null, previo: !!m.previo, previo_nota: (m.previo_nota as string | null) ?? null, vendedor_id: (m.vendedor_id as string | null) ?? (m.tomado_para ? null : (m.tomado_por as string | null)), monto: Number(m.monto), facturas: facts.get(m.id as string) ?? [] })),
     error: null,
   };
 }

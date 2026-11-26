@@ -30,6 +30,7 @@ const NAV: Record<Rol, NavItem[]> = {
     { href: "/comprador/planeacion/asistente", label: "Asistente de compras (Claude)", short: "Asistente", icon: "chat", secondary: true },
     { href: "/metas", label: "Metas de venta (en vivo)", short: "Metas", icon: "target", secondary: true },
     { href: "/periodo-metas", label: "Periodo de metas y leer facturas", short: "Periodo", icon: "target", secondary: true },
+    { href: "/finanzas/conciliaciones", label: "Conciliaciones", short: "Bancos", icon: "inbox", secondary: true },
     { href: "/pedidos-pegatron", label: "Pedidos Pegatron", short: "Pegatron", icon: "clipboard", secondary: true },
     { href: "/comprador/catalogo", label: "Comentarios del catálogo", icon: "chat", secondary: true },
     { href: "/consumo", label: "Consumo interno", short: "Consumo", icon: "clipboard" },

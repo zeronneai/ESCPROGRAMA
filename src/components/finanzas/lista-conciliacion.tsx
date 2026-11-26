@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { marcarPagadaConciliacionAction, soltarPagoAction } from "@/actions/conciliaciones";
+import { marcarPagadaConciliacionAction, marcarPrevioAction, quitarPrevioAction, soltarPagoAction } from "@/actions/conciliaciones";
 import { IdentificarPara, TomarPago } from "@/components/finanzas/tomar-pago";
 import { toast } from "@/components/feedback-global";
 import { Card, Input } from "@/components/ui";
 import { diasRestantes, type MovConc } from "@/lib/conciliaciones";
 import { money2 } from "@/lib/ventas";
 
-type Ver = "libres" | "vencidos" | "mios" | "identificados" | "todos";
+type Ver = "libres" | "vencidos" | "mios" | "identificados" | "previos" | "todos";
 const fecha = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("es-MX", { day: "numeric", month: "short" });
 
 /**
@@ -20,14 +20,15 @@ const fecha = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString("es-MX
  * - direccion (jefa, gerente, CEO): ademas identifica a nombre de un vendedor.
  * Cada abono tiene 7 dias para identificarse; despues pasa a "No identificados" (rojo).
  */
-export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, today, almacen }: { movs: MovConc[]; modo: "vendedor" | "finanzas" | "direccion"; uid: string; vendedores?: { id: string; nombre: string }[]; inicial?: Ver; today?: string; almacen?: boolean }) {
+export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, today, almacen, puedePrevio }: { movs: MovConc[]; modo: "vendedor" | "finanzas" | "direccion"; uid: string; vendedores?: { id: string; nombre: string }[]; inicial?: Ver; today?: string; almacen?: boolean; /** Jefa, gerente, CEO o comprador: marcar pagos identificados antes del portal. */ puedePrevio?: boolean }) {
   const router = useRouter();
   const [pend, start] = useTransition();
   const [ver, setVer] = useState<Ver>(inicial ?? (modo === "vendedor" ? "libres" : "todos"));
   const vencido = (m: MovConc) => !m.tomado_por && diasRestantes(m.created_at) <= 0;
   const [cuenta, setCuenta] = useState<string>("");
   // Por vendedor (finanzas, jefa, gerente): a nombre de quien quedo cada pago.
-  const quien = (m: MovConc) => (m.tomado_por ? (m.tomado_para ?? m.tomado_nombre ?? "Otro") : null);
+  const quien = (m: MovConc) => (m.previo ? (m.tomado_para ?? "Antes del portal") : m.tomado_por ? (m.tomado_para ?? m.tomado_nombre ?? "Otro") : null);
+  const [previoAbierto, setPrevioAbierto] = useState<string | null>(null);
   const [vend, setVend] = useState<string>("");
   const vends = useMemo(() => [...new Set(movs.map(quien).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b)), [movs]);
   const [buscar, setBuscar] = useState("");
@@ -39,13 +40,14 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, t
     if (ver === "libres" && (m.tomado_por || vencido(m))) return false;
     if (ver === "vencidos" && !vencido(m)) return false;
     if (ver === "identificados" && !m.tomado_por) return false;
+    if (ver === "previos" && !m.previo) return false;
     if (ver === "mios" && m.vendedor_id !== uid) return false;
     if (cuenta && `${m.banco}|${m.cuenta ?? ""}` !== cuenta) return false;
     if (vend && quien(m) !== vend) return false;
     if (t && !(m.descripcion.toLowerCase().includes(t) || (m.referencia ?? "").toLowerCase().includes(t) || m.facturas.some((f) => f.folio.toLowerCase().includes(t)) || (tn > 0 && Math.abs(m.monto - tn) < 1))) return false;
     return true;
   });
-  const cuenta_ = (v: Ver) => movs.filter((m) => (v === "libres" ? !m.tomado_por && !vencido(m) : v === "vencidos" ? vencido(m) : v === "mios" ? m.vendedor_id === uid : v === "identificados" ? !!m.tomado_por : true)).length;
+  const cuenta_ = (v: Ver) => movs.filter((m) => (v === "libres" ? !m.tomado_por && !vencido(m) : v === "vencidos" ? vencido(m) : v === "mios" ? m.vendedor_id === uid : v === "identificados" ? !!m.tomado_por : v === "previos" ? !!m.previo : true)).length;
   const soltar = (m: MovConc) =>
     start(async () => {
       const r = await soltarPagoAction(m.id);
@@ -60,8 +62,15 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, t
       toast("Factura marcada pagada con la fecha del abono", "success");
       router.refresh();
     });
-  const opciones: Ver[] = modo === "vendedor" ? ["libres", "vencidos", "mios", "todos"] : ["vencidos", "libres", "identificados", "todos"];
-  const nombre = { libres: "Por identificar", vencidos: "No identificados (+7 días)", mios: "Los míos", identificados: "Identificados", todos: "Todos" };
+  const opciones: Ver[] = modo === "vendedor" ? ["libres", "vencidos", "mios", "todos"] : ["vencidos", "libres", "identificados", ...(movs.some((m) => m.previo) ? (["previos"] as Ver[]) : []), "todos"];
+  const nombre = { libres: "Por identificar", vencidos: "No identificados (+7 días)", mios: "Los míos", identificados: "Identificados", previos: "Antes del portal", todos: "Todos" };
+  const deshacerPrevio = (m: MovConc) =>
+    start(async () => {
+      if (!window.confirm("¿Deshacer? El pago vuelve a quedar sin identificar.")) return;
+      const r = await quitarPrevioAction(m.id);
+      if (!r.ok) return toast(r.error, "error");
+      router.refresh();
+    });
 
   return (
     <div className="space-y-3">
@@ -95,7 +104,7 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, t
       <Card className="divide-y divide-slate-100 p-0">
         {lista.slice(0, 400).map((m) => {
           const mio = m.vendedor_id === uid;
-          const puedeSoltar = m.tomado_por && (modo !== "vendedor" || (m.tomado_por === uid && !m.facturas.some((f) => f.marco_pagada)));
+          const puedeSoltar = m.tomado_por && !m.previo && (modo !== "vendedor" || (m.tomado_por === uid && !m.facturas.some((f) => f.marco_pagada)));
           const dias = diasRestantes(m.created_at);
           const rojo = !m.tomado_por && dias <= 0;
           return (
@@ -109,7 +118,18 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, t
                     {rojo ? `No identificado · venció hace ${Math.max(-dias, 1)} día(s): comisión −10%` : `Quedan ${dias} día(s) para identificarlo`}
                   </span>
                 )}
-                {m.tomado_por && (
+                {m.previo && (
+                  <span className="mt-1 block space-y-1 text-xs">
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="rounded-full bg-indigo-100 px-2 py-0.5 font-semibold text-indigo-800">Identificado antes del portal{m.tomado_para ? ` · ${m.tomado_para}` : ""}</span>
+                      {m.facturas.length > 0 && <span className="text-slate-500">{m.facturas.length} factura(s):</span>}
+                      {m.facturas.slice(0, 60).map((f) => <span key={f.id} className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-700">{f.folio}</span>)}
+                      {m.facturas.length > 60 && <span className="text-slate-500">y {m.facturas.length - 60} más</span>}
+                    </span>
+                    {m.previo_nota && <span className="block text-slate-600">Nota: {m.previo_nota}</span>}
+                  </span>
+                )}
+                {m.tomado_por && !m.previo && (
                   <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
                     <span className={`rounded-full px-2 py-0.5 font-semibold ${mio ? "bg-brand-100 text-brand-800" : "bg-slate-100 text-slate-700"}`}>{mio ? (m.tomado_por === uid ? "Tomado por ti" : "Identificado a tu nombre") : (m.tomado_para ? `Identificado a nombre de ${m.tomado_para}` : `Tomado por ${m.tomado_nombre ?? "otro vendedor"}`)}</span>
                     {m.tardio && <span className="rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-800">Identificado tarde: comisión −10%, siguiente quincena</span>}
@@ -140,8 +160,17 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, t
                     <button type="button" onClick={() => setAbierto(m.id)} className="rounded-full bg-slate-800 px-3 py-1 font-semibold text-white hover:bg-slate-900">Identificar</button>
                   )}
                   {puedeSoltar && <button type="button" disabled={pend} onClick={() => soltar(m)} className="text-slate-500 hover:underline">Soltar</button>}
+                  {puedePrevio && !m.tomado_por && previoAbierto !== m.id && (
+                    <button type="button" onClick={() => setPrevioAbierto(m.id)} className="rounded-full border border-indigo-300 px-3 py-1 font-semibold text-indigo-800 hover:bg-indigo-50" title="Ya se había identificado a mano antes del portal">Ya identificado antes</button>
+                  )}
+                  {puedePrevio && m.previo && <button type="button" disabled={pend} onClick={() => deshacerPrevio(m)} className="text-slate-500 hover:underline">Deshacer</button>}
                 </span>
               </span>
+              {previoAbierto === m.id && (
+                <div className="basis-full">
+                  <MarcarPrevio mov={m} vendedores={vendedores} onClose={() => setPrevioAbierto(null)} />
+                </div>
+              )}
               {abierto === m.id && (
                 <div className="basis-full">
                   {modo === "direccion" ? <IdentificarPara mov={m} vendedores={vendedores} onClose={() => setAbierto(null)} /> : <TomarPago mov={m} onClose={() => setAbierto(null)} today={today} almacen={almacen} />}
@@ -152,6 +181,55 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, t
         })}
       </Card>
       {lista.length > 400 && <p className="text-xs text-slate-500">Se muestran los primeros 400. Usa el buscador para encontrar otros.</p>}
+    </div>
+  );
+}
+
+/** Pago identificado a mano antes del portal: folios (aunque las facturas no esten subidas), asesor y nota. */
+function MarcarPrevio({ mov, vendedores, onClose }: { mov: MovConc; vendedores: { id: string; nombre: string }[]; onClose: () => void }) {
+  const router = useRouter();
+  const [pend, start] = useTransition();
+  const [folios, setFolios] = useState("");
+  const [para, setPara] = useState("");
+  const [nota, setNota] = useState("");
+  const n = [...new Set(folios.toUpperCase().split(/[\s,;]+/).filter(Boolean))].length;
+  return (
+    <div className="mt-2 space-y-2 rounded-lg border border-indigo-200 bg-indigo-50/60 p-3 text-sm">
+      <p className="text-indigo-900">Este pago ya se había identificado antes del portal. Queda como identificado y nadie lo puede tomar ni cambiar (finanzas tampoco).</p>
+      <label className="block text-xs font-medium text-slate-700">
+        Folios de las facturas (pégalos separados por espacio, coma o renglón)
+        <textarea className="mt-1 h-24 w-full rounded-md border border-slate-300 px-2 py-1 font-mono text-xs" value={folios} onChange={(e) => setFolios(e.target.value)} placeholder="F10815, F10817, F10785..." />
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <label className="text-xs font-medium text-slate-700">
+          Asesor (opcional)
+          <input list={`vend-${mov.id}`} className="mt-1 block w-56 rounded-md border border-slate-300 px-2 py-1 text-sm" value={para} onChange={(e) => setPara(e.target.value)} maxLength={120} />
+          <datalist id={`vend-${mov.id}`}>{vendedores.map((v) => <option key={v.id} value={v.nombre} />)}</datalist>
+        </label>
+        <label className="min-w-[14rem] flex-1 text-xs font-medium text-slate-700">
+          Nota (opcional)
+          <input className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1 text-sm" value={nota} onChange={(e) => setNota(e.target.value)} maxLength={1000} placeholder="Ej. Pago Pegatron de 33 facturas, recibido en físico" />
+        </label>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={pend || (!n && !nota.trim())}
+          className="rounded-full bg-indigo-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-800 disabled:opacity-50"
+          onClick={() =>
+            start(async () => {
+              const r = await marcarPrevioAction(mov.id, folios, nota, para);
+              if (!r.ok) return toast(r.error, "error");
+              toast(`Listo: pago identificado antes del portal${r.n ? ` con ${r.n} factura(s)` : ""}`, "success");
+              onClose();
+              router.refresh();
+            })
+          }
+        >
+          {pend ? "Guardando…" : `Marcar como identificado${n ? ` (${n} folios)` : ""}`}
+        </button>
+        <button type="button" onClick={onClose} className="text-xs text-slate-500 underline">Cancelar</button>
+      </div>
     </div>
   );
 }
