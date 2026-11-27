@@ -32,6 +32,7 @@ export interface MovConc {
   /** Se identifico antes del portal (a mano): ya no se toca. */
   previo?: boolean;
   previo_nota?: string | null;
+  previo_por?: string | null;
   facturas: FacturaConc[];
 }
 
@@ -48,7 +49,7 @@ export async function cargarMovimientos(supabase: SupabaseClient, opts: { concil
   };
   const base = "id, conciliacion_id, banco, cuenta, moneda, fecha, descripcion, referencia, monto, tomado_por, tomado_nombre, tomado_at, created_at";
   // Sin la actualizacion 0077 todavia no hay plazo ni identificacion a nombre de otro.
-  let r = await armar(`${base}, tardio, tomado_para, vendedor_id, previo, previo_nota`);
+  let r = await armar(`${base}, tardio, tomado_para, vendedor_id, previo, previo_nota, previo_por`);
   if (r.error && /previo/.test(r.error.message)) r = await armar(`${base}, tardio, tomado_para, vendedor_id`);
   if (r.error && /tardio|tomado_para|vendedor_id/.test(r.error.message)) r = await armar(base);
   const { error } = r;

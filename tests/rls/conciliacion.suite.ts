@@ -130,8 +130,12 @@ export function conciliacionSuite() {
       await q(aux, "select public.conciliacion_subir($1::jsonb)", [JSON.stringify({ banco: "BBVA", cuenta: "0159" + tag, moneda: "MXN", abonos: [{ fecha: "2026-11-19", descripcion: `PEGATRON ${tag}`, monto: 432832.84 }] })]);
       const m = (await q(jefa, "select id from public.conciliacion_movimientos where descripcion=$1", [`PEGATRON ${tag}`])).rows[0].id;
       const comprador = w.buyer1;
-      expect(await failure(q(aux, "select public.conciliacion_marcar_previo($1, $2)", [m, ["F1"]]))).toMatch(/Solo la jefa/);
-      expect(await failure(q(w.seller1, "select public.conciliacion_marcar_previo($1, $2)", [m, ["F1"]]))).toMatch(/Solo la jefa/);
+      expect(await failure(q(w.seller1, "select public.conciliacion_marcar_previo($1, $2)", [m, ["F1"]]))).toMatch(/Solo finanzas/);
+      // Finanzas identifica pagos de facturas anteriores al portal: solo con folios; deshace solo lo suyo
+      expect(await failure(q(aux, "select public.conciliacion_marcar_previo($1, $2, 'nota')", [m, []]))).toMatch(/folios/);
+      await q(aux, "select public.conciliacion_marcar_previo($1, $2)", [m, ["F1"]]);
+      expect((await q("postgres", "select previo from public.conciliacion_movimientos where id=$1", [m])).rows[0].previo).toBe(true);
+      await q(aux, "select public.conciliacion_quitar_previo($1)", [m]);
       const n = (await q(comprador, "select public.conciliacion_marcar_previo($1, $2, 'Recibido en fisico', 'Alejandra Rangel') n", [m, ["f10815", " F10817 ", "F10815"]])).rows[0].n;
       expect(n).toBe(3);
       const mv = (await q("postgres", "select previo, tomado_por is not null t, tomado_para, (select count(*)::int from public.conciliacion_facturas where movimiento_id=$1) f from public.conciliacion_movimientos where id=$1", [m])).rows[0];

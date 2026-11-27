@@ -161,15 +161,15 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, t
                     <button type="button" onClick={() => setAbierto(m.id)} className="rounded-full bg-slate-800 px-3 py-1 font-semibold text-white hover:bg-slate-900">Identificar</button>
                   )}
                   {puedeSoltar && <button type="button" disabled={pend} onClick={() => soltar(m)} className="text-slate-500 hover:underline">Soltar</button>}
-                  {puedePrevio && !m.tomado_por && previoAbierto !== m.id && (
-                    <button type="button" onClick={() => setPrevioAbierto(m.id)} className="rounded-full border border-indigo-300 px-3 py-1 font-semibold text-indigo-800 hover:bg-indigo-50" title="Ya se había identificado a mano antes del portal">Ya identificado antes</button>
+                  {(puedePrevio || modo === "finanzas") && !m.tomado_por && previoAbierto !== m.id && (
+                    <button type="button" onClick={() => setPrevioAbierto(m.id)} className="rounded-full border border-indigo-300 px-3 py-1 font-semibold text-indigo-800 hover:bg-indigo-50" title={modo === "finanzas" ? "Pago de facturas que no están en el portal (anteriores a noviembre): solo pon los folios" : "Ya se había identificado a mano antes del portal"}>{modo === "finanzas" ? "Identificar" : "Ya identificado antes"}</button>
                   )}
-                  {puedePrevio && m.previo && <button type="button" disabled={pend} onClick={() => deshacerPrevio(m)} className="text-slate-500 hover:underline">Deshacer</button>}
+                  {(puedePrevio || (modo === "finanzas" && m.previo_por === uid)) && m.previo && <button type="button" disabled={pend} onClick={() => deshacerPrevio(m)} className="text-slate-500 hover:underline">Deshacer</button>}
                 </span>
               </span>
               {previoAbierto === m.id && (
                 <div className="basis-full">
-                  <MarcarPrevio mov={m} vendedores={vendedores} onClose={() => setPrevioAbierto(null)} />
+                  <MarcarPrevio mov={m} vendedores={vendedores} soloFolios={modo === "finanzas"} onClose={() => setPrevioAbierto(null)} />
                 </div>
               )}
               {abierto === m.id && (
@@ -187,7 +187,7 @@ export function ListaConciliacion({ movs, modo, uid, vendedores = [], inicial, t
 }
 
 /** Pago identificado a mano antes del portal: folios (aunque las facturas no esten subidas), asesor y nota. */
-function MarcarPrevio({ mov, vendedores, onClose }: { mov: MovConc; vendedores: { id: string; nombre: string }[]; onClose: () => void }) {
+function MarcarPrevio({ mov, vendedores, onClose, soloFolios = false }: { mov: MovConc; vendedores: { id: string; nombre: string }[]; onClose: () => void; /** Finanzas: solo los folios. */ soloFolios?: boolean }) {
   const router = useRouter();
   const [pend, start] = useTransition();
   const [folios, setFolios] = useState("");
@@ -196,12 +196,12 @@ function MarcarPrevio({ mov, vendedores, onClose }: { mov: MovConc; vendedores: 
   const n = [...new Set(folios.toUpperCase().split(/[\s,;]+/).filter(Boolean))].length;
   return (
     <div className="mt-2 space-y-2 rounded-lg border border-indigo-200 bg-indigo-50/60 p-3 text-sm">
-      <p className="text-indigo-900">Este pago ya se había identificado antes del portal. Queda como identificado y nadie lo puede tomar ni cambiar (finanzas tampoco).</p>
+      <p className="text-indigo-900">{soloFolios ? "Pago de facturas que no están en el portal (de antes de noviembre). Pon los folios y queda identificado; ya nadie lo toma." : "Este pago ya se había identificado antes del portal. Queda como identificado y nadie lo puede tomar ni cambiar (finanzas tampoco)."}</p>
       <label className="block text-xs font-medium text-slate-700">
         Folios de las facturas (pégalos separados por espacio, coma o renglón)
         <textarea className="mt-1 h-24 w-full rounded-md border border-slate-300 px-2 py-1 font-mono text-xs" value={folios} onChange={(e) => setFolios(e.target.value)} placeholder="F10815, F10817, F10785..." />
       </label>
-      <div className="flex flex-wrap gap-2">
+      {!soloFolios && <div className="flex flex-wrap gap-2">
         <label className="text-xs font-medium text-slate-700">
           Asesor (opcional)
           <input list={`vend-${mov.id}`} className="mt-1 block w-56 rounded-md border border-slate-300 px-2 py-1 text-sm" value={para} onChange={(e) => setPara(e.target.value)} maxLength={120} />
@@ -211,11 +211,11 @@ function MarcarPrevio({ mov, vendedores, onClose }: { mov: MovConc; vendedores: 
           Nota (opcional)
           <input className="mt-1 block w-full rounded-md border border-slate-300 px-2 py-1 text-sm" value={nota} onChange={(e) => setNota(e.target.value)} maxLength={1000} placeholder="Ej. Pago Pegatron de 33 facturas, recibido en físico" />
         </label>
-      </div>
+      </div>}
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          disabled={pend || (!n && !nota.trim())}
+          disabled={pend || (!n && (soloFolios || !nota.trim()))}
           className="rounded-full bg-indigo-700 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-800 disabled:opacity-50"
           onClick={() =>
             start(async () => {
@@ -227,7 +227,7 @@ function MarcarPrevio({ mov, vendedores, onClose }: { mov: MovConc; vendedores: 
             })
           }
         >
-          {pend ? "Guardando…" : `Marcar como identificado${n ? ` (${n} folios)` : ""}`}
+          {pend ? "Guardando…" : `${soloFolios ? "Identificar" : "Marcar como identificado"}${n ? ` (${n} folios)` : ""}`}
         </button>
         <button type="button" onClick={onClose} className="text-xs text-slate-500 underline">Cancelar</button>
       </div>
