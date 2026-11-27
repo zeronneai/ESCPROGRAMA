@@ -84,6 +84,12 @@ export function metasSuite() {
       const rev = (await q(w.buyer1, "select * from public.metas_revision_facturas()")).rows.find((r) => r.id === vi);
       expect(rev).toMatchObject({ cuenta_para: "Solo equipo", solo_equipo: true });
       expect(await failure(q(w.seller1, "select * from public.metas_revision_facturas()"))).toMatch(/permiso/i);
+      // Pantalla publica: ultimas ventas (a quien le cuenta), cierres y avance diario, sin montos
+      const ex = (await q(anon, "select public.metas_pantalla_extra() as e")).rows[0].e;
+      expect(ex.ventas[0]).toMatchObject({ quien: "Equipo" });
+      expect(Object.keys(ex.ventas[0]).sort()).toEqual(["at", "quien"]);
+      expect(Array.isArray(ex.diario)).toBe(true);
+      expect(JSON.stringify(ex)).not.toMatch(/subtotal|monto|cliente/);
       await q("postgres", "update public.ventas set cancelada_at=now() where id=$1", [vi]);
       // Periodo proporcional: si la jefa recorta el mes, la meta baja en proporcion a los dias.
       await q(jefa, "update public.metas_config set desde=date_trunc('month', public.local_today())::date, hasta=date_trunc('month', public.local_today())::date + 9 where id=1");

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
  * Pantalla de las teles: mantiene la pantalla encendida (Wake Lock) y un monito que camina y suelta
  * mensajes con los datos en vivo, para que la pantalla no se vea quieta.
  */
-export function MascotaMetas({ mensajes }: { mensajes: string[] }) {
+export function MascotaMetas({ mensajes, abajo = 16, alLado = false }: { mensajes: string[]; /** px desde abajo */ abajo?: number; /** Burbuja a un lado (hacia el centro) en vez de arriba */ alLado?: boolean }) {
   const [i, setI] = useState(0);
   const [lado, setLado] = useState<"izq" | "der">("izq");
   const lista = useMemo(() => (mensajes.length ? mensajes : ["¡Vamos por la meta!"]), [mensajes]);
@@ -43,23 +43,27 @@ export function MascotaMetas({ mensajes }: { mensajes: string[] }) {
   }, [lista.length]);
 
   return (
-    <div className="pointer-events-none fixed bottom-4 left-0 right-0 z-[60] h-40" aria-hidden>
+    <div className="pointer-events-none fixed left-0 right-0 z-[60] h-40" style={{ bottom: abajo }} aria-hidden>
       <style>{`
         @keyframes mm-camina-der { from { transform: translateX(4vw); } to { transform: translateX(calc(92vw - 150px)); } }
         @keyframes mm-camina-izq { from { transform: translateX(calc(92vw - 150px)); } to { transform: translateX(4vw); } }
+        @keyframes mm-lado-der { from { transform: translateX(2vw); } to { transform: translateX(38vw); } }
+        @keyframes mm-lado-izq { from { transform: translateX(38vw); } to { transform: translateX(2vw); } }
         @keyframes mm-brinca { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-10px) rotate(3deg); } }
         @keyframes mm-brazo { 0%,100% { transform: rotate(-25deg); } 50% { transform: rotate(35deg); } }
         @keyframes mm-burbuja { 0% { opacity: 0; transform: translateY(8px) scale(.9); } 12%,85% { opacity: 1; transform: none; } 100% { opacity: 0; } }
         @keyframes mm-parpadeo { 0%,92%,100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
       `}</style>
-      <div key={`${i}-${lado}`} className="absolute bottom-0" style={{ animation: `${lado === "der" ? "mm-camina-der" : "mm-camina-izq"} 8.5s ease-in-out forwards` }}>
+      <div key={`${i}-${lado}`} className="absolute bottom-0" style={{ animation: `${alLado ? (lado === "der" ? "mm-lado-der" : "mm-lado-izq") : lado === "der" ? "mm-camina-der" : "mm-camina-izq"} 8.5s ease-in-out forwards` }}>
         <div className="relative w-[150px]">
           <div
-            className="absolute bottom-[132px] left-1/2 w-[min(420px,80vw)] -translate-x-1/2 rounded-2xl border-2 border-brand-300 bg-white px-4 py-2.5 text-center text-base font-bold text-slate-800 shadow-xl"
+            className={alLado
+              ? `absolute bottom-[58px] left-[150px] w-max max-w-[min(620px,48vw)] rounded-2xl border-2 border-brand-300 bg-white px-5 py-3 text-center text-lg font-bold text-slate-800 shadow-xl`
+              : "absolute bottom-[132px] left-1/2 w-[min(420px,80vw)] -translate-x-1/2 rounded-2xl border-2 border-brand-300 bg-white px-4 py-2.5 text-center text-base font-bold text-slate-800 shadow-xl"}
             style={{ animation: "mm-burbuja 8.5s ease-in-out forwards" }}
           >
             {lista[i]}
-            <span className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-b-2 border-r-2 border-brand-300 bg-white" />
+            {!alLado && <span className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-b-2 border-r-2 border-brand-300 bg-white" />}
           </div>
           <div style={{ transform: lado === "izq" ? "scaleX(-1)" : undefined }}>
           <svg viewBox="-4 -6 128 136" width="150" height="130" style={{ animation: "mm-brinca .7s ease-in-out infinite" }}>

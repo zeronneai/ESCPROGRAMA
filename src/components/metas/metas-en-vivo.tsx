@@ -6,17 +6,17 @@ import { EVENTO_CAMBIO } from "@/components/realtime-sync";
 import { colorAvance, normalizarAvance, ritmoDe, type AvanceMeta } from "@/lib/metas-venta";
 import { createClient } from "@/lib/supabase/client";
 
-const COLORES = {
+export const COLORES = {
   verde: { trazo: "#16a34a", suave: "#dcfce7", texto: "text-green-700" },
   ambar: { trazo: "#f59e0b", suave: "#fef3c7", texto: "text-amber-700" },
   rojo: { trazo: "#dc2626", suave: "#fee2e2", texto: "text-red-700" },
 };
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const pesos = (n: number) => `$${Math.round(n).toLocaleString("es-MX")}`;
-const pctTxt = (n: number) => `${n.toLocaleString("es-MX", { maximumFractionDigits: 1 })}%`;
+export const pctTxt = (n: number) => `${n.toLocaleString("es-MX", { maximumFractionDigits: 1 })}%`;
 
 /** Anillo de avance con una marca donde deberia ir segun los dias del mes. */
-function Anillo({ pct, ritmo, tam = 150, grosor = 14, children }: { pct: number; ritmo: number; tam?: number; grosor?: number; children?: React.ReactNode }) {
+export function Anillo({ pct, ritmo, tam = 150, grosor = 14, children }: { pct: number; ritmo: number; tam?: number; grosor?: number; children?: React.ReactNode }) {
   const r = (tam - grosor) / 2;
   const circ = 2 * Math.PI * r;
   const c = COLORES[colorAvance(pct, ritmo)];

@@ -113,6 +113,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 96 | `0101_metas_revision_facturas.sql` | **Revisar a quién le cuenta cada factura en metas** (comprador, jefa, gerente): vendedor leído, meta a la que va, probar el lector y corregir. |
 | 97 | `0102_metas_vts_alias.sql` | **VTS**: las facturas que dicen "VENTAS CD. JUAREZ" cuentan para VTS Cd Juárez. |
 | 98 | `0103_minutas_iso.sql` | **Minutas**: el coordinador ISO ve todas aunque no lo incluyan y también puede hacerlas. |
+| 99 | `0104_pantalla_metas_extra.sql` | **Pantalla de metas en vivo**: últimas ventas, prospectos cerrados y avance diario del equipo para la pantalla pública (sin montos ni clientes). |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 
