@@ -110,7 +110,8 @@ export function MetasEnVivo({ inicial, publico: token }: { inicial: AvanceMeta[]
   const rango = f0.desde && fin && (diaDe(f0.desde) !== 1 || diaDe(fin) < 28) ? `del ${diaDe(f0.desde)} al ${diaDe(fin)} de ${mes}` : null;
   const equipo = f0.equipo_pct ?? 0;
   const conMontos = filas.some((f) => f.meta != null && !f.es_mio);
-  const totVend = filas.reduce((s, f) => s + (f.vendido ?? 0), 0);
+  const extra = Number(f0.equipo_extra ?? 0);
+  const totVend = filas.reduce((s, f) => s + (f.vendido ?? 0), 0) + extra;
   const totMeta = filas.reduce((s, f) => s + (f.meta ?? 0), 0);
   const seg = Math.round((ahora - act) / 1000);
   // Casa Local no es un vendedor: va junto a la meta del equipo, fuera del ranking.
@@ -155,6 +156,7 @@ export function MetasEnVivo({ inicial, publico: token }: { inicial: AvanceMeta[]
           {conMontos && (
             <p className="text-lg font-semibold tabular-nums text-slate-800">
               {pesos(totVend)} <span className="text-sm font-normal text-slate-500">de {pesos(totMeta)}</span>
+              {extra > 0 && <span className="block text-xs font-normal text-slate-500">Incluye {pesos(extra)} de facturas de Iván Muñoz (solo cuentan para el equipo)</span>}
             </p>
           )}
           <div className="flex flex-wrap gap-3 text-xs text-slate-600">

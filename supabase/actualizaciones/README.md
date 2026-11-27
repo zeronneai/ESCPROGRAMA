@@ -108,6 +108,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 91 | `0096_previo_finanzas.sql` | **Finanzas identifica pagos de facturas anteriores al portal**: botón "Identificar" solo con los folios; queda como identificado y nadie lo toca. |
 | 92 | `0097_rrhh_reglas.sql` | **Reglas adicionales de vacaciones**: la gerente agrega reglas escritas, fechas sin vacaciones, máximo de personas a la vez (por puesto o toda la empresa) y máximo de días por solicitud. |
 | 93 | `0098_estados_cuenta_diarios.sql` | **Recordatorio diario de estados de cuenta**: barra roja a la auxiliar de finanzas con las cuentas que faltan subir hoy (lunes a viernes, antes de las 9 am); cuentas sin abonos se marcan. |
+| 94 | `0099_metas_solo_equipo.sql` | **Facturas de Iván Muñoz en metas**: no cuentan para la meta de quien las subió, sí para el total del equipo. Lo demás (pagos, comisiones, recepción) no cambia. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

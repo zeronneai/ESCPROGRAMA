@@ -13,6 +13,8 @@ export interface AvanceMeta {
   dias_mes: number;
   es_mio: boolean;
   equipo_pct: number | null;
+  /** Ventas que solo cuentan para el equipo (ej. facturas de Ivan Munoz); solo con montos. */
+  equipo_extra?: number | null;
   /** Este usuario captura a mano las ventas de esta meta. */
   capturo?: boolean;
   /** Meta del mes completo (meta = la proporcional al periodo). */

@@ -72,6 +72,16 @@ export function metasSuite() {
       expect(Number(tras.find((r) => r.id === casa)!.vendido)).toBe(10000);
       expect(Number(tras.find((r) => r.nombre === `M1 ${tag}`)!.vendido)).toBe(antes - 10000);
       await q(jefa, "delete from public.metas_venta where id=$1", [casa]);
+      // Factura de IVAN MUÑOZ (ya no esta): no cuenta para quien la subio, si para el equipo.
+      const vi = (await q(w.seller1, "insert into public.ventas (customer_id, monto, moneda, pago) values ($1,7000,'MXN','contado') returning id", [w.customerId])).rows[0].id;
+      const pre = (await q(ger, "select * from public.metas_ventas_avance()")).rows;
+      await q(w.seller1, "select public.venta_vendedor_factura($1, $2)", [vi, "Iván Muñoz García"]);
+      const post = (await q(ger, "select * from public.metas_ventas_avance()")).rows;
+      expect(Number(post.find((r) => r.nombre === `M1 ${tag}`)!.vendido)).toBe(Number(pre.find((r) => r.nombre === `M1 ${tag}`)!.vendido) - 7000);
+      expect(Number(post[0].equipo_extra)).toBe(Number(pre[0].equipo_extra) + 7000);
+      expect(Number(post[0].equipo_pct)).toBe(Number(pre[0].equipo_pct));
+      expect((await q(anon, "select * from public.metas_ventas_publico()")).rows[0].equipo_extra).toBeNull();
+      await q("postgres", "update public.ventas set cancelada_at=now() where id=$1", [vi]);
       // Periodo proporcional: si la jefa recorta el mes, la meta baja en proporcion a los dias.
       await q(jefa, "update public.metas_config set desde=date_trunc('month', public.local_today())::date, hasta=date_trunc('month', public.local_today())::date + 9 where id=1");
       const dm = (await q("postgres", "select extract(day from date_trunc('month', public.local_today()) + interval '1 month - 1 day')::int d")).rows[0].d as number;
