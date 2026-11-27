@@ -1,4 +1,4 @@
--- Revisa que actualizaciones (0059 a 0091) ya estan corridas en la base.
+-- Revisa que actualizaciones (0059 a 0092) ya estan corridas en la base.
 -- Pegalo en el SQL Editor de Supabase y presiona Run. No cambia nada, solo consulta.
 select actualizacion,
        case when ya then 'Ya está corrida' else 'FALTA correrla' end as estado
@@ -35,6 +35,7 @@ from (values
   ('0088 Pagos previos entregados en recepcion', to_regprocedure('public.conciliacion_previo_recepcion(uuid,uuid)') is not null),
   ('0089 Pagos previos de vendedores', to_regprocedure('public.conciliacion_previo_conservar(uuid,text,uuid)') is not null),
   ('0090 Fecha de pago antes de la factura', position('antes de la fecha de la venta' in pg_get_functiondef('public.ventas_before()'::regprocedure)) = 0),
-  ('0091 Orden de compra en la factura', exists (select 1 from information_schema.columns where table_schema='public' and table_name='ventas' and column_name='orden_compra'))
+  ('0091 Orden de compra en la factura', exists (select 1 from information_schema.columns where table_schema='public' and table_name='ventas' and column_name='orden_compra')),
+  ('0092 Vacaciones y permisos', to_regclass('public.rrhh_solicitudes') is not null)
 ) as x(actualizacion, ya)
 order by actualizacion;

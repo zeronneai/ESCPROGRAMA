@@ -221,7 +221,9 @@ export default async function PortalLayout({ children }: { children: React.React
   const base = NAV[user.rol].some((i) => i.href === "/norma-iso") ? NAV[user.rol] : [...NAV[user.rol], { href: "/norma-iso", label: "Norma ISO 9001", icon: "shield" as const, secondary: true }];
   // Vendedor que la jefa eligio para capturar ventas de una meta sin usuario (ej. telemarketing).
   const captura = (user.rol === "vendedor" || user.rol === "marketplaces") && !!(await (await createClient()).from("metas_venta").select("id").eq("capturista_id", user.id).limit(1)).data?.length;
-  const nav = [...base, ...(captura ? [{ href: "/captura-ventas", label: "Sumar ventas de José Ortiz", short: "Sumar", icon: "dollar" as const, secondary: true }] : [])].filter((i) => almacenOn || !RUTAS_ALMACEN_VENTAS.includes(i.href));
+  // Vacaciones y permisos (formato RR.HH.): todo el personal; la gerente y el CEO lo administran.
+  const rh = [{ href: "/rrhh", label: "Vacaciones y permisos", short: "Vacaciones", icon: "calendar" as const, secondary: true }, ...(user.rol === "gerente" || user.rol === "ceo" ? [{ href: "/rrhh/gerencia", label: "Vacaciones: administrar", short: "RR.HH.", icon: "users" as const, secondary: true }] : [])];
+  const nav = [...base, ...rh, ...(captura ? [{ href: "/captura-ventas", label: "Sumar ventas de José Ortiz", short: "Sumar", icon: "dollar" as const, secondary: true }] : [])].filter((i) => almacenOn || !RUTAS_ALMACEN_VENTAS.includes(i.href));
   return (
     <div className="min-h-screen">
       <Suspense fallback={null}>

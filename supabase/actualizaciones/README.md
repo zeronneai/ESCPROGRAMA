@@ -101,6 +101,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 84 | `0089_previo_conservar.sql` | **Pagos previos ya identificados por un vendedor**: pasan a "antes del portal" sin perder a su vendedor ni sus facturas, y sus facturas salen de la bandeja de revisión de finanzas (quedan recibidas). |
 | 85 | `0090_fecha_pago_libre.sql` | **Fecha de pago antes de la factura**: se permite (a veces facturan después del pago); solo no puede ser futura. |
 | 86 | `0091_orden_compra_factura.sql` | **Orden de compra en la factura (Pegatron)**: se lee la orden de compra impresa al subir la factura y en Pedidos Pegatron sale si cada P/O ya se facturó. |
+| 87 | `0092_rrhh_vacaciones_permisos.sql` | **Vacaciones y permisos (formato RR.HH.)**: la gerente captura fecha de ingreso y días de cada colaborador; el portal suma los días de ley en cada aniversario; solicitudes con visto bueno del jefe y autorización de la gerente; festivos, vacaciones generales y calendario. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

@@ -122,6 +122,10 @@ export function decideRoute(input: {
   if (under("/periodo-metas") && !["jefe_ventas", "comprador", "marketplaces"].includes(profile.rol)) {
     return { type: "redirect", to: homeFor(profile.rol) };
   }
+  // Vacaciones y permisos: todos piden; administra la gerente (y el CEO).
+  if (under("/rrhh/gerencia") && !["gerente", "ceo"].includes(profile.rol)) {
+    return { type: "redirect", to: "/rrhh" };
+  }
   // Pedidos al comprador: ventas, gerente y CEO.
   if (under("/pedidos-compras") && !["vendedor", "jefe_ventas", "gerente", "ceo"].includes(profile.rol)) {
     return { type: "redirect", to: homeFor(profile.rol) };

@@ -20,6 +20,7 @@ import { pedidosSuite } from "./pedidos.suite";
 import { metaProspeccionSuite } from "./meta-prospeccion.suite";
 import { metasSuite } from "./metas.suite";
 import { conciliacionSuite } from "./conciliacion.suite";
+import { rrhhSuite } from "./rrhh.suite";
 
 const seller1 = randomUUID();
 const seller2 = randomUUID();
@@ -577,6 +578,7 @@ pedidosSuite();
 metaProspeccionSuite();
 metasSuite();
 conciliacionSuite();
+rrhhSuite();
 
 afterAll(async () => {
   await pool?.end();
