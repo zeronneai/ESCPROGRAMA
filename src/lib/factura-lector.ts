@@ -112,6 +112,14 @@ function montosDeNumeros(nums: number[], pct: number | null): Montos | null {
   return null;
 }
 
+/** Un nombre de vendedor (mayusculas, con acentos y Ñ), no una condicion de pago. */
+function nombreVendedor(t: string | undefined): string | null {
+  const x = (t ?? "").normalize("NFC").replace(/\s+/g, " ").trim();
+  if (!/^\p{Lu}[\p{Lu}\p{M} .'-]{2,40}$/u.test(x)) return null;
+  if (/\b(CONTADO|CREDITO|CRÉDITO|DIAS|DÍAS|CONDICIONES|VENDEDOR|CLIENTE|RFC)\b/u.test(x)) return null;
+  return x;
+}
+
 /** Texto del PDF ya separado en renglones; dentro del renglon, columnas separadas por 2+ espacios. */
 export function leerFacturaTexto(renglones: string[], filas?: Celda[][]): FacturaLeida {
   const keep = renglones.map((l, i) => ({ l: l.replace(/\s+$/, ""), f: filas?.[i] })).filter((r) => r.l.trim());
@@ -134,16 +142,25 @@ export function leerFacturaTexto(renglones: string[], filas?: Celda[][]): Factur
     const partes = lines[ci + 1].trim().split(/\s{2,}/);
     cliente = limpiar(partes.join(" · "));
     if (/Vendedor/i.test(lines[ci])) {
-      const cand = lines[ci + 2]?.trim();
-      if (cand && /^[A-ZÁÉÍÓÚÑ .]{3,40}$/.test(cand)) vendedor = cand;
+      vendedor = nombreVendedor(lines[ci + 2]);
     }
   }
 
-  // El vendedor puede venir en el mismo renglon que el cliente, en la columna de "Vendedor".
-  if (!vendedor && ci >= 0) {
-    const xv = celdas[ci]?.find((k) => /Vendedor/i.test(k.s))?.x;
-    const cand = xv !== undefined ? celdas[ci + 1]?.find((k) => Math.abs(k.x - xv) < 40)?.s.trim() : undefined;
-    if (cand && /^[A-ZÁÉÍÓÚÑ .]{3,40}$/.test(cand)) vendedor = cand;
+  // El vendedor viene en un recuadro "Vendedor" (a la derecha del cliente): el nombre va en uno de los
+  // renglones de abajo, en esa columna. pdf.js a veces lo pone medio renglon abajo o un poco corrido.
+  if (!vendedor) {
+    const vi = lines.findIndex((l) => /(^|\s)Vendedor\s*$/i.test(l) || /(^|\s{2,})Vendedor(\s{2,}|$)/i.test(l));
+    if (vi >= 0) {
+      const xv = celdas[vi]?.find((k) => /^\s*Vendedor\s*$/i.test(k.s))?.x;
+      for (let i = vi + 1; i <= vi + 4 && !vendedor && i < lines.length; i++) {
+        if (/^\s*(Condiciones|Clave SAT)/i.test(lines[i].trim())) break;
+        const cands = xv !== undefined
+          ? (celdas[i] ?? []).filter((k) => Math.abs(k.x - xv) < 90).map((k) => k.s)
+          : [lines[i], lines[i].trim().split(/\s{2,}/).pop() ?? ""];
+        const c = cands.map(nombreVendedor).find(Boolean);
+        if (c) vendedor = c;
+      }
+    }
   }
 
   // Orden de compra (columna de la derecha, abajo de "Condiciones"): el valor va en uno de los renglones

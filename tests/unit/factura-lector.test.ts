@@ -170,6 +170,27 @@ describe("datos de cliente y cobranza", () => {
     const h = leerFacturaTexto(H.map((r) => r.map((c) => c.s).join("  ")), H);
     expect(h).toMatchObject({ nombreComercial: "Encapsuladoras México", entrega: null });
   });
+  it("vendedor en el recuadro de la derecha, medio renglon abajo (como la F11564, IVAN MUÑOZ)", () => {
+    const R: Celda[][] = [
+      [{ x: 40, s: "Serie y folio: F11564" }],
+      [{ x: 40, s: "Fecha y hora de emisión: 2026-11-27T12:13:13" }],
+      [{ x: 93, s: "Cliente" }, { x: 783, s: "Vendedor" }],
+      [{ x: 15, s: "SIGMA ALIMENTOS NORESTE S.A. DE C.V." }, { x: 418, s: "SIGMA ALIMENTOS PLANTA NOROESTE," }],
+      [{ x: 777, s: "IVAN MUN\u0303OZ" }],
+      [{ x: 15, s: "AVE. JESUS CANTU LEAL No.1320 SUR" }, { x: 418, s: "C.PERIFERICO V. LOMBARDO TOLEDANO No.100 -  -" }, { x: 770, s: "Condiciones" }],
+      [{ x: 15, s: "COL. BUENOS AIRES" }, { x: 765, s: "CREDITO 30 DIAS" }],
+      [{ x: 15, s: "MONTERREY, NUEVO LEON CP: 64800" }, { x: 760, s: "Orden de compra" }],
+      [{ x: 15, s: "RFC: SAN-920216-EI1" }, { x: 418, s: ", ; C.P. :" }, { x: 776, s: "4520314763" }],
+    ];
+    const f = leerFacturaTexto(R.map((r) => r.map((c) => c.s).join("  ")), R);
+    expect(f.vendedor).toBe("IVAN MUÑOZ");
+    expect(f.ordenCompra).toBe("4520314763");
+    // Sin posiciones (solo texto) tambien
+    expect(leerFacturaTexto(R.map((r) => r.map((c) => c.s).join("  "))).vendedor).toBe("IVAN MUÑOZ");
+    // En el mismo renglon que el cliente, con la condicion de pago abajo
+    const S = R.filter((r) => !r.some((c) => c.s.startsWith("IVAN"))).map((r) => (r.some((c) => c.s.startsWith("SIGMA ALIMENTOS NORESTE")) ? [...r, { x: 790, s: "IVAN MUÑOZ" }] : r));
+    expect(leerFacturaTexto(S.map((r) => r.map((c) => c.s).join("  ")), S).vendedor).toBe("IVAN MUÑOZ");
+  });
   it("contado o credito", () => {
     expect(pagoDe("PUE", null, null, null)).toEqual({ pago: "contado", dias: null });
     expect(pagoDe("PPD", null, "2026-11-01", "2026-12-01")).toEqual({ pago: "credito", dias: 30 });
