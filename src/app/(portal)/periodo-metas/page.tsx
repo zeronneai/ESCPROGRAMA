@@ -1,6 +1,7 @@
 import { Card, PageHeader } from "@/components/ui";
 import { ConfigPeriodo } from "@/components/metas/config-periodo";
 import { LeerSubtotales } from "@/components/ventas/leer-subtotales";
+import { RevisionFacturas, type FilaRevision } from "@/components/metas/revision-facturas";
 import { requireRoles } from "@/lib/auth/sales";
 import { createClient } from "@/lib/supabase/server";
 
@@ -20,6 +21,7 @@ export default async function PeriodoMetas() {
         supabase.from("ventas").select("id", { count: "exact", head: true }).is("vendedor_factura", null).is("cancelada_at", null).or(conArchivo),
       ])
     : [{ count: null }, { count: null }];
+  const rev = lee ? await supabase.rpc("metas_revision_facturas") : null;
   return (
     <div className="space-y-5">
       <PageHeader title="Periodo de metas" subtitle="Desde y hasta qué día cuentan las metas de venta. La meta del mes se ajusta en proporción a esos días." />
@@ -31,6 +33,13 @@ export default async function PeriodoMetas() {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Leer datos de las facturas</h2>
           <p className="text-xs text-slate-500">Abre las facturas ya subidas y guarda su subtotal exacto sin IVA y el vendedor que viene impreso (ej. CASA LOCAL), para que las metas cuenten bien.</p>
           <LeerSubtotales pendientes={estimados} sinVendedor={sinVendedor ?? 0} />
+        </Card>
+      )}
+      {rev && (
+        <Card className="space-y-2 p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">¿A quién le cuenta cada factura?</h2>
+          <p className="text-xs text-slate-500">Facturas del periodo de metas con el vendedor que se leyó de la factura y a qué meta van. Las de Iván Muñoz dicen "Solo equipo". Con "Probar lector" ves qué encuentra el portal en el PDF y puedes corregir el vendedor.</p>
+          {rev.error ? <p className="text-sm text-amber-800">Falta correr la actualización 0101 en Supabase.</p> : <RevisionFacturas filas={(rev.data ?? []) as FilaRevision[]} />}
         </Card>
       )}
     </div>

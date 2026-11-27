@@ -110,6 +110,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 93 | `0098_estados_cuenta_diarios.sql` | **Recordatorio diario de estados de cuenta**: barra roja a la auxiliar de finanzas con las cuentas que faltan subir hoy (lunes a viernes, antes de las 9 am); cuentas sin abonos se marcan. |
 | 94 | `0099_metas_solo_equipo.sql` | **Facturas de Iván Muñoz en metas**: no cuentan para la meta de quien las subió, sí para el total del equipo. Lo demás (pagos, comisiones, recepción) no cambia. |
 | 95 | `0100_metas_vts.sql` | **VTS Cd Juárez igual que Casa Local**: sus facturas cuentan para su meta (no para quien las subió) y para el equipo; sale en la gráfica junto a Casa Local. |
+| 96 | `0101_metas_revision_facturas.sql` | **Revisar a quién le cuenta cada factura en metas** (comprador, jefa, gerente): vendedor leído, meta a la que va, probar el lector y corregir. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 
