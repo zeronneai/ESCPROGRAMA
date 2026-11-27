@@ -179,7 +179,7 @@ export function operacionesSuite() {
       expect(await notif(people.jefa.id, "consumo_por_aprobar", c.id)).toBe(1);
       expect((await q(w.buyer1, "select id from public.consumo_solicitudes where id=$1", [c.id])).rowCount).toBe(0);
       await q(w.seller1, "update public.consumo_solicitudes set cantidad=3 where id=$1", [c.id]);
-      expect(await failure(q(w.seller1, "select public.consumo_aprobar($1,true)", [c.id]))).toMatch(/jefa/);
+      expect(await failure(q(w.seller1, "select public.consumo_aprobar($1,true)", [c.id]))).toMatch(/permiso/i);
       expect(await failure(q(w.buyer1, "select public.consumo_avance($1,'en_proceso')", [c.id]))).toMatch(/no esta aprobada/);
       expect(await failure(q(w.seller1, "update public.consumo_solicitudes set estado='aprobada' where id=$1", [c.id]))).toMatch(/permission denied|botones/);
       await q(A("jefa"), "select public.consumo_aprobar($1,true,'Ok')", [c.id]);
@@ -196,8 +196,14 @@ export function operacionesSuite() {
       expect(await failure(q(A("jefa"), "select public.consumo_aprobar($1,false)", [r]))).toMatch(/motivo/);
       await q(A("jefa"), "select public.consumo_aprobar($1,false,'El mes que entra')", [r]);
       expect((await q(w.buyer1, "select id from public.consumo_solicitudes where id=$1", [r])).rowCount).toBe(0);
-      const own = (await q(A("jefa"), "insert into public.consumo_solicitudes (tipo, categoria, descripcion, cantidad, motivo) values ('producto','limpieza','Cloro',3,'Limpieza oficina') returning estado")).rows[0];
-      expect(own.estado).toBe("aprobada");
+      // Lo que pide la jefa (y almacen, finanzas...) lo aprueba la gerente, no la jefa.
+      const own = (await q(A("jefa"), "insert into public.consumo_solicitudes (tipo, categoria, descripcion, cantidad, motivo) values ('producto','limpieza','Cloro',3,'Limpieza oficina') returning id, estado, aprobador_rol")).rows[0];
+      expect(own).toMatchObject({ estado: "por_aprobar", aprobador_rol: "gerente" });
+      expect(await notif(people.gerente.id, "consumo_por_aprobar", own.id)).toBe(1);
+      expect(await failure(q(A("jefa"), "select public.consumo_aprobar($1,true)", [own.id]))).toMatch(/gerente/);
+      await q(A("gerente"), "select public.consumo_aprobar($1,true,'Ok')", [own.id]);
+      const ger = (await q(A("gerente"), "insert into public.consumo_solicitudes (tipo, categoria, descripcion, cantidad, motivo) values ('producto','limpieza','Jabon',1,'Limpieza oficina') returning estado")).rows[0];
+      expect(ger.estado).toBe("aprobada");
       expect(await failure(q(w.buyer1, "insert into public.consumo_solicitudes (tipo, categoria, descripcion, cantidad, motivo) values ('producto','limpieza','Cloro',3,'Limpieza')"))).toMatch(/row-level security/);
     });
 

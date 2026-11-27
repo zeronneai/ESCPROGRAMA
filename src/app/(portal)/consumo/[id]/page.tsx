@@ -62,7 +62,7 @@ export default async function ConsumoDetalle({ params }: { params: Promise<{ id:
         />
       </Card>
       <ConsumoPanel
-        c={{ id: c.id, estado, tipo, fecha_programada: c.fecha_programada }}
+        c={{ id: c.id, estado, tipo, fecha_programada: c.fecha_programada, aprobador_rol: c.aprobador_rol ?? null }}
         role={u.rol}
         isOwner={c.solicitante_id === u.id}
         form={{ tipo: c.tipo, categoria: c.categoria, descripcion: c.descripcion, cantidad: String(Number(c.cantidad)), unidad: c.unidad ?? "", motivo: c.motivo, urgente: c.urgente }}

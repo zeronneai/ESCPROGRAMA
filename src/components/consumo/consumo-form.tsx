@@ -55,7 +55,7 @@ export function ConsumoForm({ id, initial, onDone }: { id: string | null; initia
       <Field label="¿Para qué se necesita? *">
         <textarea value={v.motivo as string} onChange={set("motivo")} rows={2} className={areaCls} placeholder={servicio ? "Ej. Ya le toca servicio por kilometraje" : "Ej. Se acabaron, se usan para imprimir cotizaciones"} />
       </Field>
-      <p className="text-xs text-slate-500">La jefa de ventas la aprueba y después el comprador la pide o la agenda. Verás cada paso aquí.</p>
+      <p className="text-xs text-slate-500">Lo de vendedores lo aprueba la jefa de ventas; lo de las demás áreas, la gerente. Después el comprador la pide o la agenda. Verás cada paso aquí.</p>
       <div className="flex gap-2">
         <Button type="submit" loading={busy === "save"}>{id ? "Guardar cambios" : "Enviar solicitud"}</Button>
         {onDone && <Button type="button" variant="ghost" onClick={onDone}>Cancelar</Button>}

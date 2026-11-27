@@ -36,7 +36,7 @@ export async function saveConsumoAction(id: string | null, input: ConsumoInput):
 
 export async function aprobarConsumoAction(id: string, aprobar: boolean, nota: string): Promise<Result> {
   const u = await requireUser();
-  if (u.rol !== "jefe_ventas") return { ok: false, error: "Solo la jefa de ventas aprueba." };
+  if (!["jefe_ventas", "gerente", "ceo"].includes(u.rol)) return { ok: false, error: "Aprueban la jefa de ventas (lo de vendedores) o la gerente." };
   if (!uuid.safeParse(id).success) return { ok: false, error: "Solicitud inválida" };
   const supabase = await createClient();
   const { error } = await supabase.rpc("consumo_aprobar", { p_id: id, p_aprobar: aprobar, p_nota: nota.trim() || null });

@@ -12,13 +12,14 @@ const refrescar = () => {
   revalidatePath("/rrhh");
   revalidatePath("/rrhh/gerencia");
 };
-const msg = (m: string) => (/rrhh_/.test(m) && /exist|does not|no existe/i.test(m) ? "Falta correr la actualización 0092 en Supabase." : friendlyError(m));
+const msg = (m: string) => (/rrhh_/.test(m) && /exist|does not|no existe|could not find/i.test(m) ? "Falta correr la actualización 0092 o 0093 en Supabase." : friendlyError(m));
 const esGerente = (rol: string) => rol === "gerente" || rol === "ceo";
 const fecha = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha inválida");
 const uuid = z.string().uuid();
 
 const solicitud = z
   .object({
+    colaborador_id: uuid.nullable().optional(),
     tipo: z.enum(["vacaciones", "permiso"]),
     permiso_tipo: z.enum(["llegar_tarde", "salir_temprano", "ausentarse"]).nullable(),
     desde: fecha,
@@ -69,11 +70,26 @@ export async function contarDiasRhAction(desde: string, hasta: string): Promise<
   return error ? null : (data as number);
 }
 
-export async function resolverRhAction(id: string, accion: "visto" | "aprobar" | "rechazar", comentario?: string): Promise<Result> {
+/** Visto bueno del jefe, autorizacion de la gerente (puede cambiar el tipo y los dias) o rechazo. */
+export async function resolverRhAction(
+  id: string,
+  accion: "visto" | "aprobar" | "rechazar",
+  comentario?: string,
+  cambio?: { tipo: "vacaciones" | "permiso"; permiso_tipo?: string | null; dias?: number | null },
+): Promise<Result> {
   await requireUser();
   if (!uuid.safeParse(id).success || !["visto", "aprobar", "rechazar"].includes(accion)) return { ok: false, error: "Solicitud inválida" };
+  const dias = cambio?.dias;
+  if (dias !== undefined && dias !== null && !(Number.isFinite(dias) && dias >= 0 && dias <= 60)) return { ok: false, error: "Días inválidos" };
   const supabase = await createClient();
-  const { error } = await supabase.rpc("rrhh_resolver", { p_id: id, p_accion: accion, p_comentario: comentario?.trim() || null });
+  const { error } = await supabase.rpc("rrhh_resolver", {
+    p_id: id,
+    p_accion: accion,
+    p_comentario: comentario?.trim() || null,
+    p_tipo: accion === "aprobar" ? (cambio?.tipo ?? null) : null,
+    p_permiso_tipo: accion === "aprobar" ? (cambio?.permiso_tipo ?? null) : null,
+    p_dias: accion === "aprobar" ? (dias ?? null) : null,
+  });
   if (error) return { ok: false, error: msg(error.message) };
   refrescar();
   return { ok: true };
@@ -100,11 +116,12 @@ async function gerente() {
 
 const empleado = z
   .object({
-    profile_id: uuid,
+    colaborador_id: uuid.nullable(),
+    profile_id: uuid.nullable(),
+    nombre: z.string().trim().max(120).nullable(),
     fecha_ingreso: fecha,
     puesto: z.string().trim().max(80).nullable(),
     departamento: z.string().trim().max(80).nullable(),
-    jefe_id: uuid.nullable(),
     saldo_inicial: z.number({ error: "Pon los días que le quedan." }).min(-60).max(400),
     saldo_al: fecha,
     notas: z.string().trim().max(500).nullable(),
@@ -116,14 +133,37 @@ export async function guardarEmpleadoRhAction(input: z.input<typeof empleado>): 
   try {
     await gerente();
   } catch {
-    return { ok: false, error: "Solo la gerente captura colaboradores." };
+    return { ok: false, error: "Solo la gerente captura los días." };
   }
   const p = empleado.safeParse(input);
   if (!p.success) return { ok: false, error: p.error.issues[0].message };
-  if (p.data.jefe_id === p.data.profile_id) return { ok: false, error: "El jefe inmediato no puede ser la misma persona." };
+  const { colaborador_id, ...rest } = p.data;
   const supabase = await createClient();
-  const { error } = await supabase.from("rrhh_empleados").upsert({ ...p.data, puesto: p.data.puesto || null, departamento: p.data.departamento || null, notas: p.data.notas || null });
+  const { error } = await supabase.rpc("rrhh_empleado_guardar", { p: { ...rest, id: colaborador_id } });
   if (error) return { ok: false, error: msg(error.message) };
+  refrescar();
+  return { ok: true };
+}
+
+const externo = z
+  .object({
+    id: uuid.nullable(),
+    nombre: z.string().trim().min(2, "Escribe el nombre.").max(120),
+    puesto: z.string().trim().max(80).nullable(),
+    activo: z.boolean().optional(),
+    jefe_rol: z.enum(["jefe_ventas", "supervisor_almacen", "supervisor_finanzas"]).nullable().optional(),
+  })
+  .strict();
+
+/** Colaborador sin portal: lo da de alta el supervisor de almacen (o la gerente). */
+export async function guardarExternoRhAction(input: z.input<typeof externo>): Promise<Result> {
+  const u = await requireUser();
+  if (!esGerente(u.rol) && u.rol !== "supervisor_almacen") return { ok: false, error: "Solo el supervisor de almacén o la gerente." };
+  const p = externo.safeParse(input);
+  if (!p.success) return { ok: false, error: p.error.issues[0].message };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("rrhh_externo_guardar", { p: p.data });
+  if (error) return { ok: false, error: /rrhh_externo_guardar/.test(error.message) ? "Falta correr la actualización 0093 en Supabase." : msg(error.message) };
   refrescar();
   return { ok: true };
 }

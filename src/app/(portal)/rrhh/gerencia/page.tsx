@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { CalendarioRh } from "@/components/rrhh/calendario";
-import { EmpleadoRh, FestivosRh, ReglasRh, TemporadaRh } from "@/components/rrhh/gerencia";
+import { EmpleadoRh, ExternoRh, FestivosRh, ReglasRh, TemporadaRh } from "@/components/rrhh/gerencia";
 import { SolicitudFila } from "@/components/rrhh/solicitud-fila";
 import { requireRoles } from "@/lib/auth/sales";
 import { ROL_LABEL } from "@/lib/ops/roles";
-import { fechaRh, num, rangoRh, type EventoCal, type Saldo, type Solicitud } from "@/lib/rrhh";
+import { fechaRh, num, quienAutoriza, rangoRh, type EventoCal, type Saldo, type Solicitud } from "@/lib/rrhh";
 import type { Rol } from "@/lib/auth/route-guard";
 import { createClient } from "@/lib/supabase/server";
 
@@ -89,20 +89,27 @@ export default async function RrhhGerencia({ searchParams }: { searchParams: Pro
 
       {tab === "colaboradores" && (
         <section className="space-y-2">
-          <p className="text-sm text-slate-600">Para arrancar, de cada colaborador pon su <b>fecha de ingreso</b> y los <b>días de vacaciones que le quedan hoy</b>. A partir de ahí el portal suma los días de ley en cada aniversario y resta lo que autorices y las vacaciones generales.</p>
+          <p className="text-sm text-slate-600">Aquí están <b>todos</b> los del sistema y los colaboradores sin portal. De cada uno pon su <b>fecha de ingreso</b> y los <b>días de vacaciones que le quedan hoy</b>. A partir de ahí el portal suma los días de ley en cada aniversario y resta lo que autorices y las vacaciones generales.</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <ExternoRh gerente />
+            <span className="text-xs text-slate-500">Para los que no tienen usuario (ej. cargadores de almacén). El supervisor de almacén también los puede dar de alta.</span>
+          </div>
           <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-sm">
             {todos.map((s) => (
-              <li key={s.empleado_id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+              <li key={s.colaborador_id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
                 <div className="min-w-0">
-                  <p className="font-semibold">{s.nombre} <span className="text-xs font-normal text-slate-500">{s.puesto ?? ROL_LABEL[s.rol as Rol] ?? s.rol}</span></p>
+                  <p className="font-semibold">
+                    {s.nombre} <span className="text-xs font-normal text-slate-500">{s.puesto ?? (s.rol ? ROL_LABEL[s.rol as Rol] ?? s.rol : "")}</span>
+                    {s.sin_portal && <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">SIN PORTAL</span>}
+                  </p>
                   {s.capturado ? (
                     <p className="text-xs text-slate-500">
                       Ingreso {fechaRh(s.fecha_ingreso)} · {s.anios} {s.anios === 1 ? "año" : "años"} · por ley {s.dias_ley} días · aniversario {fechaRh(s.proximo_aniversario)} (+{s.dias_proximo})
-                      {s.jefe_nombre ? ` · jefe: ${s.jefe_nombre}` : ""}
                     </p>
                   ) : (
                     <p className="text-xs text-amber-700">Sin capturar</p>
                   )}
+                  <p className="text-[11px] text-slate-400">Autoriza: {quienAutoriza(s.jefe_rol)}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   {s.capturado && (
@@ -111,7 +118,8 @@ export default async function RrhhGerencia({ searchParams }: { searchParams: Pro
                       <p className="text-[11px] text-slate-500">disponibles{Number(s.pendientes) > 0 ? ` · ${num(s.pendientes)} en espera` : ""}</p>
                     </div>
                   )}
-                  <EmpleadoRh s={s} todos={todos} hoy={hoy} />
+                  <EmpleadoRh s={s} hoy={hoy} />
+                  {s.sin_portal && <ExternoRh s={s} gerente />}
                 </div>
               </li>
             ))}

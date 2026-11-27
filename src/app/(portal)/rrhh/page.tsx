@@ -4,7 +4,10 @@ import { CalendarioRh } from "@/components/rrhh/calendario";
 import { SolicitarRh } from "@/components/rrhh/solicitar";
 import { SolicitudFila } from "@/components/rrhh/solicitud-fila";
 import { requireUser } from "@/lib/auth/guards";
-import { fechaRh, num, type EventoCal, type Saldo, type Solicitud } from "@/lib/rrhh";
+import { ExternoRh } from "@/components/rrhh/gerencia";
+import { ROL_LABEL } from "@/lib/ops/roles";
+import type { Rol } from "@/lib/auth/route-guard";
+import { fechaRh, num, quienAutoriza, type EventoCal, type Saldo, type Solicitud } from "@/lib/rrhh";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +48,10 @@ export default async function RrhhPage({ searchParams }: { searchParams: Promise
   const equipoPend = equipo.filter((s) => s.estado === "pendiente");
   const c = cfg.data ?? { sabado_laborable: true, anticipacion_dias: 0, adelanto_max: 0 };
   const gerente = user.rol === "gerente" || user.rol === "ceo";
+  // Jefes (jefa de ventas, sup. de almacen, sup. de finanzas): ven los dias de su equipo.
+  const miEquipo = gerente ? [] : todos.filter((s) => s.empleado_id !== user.id);
+  const sinPortal = todos.filter((s) => s.sin_portal);
+  const puedeSinPortal = user.rol === "supervisor_almacen";
 
   const Card = ({ t, v, sub, tono = "" }: { t: string; v: string; sub?: string; tono?: string }) => (
     <div className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${tono}`}>
@@ -73,7 +80,7 @@ export default async function RrhhPage({ searchParams }: { searchParams: Promise
           <details className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
             <summary className="cursor-pointer font-medium text-slate-700">¿Cómo se calculan mis días?</summary>
             <ul className="mt-2 space-y-1 text-slate-600">
-              <li>Ingreso: <b>{fechaRh(yo.fecha_ingreso)}</b>{yo.puesto ? ` · ${yo.puesto}` : ""}{yo.jefe_nombre ? ` · Jefe inmediato: ${yo.jefe_nombre}` : ""}</li>
+              <li>Ingreso: <b>{fechaRh(yo.fecha_ingreso)}</b>{yo.puesto ? ` · ${yo.puesto}` : ""}{` · Autoriza: ${quienAutoriza(yo.jefe_rol).toLowerCase()}`}</li>
               <li>Te quedaban <b>{num(yo.saldo_inicial)}</b> días al {fechaRh(yo.saldo_al)} (lo capturó la gerente).</li>
               {Number(yo.ganados) > 0 && <li>+ {num(yo.ganados)} días ganados en tu aniversario.</li>}
               {Number(yo.usados) > 0 && <li>− {num(yo.usados)} días de vacaciones autorizadas.</li>}
@@ -88,11 +95,54 @@ export default async function RrhhPage({ searchParams }: { searchParams: Promise
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">La gerente todavía no captura tu fecha de ingreso y los días que te quedan. En cuanto lo haga, aquí vas a ver tus días disponibles.</p>
       )}
 
-      <SolicitarRh disponible={yo?.disponible ?? null} capturado={!!yo?.capturado} hoy={hoy} anticipacion={c.anticipacion_dias} adelanto={c.adelanto_max} />
+      <SolicitarRh
+        disponible={yo?.disponible ?? null}
+        capturado={!!yo?.capturado}
+        hoy={hoy}
+        anticipacion={c.anticipacion_dias}
+        adelanto={c.adelanto_max}
+        para={puedeSinPortal ? sinPortal.map((x) => ({ id: x.colaborador_id, nombre: x.nombre, capturado: x.capturado, disponible: x.disponible })) : []}
+      />
+
+      {(miEquipo.length > 0 || puedeSinPortal) && (
+        <section className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-semibold">Días de mi equipo</h2>
+            {puedeSinPortal && <ExternoRh gerente={false} />}
+          </div>
+          {puedeSinPortal && <p className="text-xs text-slate-500">Los que no tienen portal: dalos de alta con su nombre y pide por ellos arriba en "¿Para quién?". La gerente les captura la fecha de ingreso y los días.</p>}
+          {miEquipo.length > 0 ? (
+            <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-sm">
+              {miEquipo.map((s) => (
+                <li key={s.colaborador_id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
+                  <div className="min-w-0">
+                    <p className="font-medium">
+                      {s.nombre} <span className="text-xs font-normal text-slate-500">{s.puesto ?? (s.rol ? ROL_LABEL[s.rol as Rol] ?? s.rol : "")}</span>
+                      {s.sin_portal && <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">SIN PORTAL</span>}
+                    </p>
+                    <p className="text-xs text-slate-500">{s.capturado ? `Ingreso ${fechaRh(s.fecha_ingreso)} · por ley ${s.dias_ley} días · ${s.permisos_anio} permisos este año` : "La gerente aún no captura sus días"}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {s.capturado && (
+                      <div className="text-right">
+                        <p className="text-lg font-bold">{num(s.disponible)}</p>
+                        <p className="text-[11px] text-slate-500">disponibles{Number(s.pendientes) > 0 ? ` · ${num(s.pendientes)} en espera` : ""}</p>
+                      </div>
+                    )}
+                    {puedeSinPortal && s.sin_portal && <ExternoRh s={s} gerente={false} />}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-slate-500">Todavía no hay nadie en tu equipo.</p>
+          )}
+        </section>
+      )}
 
       {equipo.length > 0 && (
         <section className="space-y-2">
-          <h2 className="text-base font-semibold">Mi equipo {equipoPend.length > 0 && <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">{equipoPend.length} por dar visto bueno</span>}</h2>
+          <h2 className="text-base font-semibold">Solicitudes de mi equipo {equipoPend.length > 0 && <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">{equipoPend.length} por dar visto bueno</span>}</h2>
           <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-sm">{equipo.slice(0, 30).map((s) => <SolicitudFila key={s.id} s={s} modo="jefe" hoy={hoy} />)}</ul>
         </section>
       )}

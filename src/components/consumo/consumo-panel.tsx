@@ -14,7 +14,7 @@ export function ConsumoPanel({
   events,
   form,
 }: {
-  c: { id: string; estado: ConsumoEstado; tipo: "producto" | "servicio"; fecha_programada: string | null };
+  c: { id: string; estado: ConsumoEstado; tipo: "producto" | "servicio"; fecha_programada: string | null; aprobador_rol?: string | null };
   role: string;
   isOwner: boolean;
   events: TimelineEvent[];
@@ -24,13 +24,15 @@ export function ConsumoPanel({
   const [nota, setNota] = useState("");
   const [fecha, setFecha] = useState(c.fecha_programada ?? "");
   const { run, busy, notice } = useRun();
-  const canComment = isOwner || role === "jefe_ventas" || role === "comprador";
+  const canComment = isOwner || role === "jefe_ventas" || role === "comprador" || role === "gerente" || role === "ceo";
+  // La jefa aprueba lo de vendedores; la gerente lo demas (y puede tambien lo de vendedores).
+  const apruebo = !isOwner && c.estado === "por_aprobar" && (role === "gerente" || role === "ceo" || (role === "jefe_ventas" && (c.aprobador_rol ?? "jefe_ventas") === "jefe_ventas"));
 
   return (
     <div className="space-y-4">
       {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
 
-      {role === "jefe_ventas" && c.estado === "por_aprobar" && (
+      {apruebo && (
         <Card className="space-y-3 border-amber-200 bg-amber-50">
           <h2 className="text-sm font-semibold text-amber-900">¿Apruebas esta solicitud?</h2>
           <textarea value={nota} onChange={(e) => setNota(e.target.value)} rows={2} className={areaCls} placeholder="Comentario (obligatorio si la rechazas)" />

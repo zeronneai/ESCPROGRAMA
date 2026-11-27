@@ -249,10 +249,12 @@ async function guias(c: Ctx, propias: boolean, mkt: boolean): Promise<Bloque> {
 }
 
 async function consumo(c: Ctx, modo: "propio" | "aprobar" | "atender" | "lectura"): Promise<Bloque> {
-  const { data } = await c.sb.from("consumo_solicitudes").select("estado, solicitante_id, urgente, fecha_programada").in("estado", ["por_aprobar", "aprobada", "en_proceso"]).limit(5000);
-  const rows = (data ?? []) as { estado: string; solicitante_id: string; urgente: boolean; fecha_programada: string | null }[];
+  const { data } = await c.sb.from("consumo_solicitudes").select("*").in("estado", ["por_aprobar", "aprobada", "en_proceso"]).limit(5000);
+  const rows = (data ?? []) as { estado: string; solicitante_id: string; urgente: boolean; fecha_programada: string | null; aprobador_rol?: string | null }[];
   const mias = rows.filter((r) => r.solicitante_id === c.uid);
-  const porAprobar = rows.filter((r) => r.estado === "por_aprobar").length;
+  // La jefa aprueba lo de vendedores; la gerente lo demas.
+  const miRol = c.rol === "gerente" || c.rol === "ceo" ? "gerente" : "jefe_ventas";
+  const porAprobar = rows.filter((r) => r.estado === "por_aprobar" && (modo !== "aprobar" || (r.solicitante_id !== c.uid && (r.aprobador_rol ?? "jefe_ventas") === miRol))).length;
   const aprobadas = rows.filter((r) => r.estado === "aprobada").length;
   const enProceso = rows.filter((r) => r.estado === "en_proceso").length;
   const urgentes = rows.filter((r) => r.urgente && r.estado !== "en_proceso").length;
@@ -500,7 +502,7 @@ export async function cargarTablero(sb: SupabaseClient, uid: string, rol: Rol, t
       case "ceo":
         return [pagos(c), ventas(c, false), cotizacionesCompras(c, true), calidad(c, false), guias(c, false, false), consumo(c, "lectura"), encuesta(c, false), evalProveedores(c), controlCambios(c)];
       case "gerente":
-        return [ventas(c, false), cotizacionesCompras(c, true, true), calidad(c, false), guias(c, false, false), consumo(c, "lectura"), prospeccion(c, false), encuesta(c, false), evalProveedores(c), controlCambios(c)];
+        return [ventas(c, false), cotizacionesCompras(c, true, true), calidad(c, false), guias(c, false, false), consumo(c, "aprobar"), prospeccion(c, false), encuesta(c, false), evalProveedores(c), controlCambios(c)];
       case "coordinador_iso":
         return [calidad(c, false), controlCambios(c), encuesta(c, false), evalProveedores(c), soloResumen(ventas(c, false)), soloResumen(guias(c, false, false))];
       case "marketplaces":

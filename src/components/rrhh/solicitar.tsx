@@ -10,10 +10,17 @@ import { num, PERMISO_LABEL, type PermisoTipo, type TipoSolicitud } from "@/lib/
 const inp = "w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200";
 
 /** Formulario unico: vacaciones (descuenta dias) o permiso (llegar tarde, salir temprano, ausentarse). */
-export function SolicitarRh({ disponible, capturado, hoy, anticipacion, adelanto }: { disponible: number | null; capturado: boolean; hoy: string; anticipacion: number; adelanto: number }) {
+type Para = { id: string; nombre: string; capturado: boolean; disponible: number | null };
+
+export function SolicitarRh({ disponible: dispYo, capturado: capYo, hoy, anticipacion: antYo, adelanto, para = [] }: { disponible: number | null; capturado: boolean; hoy: string; anticipacion: number; adelanto: number; para?: Para[] }) {
   const router = useRouter();
   const [pend, start] = useTransition();
-  const [tipo, setTipo] = useState<TipoSolicitud>(capturado ? "vacaciones" : "permiso");
+  const [quien, setQuien] = useState("");
+  const otro = para.find((x) => x.id === quien) ?? null;
+  const disponible = otro ? otro.disponible : dispYo;
+  const capturado = otro ? otro.capturado : capYo;
+  const anticipacion = otro ? 0 : antYo;
+  const [tipo, setTipo] = useState<TipoSolicitud>(capYo ? "vacaciones" : "permiso");
   const [ptipo, setPtipo] = useState<PermisoTipo>("llegar_tarde");
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
@@ -52,6 +59,7 @@ export function SolicitarRh({ disponible, capturado, hoy, anticipacion, adelanto
     fd.set(
       "datos",
       JSON.stringify({
+        colaborador_id: otro?.id ?? null,
         tipo,
         permiso_tipo: tipo === "permiso" ? ptipo : null,
         desde,
@@ -65,7 +73,7 @@ export function SolicitarRh({ disponible, capturado, hoy, anticipacion, adelanto
     start(async () => {
       const r = await solicitarRhAction(fd);
       if (!r.ok) return toast(r.error, "error");
-      toast("Listo: tu solicitud se mandó para autorizar.", "success");
+      toast(otro ? `Listo: se registró para ${otro.nombre}.` : "Listo: tu solicitud se mandó para autorizar.", "success");
       setDesde(""); setHasta(""); setHora(""); setMotivo(""); setDias(null);
       if (archivo.current) archivo.current.value = "";
       router.refresh();
@@ -74,6 +82,15 @@ export function SolicitarRh({ disponible, capturado, hoy, anticipacion, adelanto
 
   return (
     <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      {para.length > 0 && (
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-slate-700">¿Para quién?</span>
+          <select className={inp} value={quien} onChange={(e) => setQuien(e.target.value)}>
+            <option value="">Para mí</option>
+            {para.map((x) => <option key={x.id} value={x.id}>{x.nombre} (sin portal)</option>)}
+          </select>
+        </label>
+      )}
       <div className="flex flex-wrap gap-2">
         {(["vacaciones", "permiso"] as const).map((t) => (
           <button key={t} type="button" onClick={() => setTipo(t)} className={`rounded-full border px-4 py-1.5 text-sm font-medium ${tipo === t ? "border-brand-600 bg-brand-600 text-white" : "border-slate-300 bg-white text-slate-700 hover:border-brand-400"}`}>
@@ -83,7 +100,7 @@ export function SolicitarRh({ disponible, capturado, hoy, anticipacion, adelanto
       </div>
 
       {tipo === "vacaciones" && !capturado ? (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Para pedir vacaciones, la gerente primero tiene que capturar tu fecha de ingreso y tus días. Los permisos sí los puedes pedir.</p>
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{otro ? `Para pedir vacaciones de ${otro.nombre}, la gerente primero tiene que capturar su fecha de ingreso y sus días. Los permisos sí se pueden pedir.` : "Para pedir vacaciones, la gerente primero tiene que capturar tu fecha de ingreso y tus días. Los permisos sí los puedes pedir."}</p>
       ) : (
         <>
           {tipo === "permiso" && (
@@ -98,7 +115,7 @@ export function SolicitarRh({ disponible, capturado, hoy, anticipacion, adelanto
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <label className="block text-sm">
               <span className="mb-1 block font-medium text-slate-700">{tipo === "vacaciones" ? "Desde" : ptipo === "ausentarse" ? "Desde el día" : "Día"}</span>
-              <input type="date" className={inp} value={desde} min={tipo === "vacaciones" ? minVac : undefined} onChange={(e) => setDesde(e.target.value)} />
+              <input type="date" className={inp} value={desde} min={tipo === "vacaciones" && !otro ? minVac : undefined} onChange={(e) => setDesde(e.target.value)} />
             </label>
             {(tipo === "vacaciones" || ptipo === "ausentarse") && (
               <label className="block text-sm">
@@ -116,7 +133,7 @@ export function SolicitarRh({ disponible, capturado, hoy, anticipacion, adelanto
           {tipo === "vacaciones" && dias !== null && (
             <p className={`rounded-lg px-3 py-2 text-sm ${excede ? "bg-red-50 text-red-700" : "bg-brand-50 text-brand-800"}`}>
               Se descuentan <b>{dias}</b> {dias === 1 ? "día" : "días"} (no cuentan domingos, festivos ni vacaciones generales).
-              {disponible !== null && <> Tienes <b>{num(disponible)}</b> disponibles{excede ? ", no te alcanzan." : "."}</>}
+              {disponible !== null && <> {otro ? "Tiene" : "Tienes"} <b>{num(disponible)}</b> disponibles{excede ? ", no te alcanzan." : "."}</>}
             </p>
           )}
           <label className="block text-sm">

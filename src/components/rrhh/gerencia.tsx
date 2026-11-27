@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { agregarFestivoRhAction, borrarTemporadaRhAction, guardarEmpleadoRhAction, guardarReglasRhAction, guardarTemporadaRhAction, quitarFestivoRhAction } from "@/actions/rrhh";
+import { guardarExternoRhAction, agregarFestivoRhAction, borrarTemporadaRhAction, guardarEmpleadoRhAction, guardarReglasRhAction, guardarTemporadaRhAction, quitarFestivoRhAction } from "@/actions/rrhh";
 import { toast } from "@/components/feedback-global";
 import { Button } from "@/components/ui";
-import { DIAS_SEMANA, diasEntre, diasLey, fechaRh, isoDow, type Saldo } from "@/lib/rrhh";
+import { DIAS_SEMANA, diasEntre, diasLey, fechaRh, isoDow, JEFE_LABEL, type JefeRol, type Saldo } from "@/lib/rrhh";
 
 const inp = "w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200";
 const lbl = "mb-1 block text-xs font-medium text-slate-600";
@@ -19,14 +19,14 @@ function aniosA(ingreso: string, hoy: string): number {
 }
 
 /** La gerente captura el arranque de un colaborador: ingreso, puesto, jefe y dias que le quedan hoy. */
-export function EmpleadoRh({ s, todos, hoy }: { s: Saldo; todos: Saldo[]; hoy: string }) {
+export function EmpleadoRh({ s, hoy }: { s: Saldo; hoy: string }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
   const [pend, start] = useTransition();
   const [ingreso, setIngreso] = useState(s.fecha_ingreso ?? "");
   const [puesto, setPuesto] = useState(s.puesto ?? "");
   const [depto, setDepto] = useState(s.departamento ?? "");
-  const [jefe, setJefe] = useState(s.jefe_id ?? "");
+  const [nombre, setNombre] = useState(s.nombre);
   const [saldo, setSaldo] = useState(s.saldo_inicial !== null ? String(s.saldo_inicial) : "");
   const [al, setAl] = useState(s.saldo_al ?? hoy);
   const n = aniosA(ingreso, hoy);
@@ -35,9 +35,9 @@ export function EmpleadoRh({ s, todos, hoy }: { s: Saldo; todos: Saldo[]; hoy: s
     if (!ingreso) return toast("Pon la fecha de ingreso.", "error");
     if (saldo.trim() === "" || Number.isNaN(Number(saldo))) return toast("Pon los días que le quedan.", "error");
     start(async () => {
-      const r = await guardarEmpleadoRhAction({ profile_id: s.empleado_id, fecha_ingreso: ingreso, puesto: puesto || null, departamento: depto || null, jefe_id: jefe || null, saldo_inicial: Number(saldo), saldo_al: al, notas: null });
+      const r = await guardarEmpleadoRhAction({ colaborador_id: s.colaborador_id, profile_id: s.empleado_id, nombre: s.sin_portal ? nombre : null, fecha_ingreso: ingreso, puesto: puesto || null, departamento: depto || null, saldo_inicial: Number(saldo), saldo_al: al, notas: null });
       if (!r.ok) return toast(r.error, "error");
-      toast(`Listo: ${s.nombre} quedó capturado.`, "success");
+      toast(`Listo: ${s.sin_portal ? nombre : s.nombre} quedó capturado.`, "success");
       setAbierto(false);
       router.refresh();
     });
@@ -65,15 +65,12 @@ export function EmpleadoRh({ s, todos, hoy }: { s: Saldo; todos: Saldo[]; hoy: s
           <span className={lbl}>Departamento / área</span>
           <input className={inp} value={depto} maxLength={80} onChange={(e) => setDepto(e.target.value)} />
         </label>
-        <label className="block">
-          <span className={lbl}>Jefe inmediato (da el visto bueno)</span>
-          <select className={inp} value={jefe} onChange={(e) => setJefe(e.target.value)}>
-            <option value="">Sin jefe: va directo a la gerente</option>
-            {todos.filter((t) => t.empleado_id !== s.empleado_id).map((t) => (
-              <option key={t.empleado_id} value={t.empleado_id}>{t.nombre}</option>
-            ))}
-          </select>
-        </label>
+        {s.sin_portal && (
+          <label className="block">
+            <span className={lbl}>Nombre (sin portal)</span>
+            <input className={inp} value={nombre} maxLength={120} onChange={(e) => setNombre(e.target.value)} />
+          </label>
+        )}
         <label className="block">
           <span className={lbl}>Días de vacaciones que le quedan</span>
           <input type="number" step="0.5" className={inp} value={saldo} onChange={(e) => setSaldo(e.target.value)} placeholder="Ej. 8" />
@@ -294,6 +291,59 @@ export function TemporadaRh({ t, festivos, sabadoLaborable }: { t?: Temp; festiv
       )}
       <div className="flex gap-2">
         <Button onClick={guardar} loading={pend}>Guardar temporada</Button>
+        <Button variant="ghost" onClick={() => setAbierto(false)}>Cerrar</Button>
+      </div>
+    </div>
+  );
+}
+
+/** Alta o cambio de un colaborador sin portal (lo hace el supervisor de almacen; la gerente tambien y elige su area). */
+export function ExternoRh({ s, gerente }: { s?: Saldo; gerente: boolean }) {
+  const router = useRouter();
+  const [pend, start] = useTransition();
+  const [abierto, setAbierto] = useState(false);
+  const [nombre, setNombre] = useState(s?.nombre ?? "");
+  const [puesto, setPuesto] = useState(s?.puesto ?? "");
+  const [jr, setJr] = useState<JefeRol>(s?.jefe_rol ?? "supervisor_almacen");
+  const guardar = (activo?: boolean) =>
+    start(async () => {
+      const r = await guardarExternoRhAction({ id: s?.colaborador_id ?? null, nombre, puesto: puesto || null, activo, jefe_rol: gerente ? jr : null });
+      if (!r.ok) return toast(r.error, "error");
+      toast(activo === false ? "Colaborador dado de baja." : s ? "Guardado." : `Listo: ${nombre} quedó dado de alta. La gerente captura su fecha de ingreso y sus días.`, "success");
+      setAbierto(false);
+      if (!s) { setNombre(""); setPuesto(""); }
+      router.refresh();
+    });
+  if (!abierto) {
+    return s ? (
+      <button type="button" onClick={() => setAbierto(true)} className="text-xs font-medium text-slate-600 underline">Nombre / baja</button>
+    ) : (
+      <Button variant="secondary" onClick={() => setAbierto(true)}>+ Colaborador sin portal</Button>
+    );
+  }
+  return (
+    <div className="mt-2 w-full space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <label className="block">
+          <span className={lbl}>Nombre completo</span>
+          <input className={inp} value={nombre} maxLength={120} onChange={(e) => setNombre(e.target.value)} />
+        </label>
+        <label className="block">
+          <span className={lbl}>Puesto</span>
+          <input className={inp} value={puesto} maxLength={80} onChange={(e) => setPuesto(e.target.value)} placeholder="Ej. Cargador" />
+        </label>
+        {gerente && (
+          <label className="block">
+            <span className={lbl}>Primer visto bueno</span>
+            <select className={inp} value={jr} onChange={(e) => setJr(e.target.value as JefeRol)}>
+              {(Object.keys(JEFE_LABEL) as JefeRol[]).map((k) => <option key={k} value={k}>{JEFE_LABEL[k]}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={() => guardar()} loading={pend}>{s ? "Guardar" : "Dar de alta"}</Button>
+        {s && <Button variant="secondary" className="border-red-300 text-red-700" loading={pend} onClick={() => guardar(false)}>Dar de baja</Button>}
         <Button variant="ghost" onClick={() => setAbierto(false)}>Cerrar</Button>
       </div>
     </div>

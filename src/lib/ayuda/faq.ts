@@ -237,7 +237,7 @@ export const FAQ: Faq[] = [
   {
     id: "consumo-pedir", q: "¿Cómo pido papelería, limpieza o un servicio?", roles: ["vendedor", "jefe_ventas", "gerente", "coordinador_iso", "marketplaces"], paths: ["/consumo"],
     keys: ["consumo", "papeleria", "limpieza", "servicio", "vehiculo", "carro", "hojas", "cafe", "pedir", "material", "interno"],
-    a: ["Ve a Consumo interno > \"Nueva solicitud\".", "Elige producto o servicio, la categoría, qué es, cantidad y para qué se necesita.", "La jefa de ventas la aprueba y luego compras la pide o la agenda. Ves cada paso en la solicitud."],
+    a: ["Ve a Consumo interno > \"Nueva solicitud\".", "Elige producto o servicio, la categoría, qué es, cantidad y para qué se necesita.", "Si eres vendedor la aprueba la jefa de ventas; si eres de otra área (almacén, finanzas, la jefa de ventas), la aprueba la gerente. Luego compras la pide o la agenda."],
     links: [{ label: "Nueva solicitud", href: "/consumo/nueva" }],
   },
   {

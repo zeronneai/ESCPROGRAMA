@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 type Row = {
   id: string; numero: string; solicitante_id: string; solicitante_nombre: string | null; tipo: "producto" | "servicio"; categoria: Categoria;
   descripcion: string; cantidad: number; unidad: string | null; urgente: boolean; estado: ConsumoEstado; fecha_programada: string | null; created_at: string;
+  aprobador_rol?: "jefe_ventas" | "gerente" | null;
 };
 
 export default async function Consumo({ searchParams }: { searchParams: Promise<{ ver?: string }> }) {
@@ -18,15 +19,18 @@ export default async function Consumo({ searchParams }: { searchParams: Promise<
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("consumo_solicitudes")
-    .select("id, numero, solicitante_id, solicitante_nombre, tipo, categoria, descripcion, cantidad, unidad, urgente, estado, fecha_programada, created_at")
+    .select("*")
     .order("created_at", { ascending: false })
     .limit(500);
   const all = (data ?? []) as Row[];
   const mine = all.filter((r) => r.solicitante_id === u.id);
+  const esGer = u.rol === "gerente" || u.rol === "ceo";
+  // La jefa aprueba lo de los vendedores; la gerente lo demas (almacen, finanzas, la jefa...).
+  const meToca = (r: Row) => r.estado === "por_aprobar" && r.solicitante_id !== u.id && (esGer ? (r.aprobador_rol ?? "jefe_ventas") === "gerente" : (r.aprobador_rol ?? "jefe_ventas") === "jefe_ventas");
   const views: { id: string; label: string; rows: Row[] }[] =
     u.rol === "jefe_ventas"
       ? [
-          { id: "por_aprobar", label: "Por aprobar", rows: all.filter((r) => r.estado === "por_aprobar") },
+          { id: "por_aprobar", label: "Por aprobar", rows: all.filter(meToca) },
           { id: "abiertas", label: "En curso", rows: all.filter((r) => r.estado === "aprobada" || r.estado === "en_proceso") },
           { id: "todas", label: "Todas", rows: all },
         ]
@@ -36,7 +40,14 @@ export default async function Consumo({ searchParams }: { searchParams: Promise<
             { id: "en_proceso", label: "Pedidas / agendadas", rows: all.filter((r) => r.estado === "en_proceso") },
             { id: "todas", label: "Todas", rows: all },
           ]
-        : u.rol === "gerente" || u.rol === "ceo" || u.rol === "coordinador_iso"
+        : esGer
+          ? [
+              { id: "por_aprobar", label: "Por aprobar", rows: all.filter(meToca) },
+              { id: "abiertas", label: "En curso", rows: all.filter((r) => ["por_aprobar", "aprobada", "en_proceso"].includes(r.estado)) },
+              { id: "mias", label: "Mías", rows: mine },
+              { id: "todas", label: "Todas", rows: all },
+            ]
+        : u.rol === "coordinador_iso"
           ? [
               { id: "abiertas", label: "En curso", rows: all.filter((r) => ["por_aprobar", "aprobada", "en_proceso"].includes(r.estado)) },
               { id: "mias", label: "Mías", rows: mine },
@@ -54,7 +65,7 @@ export default async function Consumo({ searchParams }: { searchParams: Promise<
     <div className="space-y-5">
       <PageHeader
         title="Consumo interno"
-        subtitle={u.rol === "jefe_ventas" ? "Aprueba lo que pide el equipo; lo aprobado le llega al comprador." : u.rol === "comprador" ? "Solicitudes aprobadas por la jefa de ventas. Márcalas pedidas o agendadas y luego recibidas o realizadas." : "Papelería, limpieza, servicios de vehículos y lo del día a día."}
+        subtitle={u.rol === "jefe_ventas" ? "Aprueba lo que piden los vendedores; lo tuyo y lo de las demás áreas lo aprueba la gerente." : esGer ? "Aprueba lo que piden almacén, finanzas, la jefa de ventas y las demás áreas (lo de vendedores lo aprueba la jefa de ventas)." : u.rol === "comprador" ? "Solicitudes ya aprobadas (por la jefa de ventas o la gerente). Márcalas pedidas o agendadas y luego recibidas o realizadas." : "Papelería, limpieza, servicios de vehículos y lo del día a día."}
         actions={u.rol !== "comprador" && (
           <Link href="/consumo/nueva" className="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700">
             <Icon name="plus" className="h-4 w-4" /> Nueva solicitud
@@ -63,7 +74,7 @@ export default async function Consumo({ searchParams }: { searchParams: Promise<
       />
       {error && <Card className="border-red-200 bg-red-50 text-sm text-red-800">No se pudo cargar: {error.message}</Card>}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {u.rol !== "comprador" && <StatCard label="Por aprobar" value={count(["por_aprobar"])} tone={count(["por_aprobar"]) && u.rol === "jefe_ventas" ? "amber" : "default"} />}
+        {u.rol !== "comprador" && <StatCard label={u.rol === "jefe_ventas" || esGer ? "Te toca aprobar" : "Por aprobar"} value={u.rol === "jefe_ventas" || esGer ? all.filter(meToca).length : count(["por_aprobar"])} tone={(u.rol === "jefe_ventas" || esGer) && all.filter(meToca).length ? "amber" : "default"} />}
         <StatCard label="Aprobadas sin atender" value={count(["aprobada"])} tone={count(["aprobada"]) && u.rol === "comprador" ? "amber" : "default"} />
         <StatCard label="Pedidas / agendadas" value={count(["en_proceso"])} />
         <StatCard label="Completadas" value={count(["completada"])} tone="green" />

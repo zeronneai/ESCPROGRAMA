@@ -26,16 +26,30 @@ export const ESTADO_COLOR: Record<EstadoSolicitud, string> = {
   cancelada: "bg-slate-100 text-slate-600",
 };
 
+export type JefeRol = "jefe_ventas" | "supervisor_almacen" | "supervisor_finanzas";
+
+/** Quien da el primer visto bueno (despues siempre autoriza la gerente). */
+export const JEFE_LABEL: Record<JefeRol, string> = {
+  jefe_ventas: "Jefa de ventas",
+  supervisor_almacen: "Supervisor de almacén",
+  supervisor_finanzas: "Supervisora de finanzas",
+};
+
+export function quienAutoriza(j: JefeRol | null | undefined): string {
+  return j ? `${JEFE_LABEL[j]} y luego la gerente` : "Directo con la gerente";
+}
+
 export interface Saldo {
-  empleado_id: string;
+  colaborador_id: string;
+  empleado_id: string | null;
   nombre: string;
-  rol: string;
+  rol: string | null;
+  sin_portal: boolean;
+  jefe_rol: JefeRol | null;
   capturado: boolean;
   fecha_ingreso: string | null;
   puesto: string | null;
   departamento: string | null;
-  jefe_id: string | null;
-  jefe_nombre: string | null;
   anios: number | null;
   dias_ley: number | null;
   proximo_aniversario: string | null;
@@ -53,10 +67,13 @@ export interface Saldo {
 export interface Solicitud {
   id: string;
   folio: number;
-  empleado_id: string;
+  colaborador_id: string;
+  empleado_id: string | null;
   nombre: string;
   puesto: string | null;
-  rol: string;
+  rol: string | null;
+  sin_portal: boolean;
+  jefe_rol: JefeRol | null;
   tipo: TipoSolicitud;
   permiso_tipo: PermisoTipo | null;
   desde: string;
@@ -71,7 +88,9 @@ export interface Solicitud {
   jefe_at: string | null;
   resuelto_nombre: string | null;
   resuelto_at: string | null;
+  registro_nombre: string | null;
   comentario: string | null;
+  cambio: string | null;
   created_at: string;
   mia: boolean;
   soy_jefe: boolean;
