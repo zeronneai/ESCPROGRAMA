@@ -56,15 +56,65 @@ const haceTxt = (iso: string, ahora: number) => {
   return `hace ${d} ${d === 1 ? "día" : "días"}`;
 };
 
-function useVentana() {
-  const [v, setV] = useState({ w: 1920, h: 1080 });
+/** La pantalla se dibuja en un lienzo fijo de 1920x1080 y se escala a lo que mida la tele: siempre cabe todo. */
+const LIENZO = { w: 1920, h: 1080 };
+function useEscala() {
+  const [s, setS] = useState(1);
   useEffect(() => {
-    const f = () => setV({ w: window.innerWidth, h: window.innerHeight });
+    const f = () => setS(Math.min(window.innerWidth / LIENZO.w, window.innerHeight / LIENZO.h));
     f();
     window.addEventListener("resize", f);
-    return () => window.removeEventListener("resize", f);
+    document.addEventListener("fullscreenchange", f);
+    return () => {
+      window.removeEventListener("resize", f);
+      document.removeEventListener("fullscreenchange", f);
+    };
   }, []);
-  return v;
+  return s;
+}
+
+/** Boton de pantalla completa (sin barras del navegador); se esconde solo si no se mueve el mouse. */
+function BotonCompleta() {
+  const [completa, setCompleta] = useState(false);
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    let t: number | undefined;
+    const mover = () => {
+      setVisible(true);
+      window.clearTimeout(t);
+      t = window.setTimeout(() => setVisible(false), 4000);
+    };
+    const cambio = () => setCompleta(!!document.fullscreenElement);
+    mover();
+    window.addEventListener("mousemove", mover);
+    window.addEventListener("touchstart", mover);
+    document.addEventListener("fullscreenchange", cambio);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener("mousemove", mover);
+      window.removeEventListener("touchstart", mover);
+      document.removeEventListener("fullscreenchange", cambio);
+    };
+  }, []);
+  const alternar = () => {
+    if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+    else void document.documentElement.requestFullscreen?.().catch(() => undefined);
+  };
+  return (
+    <>
+      <style>{completa && !visible ? "html, body { cursor: none; }" : ""}</style>
+      <button
+        type="button"
+        onClick={alternar}
+        className={`fixed right-4 top-4 z-[80] flex items-center gap-2 rounded-full bg-slate-900/85 px-5 py-3 text-base font-bold text-white shadow-xl transition-opacity duration-500 hover:bg-slate-900 ${visible ? "opacity-100" : "pointer-events-none opacity-0"}`}
+      >
+        <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          {completa ? <path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
+        </svg>
+        {completa ? "Salir de pantalla completa" : "Pantalla completa"}
+      </button>
+    </>
+  );
 }
 
 /** Grafica de area: avance acumulado del equipo dia por dia contra el ritmo esperado. */
@@ -111,7 +161,8 @@ export function PantallaTV({ inicial, extraInicial }: { inicial: AvanceMeta[]; e
   const [brillo, setBrillo] = useState<Set<string>>(new Set());
   const previo = useRef(new Map(inicial.map((f) => [f.id, f.pct])));
   const ultVenta = useRef(extraInicial?.ventas[0]?.at ?? null);
-  const { w, h } = useVentana();
+  const escala = useEscala();
+  const { w, h } = LIENZO;
 
   const cargar = useCallback(async () => {
     const sb = createClient();
@@ -182,14 +233,14 @@ export function PantallaTV({ inicial, extraInicial }: { inicial: AvanceMeta[]; e
 
   // Tamanos segun la pantalla: todo cabe sin scroll.
   const banda = 180; // mascota y cintilla abajo
-  const cont = Math.max(420, h - 76 - banda);
+  const cont = h - 76 - banda - 16;
   const izq = w * 0.66 - 48;
   const alto1 = cont * 0.42;
   const tamEq = Math.max(110, Math.min(alto1 - 32, (izq * 0.58) * 0.5, 250));
-  const tamEsp = Math.max(90, Math.min(alto1 - 64, (izq * 0.42) / Math.max(1, especiales.length) - 40, 200));
+  const tamEsp = Math.max(90, Math.min(alto1 - 80, (izq * 0.42) / Math.max(1, especiales.length) - 40, 220));
   const filasV = orden.length > 5 ? 2 : 1;
   const colsV = Math.max(1, Math.ceil(orden.length / filasV));
-  const tamV = Math.max(80, Math.min((cont * 0.58) / filasV - 64, izq / colsV - 36, 230));
+  const tamV = Math.max(80, Math.min((cont * 0.58 - 16 * (filasV - 1)) / filasV - 84, izq / colsV - 40, 240));
 
   if (!f0) return <p className="p-10 text-center text-2xl text-slate-500">No hay metas activas este mes.</p>;
   const mes = MESES[Number(f0.mes.slice(5, 7)) - 1];
@@ -266,7 +317,9 @@ export function PantallaTV({ inicial, extraInicial }: { inicial: AvanceMeta[]; e
   ].filter(Boolean);
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-[#eef3fb]">
+    <div className="fixed inset-0 flex items-center justify-center overflow-hidden bg-[#eef3fb]" onDoubleClick={() => (document.fullscreenElement ? void document.exitFullscreen().catch(() => undefined) : void document.documentElement.requestFullscreen?.().catch(() => undefined))}>
+    <BotonCompleta />
+    <div className="relative flex shrink-0 flex-col overflow-hidden bg-[#eef3fb]" style={{ width: LIENZO.w, height: LIENZO.h, transform: `scale(${escala})`, transformOrigin: "center center" }}>
       <style>{`
         @keyframes tv-entra { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
         @keyframes tv-zoom { from { transform: scale(.96); opacity: 0; } 15% { opacity: 1; } to { transform: scale(1.02); } }
@@ -320,7 +373,7 @@ export function PantallaTV({ inicial, extraInicial }: { inicial: AvanceMeta[]; e
                   <Anillo pct={f.pct} ritmo={ritmo} tam={tamEsp} grosor={Math.round(tamEsp / 11)}>
                     <span className={`font-extrabold tabular-nums ${c.texto}`} style={{ fontSize: tamEsp / 5 }}>{pctTxt(f.pct)}</span>
                   </Anillo>
-                  <p className="text-center text-lg font-bold text-slate-900">{esCasa(f) ? "🏠" : "🌵"} {f.nombre}</p>
+                  <p className="line-clamp-2 text-center font-bold leading-tight text-slate-900" style={{ fontSize: Math.max(18, Math.min(24, tamEsp / 8)) }}>{esCasa(f) ? "🏠" : "🌵"} {f.nombre}</p>
                 </div>
               );
             })}
@@ -337,7 +390,7 @@ export function PantallaTV({ inicial, extraInicial }: { inicial: AvanceMeta[]; e
                     <span className={`font-extrabold tabular-nums ${c.texto}`} style={{ fontSize: tamV / 5 }}>{pctTxt(f.pct)}</span>
                     {f.pct >= 100 && <span className="text-xs font-bold text-green-700">¡Meta!</span>}
                   </Anillo>
-                  <p className="max-w-full truncate px-2 text-center text-lg font-bold text-slate-900">{f.nombre}</p>
+                  <p className="line-clamp-2 max-w-full break-words px-2 text-center font-bold leading-tight text-slate-900" style={{ fontSize: Math.max(18, Math.min(26, tamV / 8)) }}>{f.nombre}</p>
                 </div>
               );
             })}
@@ -364,6 +417,7 @@ export function PantallaTV({ inicial, extraInicial }: { inicial: AvanceMeta[]; e
         </div>
       </div>
       <MascotaMetas abajo={46} alLado mensajes={ticker.slice(0, 8)} />
+    </div>
     </div>
   );
 }

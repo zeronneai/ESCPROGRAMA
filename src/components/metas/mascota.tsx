@@ -47,8 +47,8 @@ export function MascotaMetas({ mensajes, abajo = 16, alLado = false }: { mensaje
       <style>{`
         @keyframes mm-camina-der { from { transform: translateX(4vw); } to { transform: translateX(calc(92vw - 150px)); } }
         @keyframes mm-camina-izq { from { transform: translateX(calc(92vw - 150px)); } to { transform: translateX(4vw); } }
-        @keyframes mm-lado-der { from { transform: translateX(2vw); } to { transform: translateX(38vw); } }
-        @keyframes mm-lado-izq { from { transform: translateX(38vw); } to { transform: translateX(2vw); } }
+        @keyframes mm-lado-der { from { transform: translateX(40px); } to { transform: translateX(720px); } }
+        @keyframes mm-lado-izq { from { transform: translateX(720px); } to { transform: translateX(40px); } }
         @keyframes mm-brinca { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-10px) rotate(3deg); } }
         @keyframes mm-brazo { 0%,100% { transform: rotate(-25deg); } 50% { transform: rotate(35deg); } }
         @keyframes mm-burbuja { 0% { opacity: 0; transform: translateY(8px) scale(.9); } 12%,85% { opacity: 1; transform: none; } 100% { opacity: 0; } }
@@ -58,7 +58,7 @@ export function MascotaMetas({ mensajes, abajo = 16, alLado = false }: { mensaje
         <div className="relative w-[150px]">
           <div
             className={alLado
-              ? `absolute bottom-[58px] left-[150px] w-max max-w-[min(620px,48vw)] rounded-2xl border-2 border-brand-300 bg-white px-5 py-3 text-center text-lg font-bold text-slate-800 shadow-xl`
+              ? `absolute bottom-[58px] left-[150px] w-max max-w-[900px] rounded-2xl border-2 border-brand-300 bg-white px-5 py-3 text-center text-lg font-bold text-slate-800 shadow-xl`
               : "absolute bottom-[132px] left-1/2 w-[min(420px,80vw)] -translate-x-1/2 rounded-2xl border-2 border-brand-300 bg-white px-4 py-2.5 text-center text-base font-bold text-slate-800 shadow-xl"}
             style={{ animation: "mm-burbuja 8.5s ease-in-out forwards" }}
           >
