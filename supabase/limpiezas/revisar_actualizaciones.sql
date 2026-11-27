@@ -1,4 +1,4 @@
--- Revisa que actualizaciones (0059 a 0099) ya estan corridas en la base.
+-- Revisa que actualizaciones (0059 a 0100) ya estan corridas en la base.
 -- Pegalo en el SQL Editor de Supabase y presiona Run. No cambia nada, solo consulta.
 select actualizacion,
        case when ya then 'Ya está corrida' else 'FALTA correrla' end as estado
@@ -43,6 +43,7 @@ from (values
   ('0096 Finanzas identifica pagos previos', coalesce(position('is_finanzas' in pg_get_functiondef(to_regprocedure('public.puede_marcar_previo()'))) > 0, false)),
   ('0097 Reglas de vacaciones', to_regclass('public.rrhh_reglas') is not null),
   ('0098 Estados de cuenta diarios', to_regclass('public.conciliacion_cuentas') is not null),
-  ('0099 Ivan Munoz solo equipo', exists (select 1 from information_schema.columns where table_schema='public' and table_name='metas_config' and column_name='solo_equipo'))
+  ('0099 Ivan Munoz solo equipo', exists (select 1 from information_schema.columns where table_schema='public' and table_name='metas_config' and column_name='solo_equipo')),
+  ('0100 VTS como Casa Local', exists (select 1 from public.metas_venta where public.nombre_norm(nombre) = 'VTS CD JUAREZ' and estado = 'activa'))
 ) as x(actualizacion, ya)
 order by actualizacion;
