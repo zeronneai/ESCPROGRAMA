@@ -279,3 +279,56 @@ export async function borrarTemporadaRhAction(id: string): Promise<Result> {
   refrescar();
   return { ok: true };
 }
+
+const regla = z
+  .object({
+    tipo: z.enum(["nota", "bloqueo", "max_simultaneos", "max_dias"]),
+    texto: z.string().trim().max(500).nullable(),
+    desde: fecha.nullable(),
+    hasta: fecha.nullable(),
+    valor: z.number().int().min(0).max(365).nullable(),
+    puesto: z.string().trim().max(80).nullable(),
+  })
+  .strict()
+  .refine((r) => r.tipo !== "nota" || (r.texto?.length ?? 0) > 2, { message: "Escribe la regla." })
+  .refine((r) => r.tipo !== "bloqueo" || (!!r.desde && !!r.hasta && r.hasta >= r.desde), { message: "Pon desde y hasta qué día no se pueden pedir vacaciones." })
+  .refine((r) => !["max_simultaneos", "max_dias"].includes(r.tipo) || (r.valor ?? 0) > 0, { message: "Pon el número máximo." });
+
+/** Reglas adicionales de la gerente. */
+export async function agregarReglaRhAction(input: z.input<typeof regla>): Promise<Result> {
+  try {
+    await gerente();
+  } catch {
+    return { ok: false, error: "Solo la gerente agrega reglas." };
+  }
+  const p = regla.safeParse(input);
+  if (!p.success) return { ok: false, error: p.error.issues[0].message };
+  const d = p.data;
+  const row = {
+    tipo: d.tipo,
+    texto: d.texto || null,
+    desde: d.tipo === "bloqueo" ? d.desde : null,
+    hasta: d.tipo === "bloqueo" ? d.hasta : null,
+    valor: ["max_simultaneos", "max_dias"].includes(d.tipo) ? d.valor : null,
+    puesto: d.tipo === "max_simultaneos" ? d.puesto || null : null,
+  };
+  const supabase = await createClient();
+  const { error } = await supabase.from("rrhh_reglas").insert(row);
+  if (error) return { ok: false, error: /rrhh_reglas/.test(error.message) ? "Falta correr la actualización 0097 en Supabase." : msg(error.message) };
+  refrescar();
+  return { ok: true };
+}
+
+export async function cambiarReglaRhAction(id: string, accion: "activar" | "apagar" | "borrar"): Promise<Result> {
+  try {
+    await gerente();
+  } catch {
+    return { ok: false, error: "Solo la gerente." };
+  }
+  if (!uuid.safeParse(id).success) return { ok: false, error: "Regla inválida" };
+  const supabase = await createClient();
+  const { error } = accion === "borrar" ? await supabase.from("rrhh_reglas").delete().eq("id", id) : await supabase.from("rrhh_reglas").update({ activo: accion === "activar" }).eq("id", id);
+  if (error) return { ok: false, error: msg(error.message) };
+  refrescar();
+  return { ok: true };
+}

@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
-import { guardarExternoRhAction, agregarFestivoRhAction, borrarTemporadaRhAction, guardarEmpleadoRhAction, guardarReglasRhAction, guardarTemporadaRhAction, quitarFestivoRhAction } from "@/actions/rrhh";
+import { agregarReglaRhAction, cambiarReglaRhAction, guardarExternoRhAction, agregarFestivoRhAction, borrarTemporadaRhAction, guardarEmpleadoRhAction, guardarReglasRhAction, guardarTemporadaRhAction, quitarFestivoRhAction } from "@/actions/rrhh";
 import { toast } from "@/components/feedback-global";
 import { Button } from "@/components/ui";
-import { DIAS_SEMANA, diasEntre, diasLey, fechaRh, isoDow, JEFE_LABEL, type JefeRol, type Saldo } from "@/lib/rrhh";
+import { DIAS_SEMANA, diasEntre, diasLey, fechaRh, isoDow, JEFE_LABEL, REGLA_TIPOS, reglaTxt, type JefeRol, type Regla, type ReglaTipo, type Saldo } from "@/lib/rrhh";
 
 const inp = "w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200";
 const lbl = "mb-1 block text-xs font-medium text-slate-600";
@@ -376,6 +376,84 @@ export function ExternoRh({ s, gerente, hoy }: { s?: Saldo; gerente: boolean; ho
         <Button onClick={() => guardar()} loading={pend}>{s ? "Guardar" : "Dar de alta"}</Button>
         {s && <Button variant="secondary" className="border-red-300 text-red-700" loading={pend} onClick={() => guardar(false)}>Dar de baja</Button>}
         <Button variant="ghost" onClick={() => setAbierto(false)}>Cerrar</Button>
+      </div>
+    </div>
+  );
+}
+
+/** Reglas adicionales de la gerente: escritas, fechas sin vacaciones, maximo a la vez y maximo de dias. */
+export function ReglasExtraRh({ reglas, puestos }: { reglas: Regla[]; puestos: string[] }) {
+  const router = useRouter();
+  const [pend, start] = useTransition();
+  const [tipo, setTipo] = useState<ReglaTipo>("nota");
+  const [texto, setTexto] = useState("");
+  const [desde, setDesde] = useState("");
+  const [hasta, setHasta] = useState("");
+  const [valor, setValor] = useState("");
+  const [puesto, setPuesto] = useState("");
+  const agregar = () =>
+    start(async () => {
+      const r = await agregarReglaRhAction({ tipo, texto: texto.trim() || null, desde: desde || null, hasta: hasta || null, valor: valor ? Math.round(Number(valor)) : null, puesto: puesto.trim() || null });
+      if (!r.ok) return toast(r.error, "error");
+      toast("Regla agregada: ya la ven todos y se revisa al pedir vacaciones.", "success");
+      setTexto(""); setDesde(""); setHasta(""); setValor(""); setPuesto("");
+      router.refresh();
+    });
+  const cambiar = (id: string, a: "activar" | "apagar" | "borrar") =>
+    start(async () => {
+      const r = await cambiarReglaRhAction(id, a);
+      if (!r.ok) return toast(r.error, "error");
+      router.refresh();
+    });
+  return (
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div>
+        <h3 className="text-base font-semibold">Reglas adicionales</h3>
+        <p className="text-xs text-slate-500">Además de las de siempre. Todos las ven en su página de vacaciones; las de fechas, máximos y días se revisan solas al pedir.</p>
+      </div>
+      {reglas.length > 0 && (
+        <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 text-sm">
+          {reglas.map((r) => (
+            <li key={r.id} className={`flex flex-wrap items-center justify-between gap-2 px-3 py-2 ${r.activo ? "" : "opacity-50"}`}>
+              <span className="min-w-0"><span className="mr-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{REGLA_TIPOS[r.tipo]}</span>{reglaTxt(r)}</span>
+              <span className="flex gap-3 text-xs">
+                <button type="button" disabled={pend} className="text-slate-600 underline" onClick={() => cambiar(r.id, r.activo ? "apagar" : "activar")}>{r.activo ? "Apagar" : "Encender"}</button>
+                <button type="button" disabled={pend} className="text-slate-500 underline hover:text-red-600" onClick={() => cambiar(r.id, "borrar")}>Borrar</button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="space-y-3 rounded-lg bg-slate-50 p-3">
+        <label className="block">
+          <span className={lbl}>Tipo de regla</span>
+          <select className={inp} value={tipo} onChange={(e) => setTipo(e.target.value as ReglaTipo)}>
+            {(Object.keys(REGLA_TIPOS) as ReglaTipo[]).map((k) => <option key={k} value={k}>{REGLA_TIPOS[k]}</option>)}
+          </select>
+        </label>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {tipo === "bloqueo" && (
+            <>
+              <label className="block"><span className={lbl}>Desde</span><input type="date" className={inp} value={desde} onChange={(e) => setDesde(e.target.value)} /></label>
+              <label className="block"><span className={lbl}>Hasta (incluido)</span><input type="date" className={inp} value={hasta} min={desde || undefined} onChange={(e) => setHasta(e.target.value)} /></label>
+            </>
+          )}
+          {(tipo === "max_simultaneos" || tipo === "max_dias") && (
+            <label className="block"><span className={lbl}>{tipo === "max_dias" ? "Máximo de días" : "Máximo de personas"}</span><input type="number" min={1} className={inp} value={valor} onChange={(e) => setValor(e.target.value)} /></label>
+          )}
+          {tipo === "max_simultaneos" && (
+            <label className="block">
+              <span className={lbl}>Puesto (vacío = toda la empresa)</span>
+              <input list="rrhh-puestos" className={inp} value={puesto} maxLength={80} onChange={(e) => setPuesto(e.target.value)} placeholder="Ej. Almacenista" />
+              <datalist id="rrhh-puestos">{puestos.map((x) => <option key={x} value={x} />)}</datalist>
+            </label>
+          )}
+          <label className={`block ${tipo === "nota" ? "sm:col-span-3" : ""}`}>
+            <span className={lbl}>{tipo === "nota" ? "Regla" : "Motivo (opcional)"}</span>
+            <input className={inp} value={texto} maxLength={500} onChange={(e) => setTexto(e.target.value)} placeholder={tipo === "nota" ? "Ej. Las vacaciones se platican con tu jefe antes de pedirlas" : tipo === "bloqueo" ? "Ej. Inventario anual" : ""} />
+          </label>
+        </div>
+        <Button onClick={agregar} loading={pend}>Agregar regla</Button>
       </div>
     </div>
   );

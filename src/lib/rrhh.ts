@@ -97,7 +97,7 @@ export interface Solicitud {
 }
 
 export interface EventoCal {
-  clase: "festivo" | "temporada" | "vacaciones" | "permiso";
+  clase: "festivo" | "temporada" | "bloqueo" | "vacaciones" | "permiso";
   desde: string;
   hasta: string;
   titulo: string;
@@ -166,4 +166,32 @@ export function diasEntre(desde: string, hasta: string): string[] {
 export function isoDow(iso: string): number {
   const g = new Date(iso + "T12:00:00Z").getUTCDay();
   return g === 0 ? 7 : g;
+}
+
+export type ReglaTipo = "nota" | "bloqueo" | "max_simultaneos" | "max_dias";
+export interface Regla {
+  id: string;
+  tipo: ReglaTipo;
+  texto: string | null;
+  desde: string | null;
+  hasta: string | null;
+  valor: number | null;
+  puesto: string | null;
+  activo: boolean;
+}
+export const REGLA_TIPOS: Record<ReglaTipo, string> = {
+  nota: "Regla escrita (solo se muestra)",
+  bloqueo: "Fechas sin vacaciones",
+  max_simultaneos: "Máximo de personas de vacaciones a la vez",
+  max_dias: "Máximo de días por solicitud",
+};
+/** Como se le explica la regla a todos. */
+export function reglaTxt(r: Regla): string {
+  const extra = r.texto?.trim() ? ` (${r.texto.trim()})` : "";
+  switch (r.tipo) {
+    case "nota": return r.texto?.trim() ?? "";
+    case "bloqueo": return `No se pueden pedir vacaciones del ${rangoRh(r.desde ?? "", r.hasta ?? "")}${extra}.`;
+    case "max_simultaneos": return `Máximo ${r.valor} ${r.valor === 1 ? "persona" : "personas"}${r.puesto ? ` de ${r.puesto}` : " de toda la empresa"} de vacaciones el mismo día${extra}.`;
+    case "max_dias": return `Máximo ${r.valor} días por solicitud de vacaciones${extra}.`;
+  }
 }

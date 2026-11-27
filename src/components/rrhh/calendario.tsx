@@ -35,7 +35,7 @@ export function CalendarioRh({ mes: mesIni, eventos: evIni, hoy, sabadoLaborable
   const del = (dia: string) => eventos.filter((e) => e.desde <= dia && e.hasta >= dia);
   const quien = (e: EventoCal) => (e.mio ? "Tú" : e.nombre ?? puestoTxt(e.puesto));
   const gente = eventos.filter((e) => e.clase === "vacaciones" || e.clase === "permiso").sort((a, b) => a.desde.localeCompare(b.desde));
-  const fijos = eventos.filter((e) => e.clase === "festivo" || e.clase === "temporada").sort((a, b) => a.desde.localeCompare(b.desde));
+  const fijos = eventos.filter((e) => e.clase === "festivo" || e.clase === "temporada" || e.clase === "bloqueo").sort((a, b) => a.desde.localeCompare(b.desde));
 
   return (
     <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
@@ -53,18 +53,20 @@ export function CalendarioRh({ mes: mesIni, eventos: evIni, hoy, sabadoLaborable
           const ev = del(dia);
           const fest = ev.find((e) => e.clase === "festivo");
           const temp = ev.find((e) => e.clase === "temporada");
+          const bloq = ev.find((e) => e.clase === "bloqueo");
           const desc = !!temp?.descuento?.includes(dia);
           const dow = i % 7;
           const descanso = dow === 6 || (dow === 5 && !sabadoLaborable);
           const ppl = ev.filter((e) => e.clase === "vacaciones" || e.clase === "permiso");
-          const bg = fest ? "bg-red-50" : temp ? (desc ? "bg-violet-100" : "bg-violet-50") : descanso ? "bg-slate-50" : "bg-white";
+          const bg = fest ? "bg-red-50" : temp ? (desc ? "bg-violet-200" : "bg-emerald-50") : bloq ? "bg-slate-100" : descanso ? "bg-slate-50" : "bg-white";
           return (
             <div key={i} className={`min-h-16 min-w-0 p-1 sm:min-h-20 ${bg}`}>
               <div className={`flex items-center justify-between ${dia === hoy ? "font-bold text-brand-700" : descanso ? "text-slate-400" : "text-slate-700"}`}>
                 <span className={dia === hoy ? "rounded-full bg-brand-600 px-1.5 text-white" : ""}>{Number(dia.slice(8))}</span>
               </div>
               {fest && <p className="truncate text-[10px] font-semibold text-red-700" title={fest.titulo}>{fest.titulo}</p>}
-              {temp && <p className="truncate text-[10px] font-medium text-violet-800" title={temp.titulo}>{desc ? "Se descuenta" : temp.titulo}</p>}
+              {temp && (desc ? <p className="truncate text-[10px] font-bold text-violet-900" title={temp.titulo}>Se descuenta</p> : <p className="truncate text-[10px] font-medium text-emerald-700" title={temp.titulo}>{descanso || fest ? temp.titulo : "Lo da la empresa"}</p>)}
+              {bloq && <p className="truncate text-[10px] font-semibold text-slate-600" title={bloq.titulo}>Sin vacaciones</p>}
               {ppl.slice(0, 2).map((e, k) => (
                 <p key={k} title={`${e.titulo} · ${quien(e)}`} className={`mt-0.5 truncate rounded px-1 text-[10px] ${e.mio ? "bg-brand-600 text-white" : e.estado === "aprobada" ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
                   {quien(e)}
@@ -77,7 +79,9 @@ export function CalendarioRh({ mes: mesIni, eventos: evIni, hoy, sabadoLaborable
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
         <span><span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-red-200 align-middle" />Festivo</span>
-        <span><span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-violet-200 align-middle" />Vacaciones generales (morado fuerte: se descuenta)</span>
+        <span><span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-violet-300 align-middle" />Vacaciones generales: se descuenta</span>
+        <span><span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-emerald-200 align-middle" />Vacaciones generales: lo da la empresa</span>
+        <span><span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-slate-300 align-middle" />Sin vacaciones</span>
         <span><span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-green-200 align-middle" />Autorizado</span>
         <span><span className="mr-1 inline-block h-2.5 w-2.5 rounded-sm bg-amber-200 align-middle" />En espera</span>
       </div>
@@ -85,7 +89,7 @@ export function CalendarioRh({ mes: mesIni, eventos: evIni, hoy, sabadoLaborable
         <ul className="divide-y divide-slate-100 text-sm">
           {fijos.map((e, k) => (
             <li key={`f${k}`} className="flex flex-wrap justify-between gap-2 py-1.5">
-              <span className={e.clase === "festivo" ? "font-medium text-red-700" : "font-medium text-violet-800"}>{e.clase === "festivo" ? "Festivo: " : "Vacaciones generales: "}{e.titulo}</span>
+              <span className={e.clase === "festivo" ? "font-medium text-red-700" : e.clase === "bloqueo" ? "font-medium text-slate-700" : "font-medium text-violet-800"}>{e.clase === "festivo" ? "Festivo: " : e.clase === "bloqueo" ? "Sin vacaciones: " : "Vacaciones generales: "}{e.titulo}</span>
               <span className="text-slate-500">
                 {rangoRh(e.desde, e.hasta)}
                 {e.clase === "temporada" && ` · se descuentan ${e.descuento?.length ?? 0} días${e.descuento?.length ? ` (${e.descuento.map((d) => fechaRh(d, false)).join(", ")})` : ""}`}

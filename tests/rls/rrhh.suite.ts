@@ -113,5 +113,26 @@ export function rrhhSuite() {
       expect(Number((await q(emp, "select * from public.rrhh_saldos()")).rows[0].disponible)).toBe(19);
       expect((await q(emp, "update public.rrhh_config set sabado_laborable=false where id=1")).rowCount).toBe(0);
     });
+
+    it("reglas adicionales de la gerente: fechas bloqueadas, maximo a la vez por puesto y maximo de dias", async () => {
+      const ger = await persona("gerente", "Gerente Reglas");
+      const a1 = await persona("almacen", "Alm Reglas 1");
+      const a2 = await persona("almacen", "Alm Reglas 2");
+      const ingreso = (await q("postgres", "select (public.local_today() - interval '5 years')::date::text as d")).rows[0].d as string;
+      const hoy = (await q("postgres", "select public.local_today()::text as d")).rows[0].d as string;
+      for (const x of [a1, a2]) await q(ger, "select public.rrhh_empleado_guardar($1::jsonb)", [J({ profile_id: x.id, fecha_ingreso: ingreso, puesto: "Cargador Reglas", saldo_inicial: 30, saldo_al: hoy })]);
+      const lunes = (await q("postgres", "select (public.local_today() + 120 + ((8 - extract(isodow from public.local_today() + 120)::int) % 7))::text as d")).rows[0].d as string;
+      await q("postgres", "delete from public.rrhh_festivos where fecha between $1 and $2", [lunes, mas(lunes, 30)]);
+      expect(await failure(q(a1, "insert into public.rrhh_reglas (tipo, texto) values ('nota', 'Hola')"))).toMatch(/row-level/);
+      await q(ger, "insert into public.rrhh_reglas (tipo, desde, hasta, texto) values ('bloqueo', $1, $2, 'Inventario')", [lunes, mas(lunes, 1)]);
+      await q(ger, "insert into public.rrhh_reglas (tipo, valor, puesto) values ('max_simultaneos', 1, 'cargador reglas')");
+      await q(ger, "insert into public.rrhh_reglas (tipo, valor) values ('max_dias', 10)");
+      expect(await failure(q(a1, "select public.rrhh_solicitar($1::jsonb)", [J({ tipo: "vacaciones", desde: lunes, hasta: mas(lunes, 2) })]))).toMatch(/Inventario/);
+      await q(a1, "select public.rrhh_solicitar($1::jsonb)", [J({ tipo: "vacaciones", desde: mas(lunes, 7), hasta: mas(lunes, 8) })]);
+      expect(await failure(q(a2, "select public.rrhh_solicitar($1::jsonb)", [J({ tipo: "vacaciones", desde: mas(lunes, 8), hasta: mas(lunes, 9) })]))).toMatch(/máximo 1/);
+      expect(await failure(q(a2, "select public.rrhh_solicitar($1::jsonb)", [J({ tipo: "vacaciones", desde: mas(lunes, 14), hasta: mas(lunes, 28) })]))).toMatch(/máximo 10/);
+      expect((await q(a2, "select * from public.rrhh_calendario($1, $2)", [lunes, mas(lunes, 1)])).rows.find((r) => r.clase === "bloqueo")?.titulo).toBe("Inventario");
+      await q("postgres", "update public.rrhh_reglas set activo=false");
+    });
   });
 }

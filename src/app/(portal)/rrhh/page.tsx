@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/auth/guards";
 import { ExternoRh } from "@/components/rrhh/gerencia";
 import { ROL_LABEL } from "@/lib/ops/roles";
 import type { Rol } from "@/lib/auth/route-guard";
-import { fechaRh, num, quienAutoriza, type EventoCal, type Saldo, type Solicitud } from "@/lib/rrhh";
+import { fechaRh, num, quienAutoriza, reglaTxt, type Regla, type EventoCal, type Saldo, type Solicitud } from "@/lib/rrhh";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -26,11 +26,12 @@ export default async function RrhhPage({ searchParams }: { searchParams: Promise
   const hoy = new Date().toLocaleDateString("en-CA", { timeZone: "America/Chihuahua" });
   const mes = /^\d{4}-\d{2}$/.test(sp.mes ?? "") ? sp.mes! : hoy.slice(0, 7);
   const { ini, fin } = rangoMes(mes);
-  const [saldos, sols, cal, cfg] = await Promise.all([
+  const [saldos, sols, cal, cfg, reglasQ] = await Promise.all([
     supabase.rpc("rrhh_saldos"),
     supabase.rpc("rrhh_solicitudes_ver"),
     supabase.rpc("rrhh_calendario", { p_desde: ini, p_hasta: fin }),
     supabase.from("rrhh_config").select("sabado_laborable, anticipacion_dias, adelanto_max").eq("id", 1).maybeSingle(),
+    supabase.from("rrhh_reglas").select("id, tipo, texto, desde, hasta, valor, puesto, activo").eq("activo", true).order("created_at"),
   ]);
   if (saldos.error) {
     return (
@@ -95,6 +96,15 @@ export default async function RrhhPage({ searchParams }: { searchParams: Promise
         </>
       ) : (
         <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">La gerente todavía no captura tu fecha de ingreso y los días que te quedan. En cuanto lo haga, aquí vas a ver tus días disponibles.</p>
+      )}
+
+      {(reglasQ.data?.length ?? 0) > 0 && (
+        <section className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
+          <h2 className="font-semibold text-slate-800">Reglas de vacaciones</h2>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5 text-slate-600">
+            {((reglasQ.data ?? []) as Regla[]).map((r) => <li key={r.id}>{reglaTxt(r)}</li>)}
+          </ul>
+        </section>
       )}
 
       <SolicitarRh

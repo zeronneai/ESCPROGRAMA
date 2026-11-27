@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { CalendarioRh } from "@/components/rrhh/calendario";
-import { EmpleadoRh, ExternoRh, FestivosRh, ReglasRh, TemporadaRh } from "@/components/rrhh/gerencia";
+import { EmpleadoRh, ExternoRh, FestivosRh, ReglasExtraRh, ReglasRh, TemporadaRh } from "@/components/rrhh/gerencia";
 import { SolicitudFila } from "@/components/rrhh/solicitud-fila";
 import { requireRoles } from "@/lib/auth/sales";
 import { ROL_LABEL } from "@/lib/ops/roles";
-import { fechaRh, num, quienAutoriza, rangoRh, type EventoCal, type Saldo, type Solicitud } from "@/lib/rrhh";
+import { fechaRh, num, quienAutoriza, rangoRh, type EventoCal, type Regla, type Saldo, type Solicitud } from "@/lib/rrhh";
 import type { Rol } from "@/lib/auth/route-guard";
 import { createClient } from "@/lib/supabase/server";
 
@@ -31,7 +31,7 @@ export default async function RrhhGerencia({ searchParams }: { searchParams: Pro
   const [y, m] = mes.split("-").map(Number);
   const fin = `${mes}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
 
-  const [saldos, sols, cal, cfg, tabla, fest, temps] = await Promise.all([
+  const [saldos, sols, cal, cfg, tabla, fest, temps, reglasQ] = await Promise.all([
     supabase.rpc("rrhh_saldos"),
     supabase.rpc("rrhh_solicitudes_ver"),
     supabase.rpc("rrhh_calendario", { p_desde: `${mes}-01`, p_hasta: fin }),
@@ -39,6 +39,7 @@ export default async function RrhhGerencia({ searchParams }: { searchParams: Pro
     supabase.from("rrhh_tabla_dias").select("anios, dias").order("anios"),
     supabase.from("rrhh_festivos").select("fecha, nombre").order("fecha"),
     supabase.from("rrhh_temporadas").select("id, nombre, desde, hasta, dias_descuento").order("desde", { ascending: false }),
+    supabase.from("rrhh_reglas").select("id, tipo, texto, desde, hasta, valor, puesto, activo").order("created_at"),
   ]);
   const header = <PageHeader title="Vacaciones y permisos: gerencia" subtitle="Captura los días de cada colaborador, autoriza solicitudes y define festivos y vacaciones generales." actions={<Link href="/rrhh" className="rounded-lg border border-slate-300 px-3 py-2 text-sm hover:bg-slate-50">Mis vacaciones</Link>} />;
   if (saldos.error) {
@@ -149,7 +150,16 @@ export default async function RrhhGerencia({ searchParams }: { searchParams: Pro
 
       {tab === "festivos" && <FestivosRh festivos={festivos} />}
 
-      {tab === "reglas" && <ReglasRh cfg={c} tabla={(tabla.data ?? []) as { anios: number; dias: number }[]} />}
+      {tab === "reglas" && (
+        <div className="space-y-4">
+          <ReglasRh cfg={c} tabla={(tabla.data ?? []) as { anios: number; dias: number }[]} />
+          {reglasQ.error ? (
+            <p className="text-sm text-amber-700">Para agregar reglas adicionales corre <code>0097_rrhh_reglas.sql</code> en Supabase.</p>
+          ) : (
+            <ReglasExtraRh reglas={(reglasQ.data ?? []) as Regla[]} puestos={[...new Set(todos.map((x) => x.puesto).filter((x): x is string => !!x))].sort()} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
