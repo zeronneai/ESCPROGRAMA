@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { subirConciliacionAction } from "@/actions/conciliaciones";
+import { EVENTO_CAMBIO } from "@/components/realtime-sync";
 import { toast } from "@/components/feedback-global";
 import { Button, Card } from "@/components/ui";
 import type { EstadoCuentaLeido } from "@/lib/estado-cuenta";
@@ -46,6 +47,7 @@ export function SubirConciliacion() {
       fd.set("datos", JSON.stringify({ banco: leido.banco, cuenta: leido.cuenta, moneda, desde: leido.desde, hasta: leido.hasta, abonos: leido.abonos.map(({ fecha, descripcion, referencia, monto }) => ({ fecha, descripcion, referencia, monto })) }));
       const r = await subirConciliacionAction(fd);
       if (!r.ok) return toast(r.error, "error");
+      window.dispatchEvent(new CustomEvent(EVENTO_CAMBIO, { detail: "conciliaciones" }));
       toast(r.nuevos ? `Listo: ${r.nuevos} abono(s) nuevo(s) para que los vendedores los identifiquen${r.repetidos ? ` (${r.repetidos} ya estaban)` : ""}.` : "Todos esos abonos ya estaban subidos.", "success");
       setArchivo(null);
       setLeido(null);

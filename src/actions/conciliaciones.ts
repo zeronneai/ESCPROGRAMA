@@ -183,3 +183,44 @@ export async function quitarPrevioAction(movId: string): Promise<Result> {
   revalidatePath("/vendedor/conciliaciones");
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------------
+// Estados de cuenta diarios (recordatorio de finanzas)
+// ---------------------------------------------------------------------------
+const FIN = ["aux_finanzas", "supervisor_finanzas", "gerente", "ceo"];
+
+export async function agregarCuentaDiariaAction(banco: string, cuenta: string, nombre: string, moneda: "MXN" | "USD"): Promise<Result> {
+  const u = await requireUser();
+  if (!FIN.includes(u.rol)) return { ok: false, error: "Solo finanzas." };
+  const num = String(cuenta ?? "").replace(/\D/g, "");
+  if (num.length < 4 || num.length > 20) return { ok: false, error: "Pon el número de cuenta (como sale en el estado de cuenta)." };
+  if (!String(banco ?? "").trim()) return { ok: false, error: "Pon el banco." };
+  const supabase = await createClient();
+  const { error } = await supabase.from("conciliacion_cuentas").upsert({ banco: banco.trim().slice(0, 40), cuenta: num, nombre: nombre.trim().slice(0, 80) || null, moneda: moneda === "USD" ? "USD" : "MXN", activo: true }, { onConflict: "cuenta" });
+  if (error) return { ok: false, error: /conciliacion_cuentas/.test(error.message) ? "Falta correr la actualización 0098 en la base." : friendlyError(error.message) };
+  revalidatePath("/finanzas/conciliaciones");
+  return { ok: true };
+}
+
+export async function quitarCuentaDiariaAction(id: string): Promise<Result> {
+  const u = await requireUser();
+  if (!FIN.includes(u.rol)) return { ok: false, error: "Solo finanzas." };
+  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "Cuenta inválida" };
+  const supabase = await createClient();
+  const { error } = await supabase.from("conciliacion_cuentas").update({ activo: false }).eq("id", id);
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/finanzas/conciliaciones");
+  return { ok: true };
+}
+
+/** La cuenta no tuvo abonos hoy (no hay estado de cuenta que subir). */
+export async function sinAbonosHoyAction(id: string, quitar = false): Promise<Result> {
+  const u = await requireUser();
+  if (u.rol !== "aux_finanzas" && u.rol !== "supervisor_finanzas") return { ok: false, error: "Solo finanzas." };
+  if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "Cuenta inválida" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("estado_cuenta_sin_abonos", { p_cuenta: id, p_quitar: quitar });
+  if (error) return { ok: false, error: friendlyError(error.message) };
+  revalidatePath("/finanzas/conciliaciones");
+  return { ok: true };
+}

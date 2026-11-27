@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { ListaConciliacion } from "@/components/finanzas/lista-conciliacion";
 import { SubirConciliacion } from "@/components/finanzas/subir-conciliacion";
+import { CuentasDiarias } from "@/components/finanzas/cuentas-diarias";
+import type { CuentaHoy } from "@/lib/estados-cuenta-diarios";
 import { Card, PageHeader } from "@/components/ui";
 import { requireRoles } from "@/lib/auth/sales";
 import { cargarMovimientos, diasRestantes } from "@/lib/conciliaciones";
@@ -27,6 +29,7 @@ export default async function Conciliaciones() {
   }
   const finanzas = u.rol === "aux_finanzas" || u.rol === "supervisor_finanzas";
   // Todos los abonos (para ver los pendientes y, la direccion, identificarlos a nombre de un vendedor).
+  const hoyCtas = finanzas || u.rol === "gerente" || u.rol === "ceo" ? await supabase.rpc("estados_cuenta_hoy") : null;
   const [{ movs: todos }, { data: vends }] = await Promise.all([
     cargarMovimientos(supabase),
     finanzas ? Promise.resolve({ data: [] as { id: string; nombre: string }[] }) : supabase.from("profiles").select("id, nombre").in("rol", ["vendedor", "jefe_ventas"]).eq("activo", true).order("nombre"),
@@ -38,6 +41,7 @@ export default async function Conciliaciones() {
     <div className="space-y-5">
       <PageHeader title="Conciliaciones" subtitle="Sube el estado de cuenta: los vendedores identifican sus pagos y sus facturas quedan pagadas con la fecha del abono." />
       {error && <Card className="border-amber-200 bg-amber-50 text-sm text-amber-900">Falta correr la actualización 0076 en la base.</Card>}
+      {hoyCtas && !hoyCtas.error && !error && <CuentasDiarias cuentas={(hoyCtas.data ?? []) as CuentaHoy[]} finanzas={finanzas} />}
       {finanzas && !error && <SubirConciliacion />}
       {!error && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

@@ -22,6 +22,7 @@ import { metasSuite } from "./metas.suite";
 import { conciliacionSuite } from "./conciliacion.suite";
 import { rrhhSuite } from "./rrhh.suite";
 import { incidenciasSuite } from "./incidencias.suite";
+import { edoCtaSuite } from "./edocta.suite";
 
 const seller1 = randomUUID();
 const seller2 = randomUUID();
@@ -581,6 +582,7 @@ metasSuite();
 conciliacionSuite();
 rrhhSuite();
 incidenciasSuite();
+edoCtaSuite();
 
 afterAll(async () => {
   await pool?.end();

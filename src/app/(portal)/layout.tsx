@@ -11,6 +11,7 @@ import { RealtimeSync } from "@/components/realtime-sync";
 import { AvisoConciliacion } from "@/components/finanzas/aviso-conciliacion";
 import { AvisoMetaProspeccion } from "@/components/prospeccion/aviso-meta";
 import { AvisoIncidenciasIso } from "@/components/incidencias/aviso-iso";
+import { AvisoEstadosCuenta } from "@/components/finanzas/aviso-estados-cuenta";
 import { RIESGO_ROLES } from "@/lib/riesgos";
 import { CATALOGO, CATALOGO_VISIBLE } from "@/lib/marca";
 import { AddCustomerButton } from "@/components/customers";
@@ -240,6 +241,7 @@ export default async function PortalLayout({ children }: { children: React.React
           </>
         } logo={<span className="flex items-center gap-2"><Logo className="h-7 sm:h-8" /><Wordmark className="hidden border-l border-slate-200 pl-2 text-base sm:inline" /></span>} />
       <RealtimeSync />
+      {user.rol === "aux_finanzas" && <AvisoEstadosCuenta />}
       {(user.rol === "vendedor" || user.rol === "jefe_ventas") && <AvisoConciliacion destino="/vendedor/conciliaciones" />}
       {(user.rol === "gerente" || user.rol === "ceo") && <AvisoConciliacion destino="/finanzas/conciliaciones" />}
       {user.rol === "vendedor" && <AvisoMetaProspeccion />}
