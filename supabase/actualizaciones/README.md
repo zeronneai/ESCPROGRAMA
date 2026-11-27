@@ -112,6 +112,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 95 | `0100_metas_vts.sql` | **VTS Cd Juárez igual que Casa Local**: sus facturas cuentan para su meta (no para quien las subió) y para el equipo; sale en la gráfica junto a Casa Local. |
 | 96 | `0101_metas_revision_facturas.sql` | **Revisar a quién le cuenta cada factura en metas** (comprador, jefa, gerente): vendedor leído, meta a la que va, probar el lector y corregir. |
 | 97 | `0102_metas_vts_alias.sql` | **VTS**: las facturas que dicen "VENTAS CD. JUAREZ" cuentan para VTS Cd Juárez. |
+| 98 | `0103_minutas_iso.sql` | **Minutas**: el coordinador ISO ve todas aunque no lo incluyan y también puede hacerlas. |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

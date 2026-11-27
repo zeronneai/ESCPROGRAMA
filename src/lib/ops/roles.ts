@@ -18,7 +18,7 @@ export const ROL_LABEL: Record<Rol, string> = {
 export const ALMACEN_ROLES: Rol[] = ["almacen", "supervisor_almacen"];
 
 /** Jefes de departamento: crean minutas. */
-export const MINUTA_CREATORS: Rol[] = ["jefe_ventas", "gerente", "comprador", "supervisor_almacen", "supervisor_finanzas", "ceo"];
+export const MINUTA_CREATORS: Rol[] = ["jefe_ventas", "gerente", "comprador", "supervisor_almacen", "supervisor_finanzas", "ceo", "coordinador_iso"];
 
 /** Puestos que leen ventas, clientes y bitacora de todos (sin editar). */
 export const SALES_READERS: Rol[] = ["jefe_ventas", "gerente", "coordinador_iso", "comprador", "ceo"];

@@ -19,6 +19,7 @@ export function minutasSuite() {
       const sup = await user("supervisor_finanzas");
       const alm = await user("supervisor_almacen");
       const ger = await user("gerente");
+      const iso = await user("coordinador_iso");
       expect(await failure(q(w.seller1, "insert into public.minutas (tema) values ('Junta')"))).toMatch(/row-level security/);
       const m = (await q(sup.a, `insert into public.minutas (tema, lugar, agenda, desarrollo, compromisos)
         values ('Cierre de mes', 'Sala', '[{"tema":"Cobranza","descripcion":"Revisar saldos"}]', '[{"tema":"Cobranza","desarrollo":"Se revisaron"}]',
@@ -34,6 +35,11 @@ export function minutasSuite() {
       expect(Number((await q("postgres", "select count(*) from public.notifications where tipo='minuta_firma' and ref_id=$1", [m.id])).rows[0].count)).toBe(2);
       expect((await q(alm.a, "select id from public.minutas where id=$1", [m.id])).rowCount).toBe(1);
       expect((await q(ger.a, "select id from public.minutas where id=$1", [m.id])).rowCount).toBe(1);
+      // El coordinador ISO las ve todas aunque no lo incluyan, y tambien hace minutas
+      expect((await q(iso.a, "select id from public.minutas where id=$1", [m.id])).rowCount).toBe(1);
+      expect((await q(iso.a, "select count(*)::int as n from public.minuta_firmas where minuta_id=$1", [m.id])).rows[0].n).toBe(3);
+      const mi = (await q(iso.a, "insert into public.minutas (tema) values ('Revision ISO') returning id")).rows[0].id;
+      await q(iso.a, "select public.minuta_firmantes($1,$2::uuid[])", [mi, [iso.id, ger.id]]);
       expect((await q(w.seller2, "select id from public.minutas where id=$1", [m.id])).rowCount).toBe(0);
       expect(await failure(q(w.seller2, "select public.minuta_firmar($1)", [m.id]))).toMatch(/No te toca/);
       await q(alm.a, "select public.minuta_firmar($1)", [m.id]);
