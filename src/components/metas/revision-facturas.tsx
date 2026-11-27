@@ -71,7 +71,7 @@ export function RevisionFacturas({ filas }: { filas: FilaRevision[] }) {
       <div className="flex flex-wrap items-center gap-2">
         <input value={buscar} onChange={(e) => setBuscar(e.target.value)} placeholder="Buscar folio, vendedor o quien la subió (ej. IVAN)" className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm sm:max-w-sm" />
         <button type="button" onClick={() => setBuscar("IVAN")} className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium hover:bg-slate-50">Solo IVAN</button>
-        <button type="button" onClick={() => setBuscar("VTS")} className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium hover:bg-slate-50">Solo VTS</button>
+        <button type="button" onClick={() => setBuscar("JUAREZ")} className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium hover:bg-slate-50">Solo VTS</button>
         <button type="button" onClick={() => setBuscar("CASA LOCAL")} className="rounded-full border border-slate-300 px-3 py-1 text-xs font-medium hover:bg-slate-50">Solo Casa Local</button>
         {buscar && <button type="button" onClick={() => setBuscar("")} className="text-xs text-slate-500 underline">Ver todas</button>}
       </div>

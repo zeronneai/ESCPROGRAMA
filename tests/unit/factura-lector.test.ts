@@ -190,6 +190,9 @@ describe("datos de cliente y cobranza", () => {
     // En el mismo renglon que el cliente, con la condicion de pago abajo
     const S = R.filter((r) => !r.some((c) => c.s.startsWith("IVAN"))).map((r) => (r.some((c) => c.s.startsWith("SIGMA ALIMENTOS NORESTE")) ? [...r, { x: 790, s: "IVAN MUÑOZ" }] : r));
     expect(leerFacturaTexto(S.map((r) => r.map((c) => c.s).join("  ")), S).vendedor).toBe("IVAN MUÑOZ");
+    // VTS: "VENTAS CD. JUAREZ"
+    const V = R.map((r) => r.map((c) => (c.s.startsWith("IVAN") ? { ...c, s: "VENTAS CD. JUAREZ" } : c)));
+    expect(leerFacturaTexto(V.map((r) => r.map((c) => c.s).join("  ")), V).vendedor).toBe("VENTAS CD. JUAREZ");
   });
   it("contado o credito", () => {
     expect(pagoDe("PUE", null, null, null)).toEqual({ pago: "contado", dias: null });
