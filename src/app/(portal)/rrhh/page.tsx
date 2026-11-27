@@ -52,6 +52,8 @@ export default async function RrhhPage({ searchParams }: { searchParams: Promise
   const miEquipo = gerente ? [] : todos.filter((s) => s.empleado_id !== user.id);
   const sinPortal = todos.filter((s) => s.sin_portal);
   const puedeSinPortal = user.rol === "supervisor_almacen";
+  // Cualquier jefe pide por los sin portal de su area (ej. la jefa de ventas por Jose Ortiz).
+  const pidePorOtros = ["supervisor_almacen", "jefe_ventas", "supervisor_finanzas"].includes(user.rol);
 
   const Card = ({ t, v, sub, tono = "" }: { t: string; v: string; sub?: string; tono?: string }) => (
     <div className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${tono}`}>
@@ -101,7 +103,7 @@ export default async function RrhhPage({ searchParams }: { searchParams: Promise
         hoy={hoy}
         anticipacion={c.anticipacion_dias}
         adelanto={c.adelanto_max}
-        para={puedeSinPortal ? sinPortal.map((x) => ({ id: x.colaborador_id, nombre: x.nombre, capturado: x.capturado, disponible: x.disponible })) : []}
+        para={pidePorOtros ? sinPortal.map((x) => ({ id: x.colaborador_id, nombre: x.nombre, capturado: x.capturado, disponible: x.disponible })) : []}
       />
 
       {(miEquipo.length > 0 || puedeSinPortal) && (
@@ -110,7 +112,8 @@ export default async function RrhhPage({ searchParams }: { searchParams: Promise
             <h2 className="text-base font-semibold">Días de mi equipo</h2>
             {puedeSinPortal && <ExternoRh gerente={false} />}
           </div>
-          {puedeSinPortal && <p className="text-xs text-slate-500">Los que no tienen portal: dalos de alta con su nombre y pide por ellos arriba en "¿Para quién?". La gerente les captura la fecha de ingreso y los días.</p>}
+          {pidePorOtros && sinPortal.length > 0 && <p className="text-xs text-slate-500">Para pedir por los que no tienen portal, elígelos arriba en "¿Para quién?".</p>}
+          {puedeSinPortal && <p className="text-xs text-slate-500">También puedes dar de alta a los que no tienen portal; la gerente les captura la fecha de ingreso y los días.</p>}
           {miEquipo.length > 0 ? (
             <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-sm">
               {miEquipo.map((s) => (

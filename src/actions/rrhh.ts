@@ -156,16 +156,16 @@ const externo = z
   .strict();
 
 /** Colaborador sin portal: lo da de alta el supervisor de almacen (o la gerente). */
-export async function guardarExternoRhAction(input: z.input<typeof externo>): Promise<Result> {
+export async function guardarExternoRhAction(input: z.input<typeof externo>): Promise<Result<{ id: string }>> {
   const u = await requireUser();
   if (!esGerente(u.rol) && u.rol !== "supervisor_almacen") return { ok: false, error: "Solo el supervisor de almacén o la gerente." };
   const p = externo.safeParse(input);
   if (!p.success) return { ok: false, error: p.error.issues[0].message };
   const supabase = await createClient();
-  const { error } = await supabase.rpc("rrhh_externo_guardar", { p: p.data });
+  const { data, error } = await supabase.rpc("rrhh_externo_guardar", { p: p.data });
   if (error) return { ok: false, error: /rrhh_externo_guardar/.test(error.message) ? "Falta correr la actualización 0093 en Supabase." : msg(error.message) };
   refrescar();
-  return { ok: true };
+  return { ok: true, id: data as string };
 }
 
 const reglas = z

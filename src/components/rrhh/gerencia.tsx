@@ -297,26 +297,40 @@ export function TemporadaRh({ t, festivos, sabadoLaborable }: { t?: Temp; festiv
   );
 }
 
-/** Alta o cambio de un colaborador sin portal (lo hace el supervisor de almacen; la gerente tambien y elige su area). */
-export function ExternoRh({ s, gerente }: { s?: Saldo; gerente: boolean }) {
+const AREAS: { rol: JefeRol; area: string }[] = [
+  { rol: "supervisor_almacen", area: "Almacén (lo ve el supervisor de almacén)" },
+  { rol: "jefe_ventas", area: "Ventas (lo ve la jefa de ventas)" },
+  { rol: "supervisor_finanzas", area: "Finanzas (lo ve la supervisora de finanzas)" },
+];
+
+/** Alta o cambio de un colaborador sin portal. La gerente elige su area (le aparece a ese jefe) y de una vez sus dias. */
+export function ExternoRh({ s, gerente, hoy }: { s?: Saldo; gerente: boolean; hoy?: string }) {
   const router = useRouter();
   const [pend, start] = useTransition();
   const [abierto, setAbierto] = useState(false);
   const [nombre, setNombre] = useState(s?.nombre ?? "");
   const [puesto, setPuesto] = useState(s?.puesto ?? "");
   const [jr, setJr] = useState<JefeRol>(s?.jefe_rol ?? "supervisor_almacen");
+  const [ingreso, setIngreso] = useState("");
+  const [saldo, setSaldo] = useState("");
+  const conDias = gerente && !s;
   const guardar = (activo?: boolean) =>
     start(async () => {
+      if (conDias && ingreso && (saldo.trim() === "" || Number.isNaN(Number(saldo)))) return toast("Pon los días que le quedan (o deja vacía la fecha para capturarlo después).", "error");
       const r = await guardarExternoRhAction({ id: s?.colaborador_id ?? null, nombre, puesto: puesto || null, activo, jefe_rol: gerente ? jr : null });
       if (!r.ok) return toast(r.error, "error");
-      toast(activo === false ? "Colaborador dado de baja." : s ? "Guardado." : `Listo: ${nombre} quedó dado de alta. La gerente captura su fecha de ingreso y sus días.`, "success");
+      if (conDias && ingreso) {
+        const d = await guardarEmpleadoRhAction({ colaborador_id: r.id, profile_id: null, nombre, fecha_ingreso: ingreso, puesto: puesto || null, departamento: null, saldo_inicial: Number(saldo), saldo_al: hoy ?? ingreso, notas: null });
+        if (!d.ok) return toast(`Se dio de alta, pero los días no se guardaron: ${d.error}`, "error");
+      }
+      toast(activo === false ? "Colaborador dado de baja." : s ? "Guardado." : `Listo: ${nombre} quedó dado de alta.`, "success");
       setAbierto(false);
-      if (!s) { setNombre(""); setPuesto(""); }
+      if (!s) { setNombre(""); setPuesto(""); setIngreso(""); setSaldo(""); }
       router.refresh();
     });
   if (!abierto) {
     return s ? (
-      <button type="button" onClick={() => setAbierto(true)} className="text-xs font-medium text-slate-600 underline">Nombre / baja</button>
+      <button type="button" onClick={() => setAbierto(true)} className="text-xs font-medium text-slate-600 underline">{gerente ? "Área / baja" : "Nombre / baja"}</button>
     ) : (
       <Button variant="secondary" onClick={() => setAbierto(true)}>+ Colaborador sin portal</Button>
     );
@@ -334,13 +348,30 @@ export function ExternoRh({ s, gerente }: { s?: Saldo; gerente: boolean }) {
         </label>
         {gerente && (
           <label className="block">
-            <span className={lbl}>Primer visto bueno</span>
+            <span className={lbl}>Área</span>
             <select className={inp} value={jr} onChange={(e) => setJr(e.target.value as JefeRol)}>
-              {(Object.keys(JEFE_LABEL) as JefeRol[]).map((k) => <option key={k} value={k}>{JEFE_LABEL[k]}</option>)}
+              {AREAS.map((a) => <option key={a.rol} value={a.rol}>{a.area}</option>)}
             </select>
           </label>
         )}
+        {conDias && (
+          <>
+            <label className="block">
+              <span className={lbl}>Fecha de ingreso</span>
+              <input type="date" className={inp} value={ingreso} max={hoy} onChange={(e) => setIngreso(e.target.value)} />
+            </label>
+            <label className="block">
+              <span className={lbl}>Días de vacaciones que le quedan hoy</span>
+              <input type="number" step="0.5" className={inp} value={saldo} onChange={(e) => setSaldo(e.target.value)} placeholder="Ej. 8" />
+            </label>
+          </>
+        )}
       </div>
+      {conDias && ingreso && (
+        <p className="rounded bg-white px-2 py-1.5 text-xs text-slate-600">
+          Por ley le tocan <b>{diasLey(aniosA(ingreso, hoy ?? ingreso))}</b> días en su año actual; en su próximo aniversario gana <b>{diasLey(aniosA(ingreso, hoy ?? ingreso) + 1)}</b>.
+        </p>
+      )}
       <div className="flex flex-wrap gap-2">
         <Button onClick={() => guardar()} loading={pend}>{s ? "Guardar" : "Dar de alta"}</Button>
         {s && <Button variant="secondary" className="border-red-300 text-red-700" loading={pend} onClick={() => guardar(false)}>Dar de baja</Button>}

@@ -85,6 +85,19 @@ export function rrhhSuite() {
       expect(Number(se.disponible)).toBe(3.5);
       expect(se.sin_portal).toBe(true);
 
+      // Marketplaces es de la jefa; la jefa pide por un vendedor sin portal que la gerente dio de alta en ventas
+      const mkt = await persona("marketplaces", "Marketplaces RH");
+      const pm = (await q(mkt, "select public.rrhh_solicitar($1::jsonb) as id", [J({ tipo: "permiso", permiso_tipo: "salir_temprano", desde: hoy, motivo: "Tramite" })])).rows[0].id as string;
+      expect((await q("postgres", "select count(*)::int as n from public.notifications where user_id=$1 and ref_id=$2", [jefa.id, pm])).rows[0].n).toBe(1);
+      const jose = (await q(ger, "select public.rrhh_externo_guardar($1::jsonb) as id", [J({ nombre: "Jose Ortiz", puesto: "Vendedor", jefe_rol: "jefe_ventas" })])).rows[0].id as string;
+      expect((await q(supAlm, "select * from public.rrhh_saldos()")).rows.find((r) => r.colaborador_id === jose)).toBeUndefined();
+      expect((await q(jefa, "select * from public.rrhh_saldos()")).rows.find((r) => r.colaborador_id === jose)).toBeTruthy();
+      const pj = (await q(jefa, "select public.rrhh_solicitar($1::jsonb) as id", [J({ colaborador_id: jose, tipo: "permiso", permiso_tipo: "ausentarse", desde: hoy, motivo: "Cita medica" })])).rows[0].id as string;
+      expect((await q(ger, "select estado from public.rrhh_solicitudes where id=$1", [pj])).rows[0].estado).toBe("visto_jefe");
+      expect(await failure(q(supAlm, "select public.rrhh_solicitar($1::jsonb)", [J({ colaborador_id: jose, tipo: "permiso", permiso_tipo: "ausentarse", desde: hoy, motivo: "xxx" })]))).toMatch(/sin portal/);
+      const cm = (await q(mkt, "insert into public.consumo_solicitudes (tipo, categoria, descripcion, cantidad, motivo) values ('producto','papeleria','Etiquetas',1,'Envios') returning aprobador_rol")).rows[0];
+      expect(cm.aprobador_rol).toBe("jefe_ventas");
+
       // Calendario: los demas ven solo el puesto
       const cal = (await q(comp, "select * from public.rrhh_calendario($1, $2)", [lunes, mas(lunes, 2)])).rows.filter((r) => r.clase === "vacaciones");
       expect(cal[0]).toMatchObject({ puesto: "Almacenista", nombre: null });

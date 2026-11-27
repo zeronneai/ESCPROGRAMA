@@ -103,6 +103,7 @@ Una prueba automatica (`tests/unit/migrations.test.ts`) verifica que las migraci
 | 86 | `0091_orden_compra_factura.sql` | **Orden de compra en la factura (Pegatron)**: se lee la orden de compra impresa al subir la factura y en Pedidos Pegatron sale si cada P/O ya se facturó. |
 | 87 | `0092_rrhh_vacaciones_permisos.sql` | **Vacaciones y permisos (formato RR.HH.)**: la gerente captura fecha de ingreso y días de cada colaborador; el portal suma los días de ley en cada aniversario; solicitudes con visto bueno del jefe y autorización de la gerente; festivos, vacaciones generales y calendario. |
 | 88 | `0093_rrhh_filtros_consumo.sql` | **Quién autoriza según el puesto**: vacaciones y permisos con primer visto bueno de la jefa de ventas (vendedores), la supervisora de finanzas (auxiliar) o el supervisor de almacén (almacén y colaboradores sin portal), y la gerente termina (puede cambiar permiso por vacaciones). Consumo interno: la jefa aprueba solo lo de vendedores, lo demás la gerente. |
+| 89 | `0094_marketplaces_jefa.sql` | **Marketplaces con la jefa de ventas**: sus vacaciones, permisos y consumo interno los aprueba la jefa de ventas (y la gerente termina en vacaciones y permisos). |
 
 Opcional: `supabase/borrar-datos-de-prueba.sql` borra solicitudes, clientes, bitácora, quejas, guías, etc. para empezar en limpio. Conserva usuarios, configuración, tabulador y proveedores. No se puede deshacer.
 

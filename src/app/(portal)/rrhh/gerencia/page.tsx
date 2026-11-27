@@ -91,8 +91,8 @@ export default async function RrhhGerencia({ searchParams }: { searchParams: Pro
         <section className="space-y-2">
           <p className="text-sm text-slate-600">Aquí están <b>todos</b> los del sistema y los colaboradores sin portal. De cada uno pon su <b>fecha de ingreso</b> y los <b>días de vacaciones que le quedan hoy</b>. A partir de ahí el portal suma los días de ley en cada aniversario y resta lo que autorices y las vacaciones generales.</p>
           <div className="flex flex-wrap items-center gap-2">
-            <ExternoRh gerente />
-            <span className="text-xs text-slate-500">Para los que no tienen usuario (ej. cargadores de almacén). El supervisor de almacén también los puede dar de alta.</span>
+            <ExternoRh gerente hoy={hoy} />
+            <span className="text-xs text-slate-500">Para los que no tienen usuario (ej. los de almacén o José Ortiz). Elige su área y le aparece a su jefe, que puede pedir por él.</span>
           </div>
           <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-sm">
             {todos.map((s) => (
