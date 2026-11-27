@@ -1,4 +1,8 @@
-import Link from "next/link";
+"use client";
+
+import { useRef, useState, useTransition } from "react";
+import { calendarioRhAction } from "@/actions/rrhh";
+import { Spinner } from "@/components/ui";
 import { ROL_LABEL } from "@/lib/ops/roles";
 import { DIAS_SEMANA, ESTADO_LABEL, fechaRh, MESES_LARGOS, rangoRh, semanasDelMes, type EventoCal } from "@/lib/rrhh";
 import type { Rol } from "@/lib/auth/route-guard";
@@ -7,7 +11,21 @@ const puestoTxt = (p: string | null) => (p ? (ROL_LABEL[p as Rol] ?? p) : "");
 
 /** Mes en cuadricula: festivos, temporadas generales (dias que se descuentan) y quien esta fuera.
  *  Los demas solo ven el puesto; la gerente (y el jefe de su equipo) ven el nombre. */
-export function CalendarioRh({ mes, eventos, hoy, sabadoLaborable, href }: { mes: string; eventos: EventoCal[]; hoy: string; sabadoLaborable: boolean; href: (mes: string) => string }) {
+export function CalendarioRh({ mes: mesIni, eventos: evIni, hoy, sabadoLaborable }: { mes: string; eventos: EventoCal[]; hoy: string; sabadoLaborable: boolean }) {
+  // Cambiar de mes no recarga la pagina (no se pierde lo que se este llenando arriba).
+  const [mes, setMes] = useState(mesIni);
+  const [eventos, setEventos] = useState(evIni);
+  const [cargando, start] = useTransition();
+  const cache = useRef<Record<string, EventoCal[]>>({ [mesIni]: evIni });
+  const ir = (nuevo: string) => {
+    setMes(nuevo);
+    if (cache.current[nuevo]) return setEventos(cache.current[nuevo]);
+    start(async () => {
+      const r = await calendarioRhAction(nuevo);
+      if (r) cache.current[nuevo] = r;
+      setEventos(r ?? []);
+    });
+  };
   const [y, m] = mes.split("-").map(Number);
   const semanas = semanasDelMes(y, m - 1);
   const mover = (d: number) => {
@@ -22,11 +40,11 @@ export function CalendarioRh({ mes, eventos, hoy, sabadoLaborable, href }: { mes
   return (
     <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
       <div className="flex items-center justify-between gap-2">
-        <Link href={href(mover(-1))} className="rounded-md border border-slate-300 px-2.5 py-1 text-sm hover:bg-slate-50" aria-label="Mes anterior">‹</Link>
-        <h2 className="text-base font-semibold">{MESES_LARGOS[m - 1]} {y}</h2>
-        <Link href={href(mover(1))} className="rounded-md border border-slate-300 px-2.5 py-1 text-sm hover:bg-slate-50" aria-label="Mes siguiente">›</Link>
+        <button type="button" onClick={() => ir(mover(-1))} className="rounded-md border border-slate-300 px-2.5 py-1 text-sm hover:bg-slate-50" aria-label="Mes anterior">‹</button>
+        <h2 className="flex items-center gap-2 text-base font-semibold">{MESES_LARGOS[m - 1]} {y}{cargando && <Spinner className="h-4 w-4 text-slate-400" />}</h2>
+        <button type="button" onClick={() => ir(mover(1))} className="rounded-md border border-slate-300 px-2.5 py-1 text-sm hover:bg-slate-50" aria-label="Mes siguiente">›</button>
       </div>
-      <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 text-xs">
+      <div className={`grid grid-cols-7 gap-px overflow-hidden rounded-lg transition-opacity ${cargando ? "opacity-60" : ""} border border-slate-200 bg-slate-200 text-xs`}>
         {DIAS_SEMANA.map((d) => (
           <div key={d} className="bg-slate-50 py-1 text-center font-semibold text-slate-500">{d}</div>
         ))}

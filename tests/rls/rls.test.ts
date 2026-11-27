@@ -21,6 +21,7 @@ import { metaProspeccionSuite } from "./meta-prospeccion.suite";
 import { metasSuite } from "./metas.suite";
 import { conciliacionSuite } from "./conciliacion.suite";
 import { rrhhSuite } from "./rrhh.suite";
+import { incidenciasSuite } from "./incidencias.suite";
 
 const seller1 = randomUUID();
 const seller2 = randomUUID();
@@ -579,6 +580,7 @@ metaProspeccionSuite();
 metasSuite();
 conciliacionSuite();
 rrhhSuite();
+incidenciasSuite();
 
 afterAll(async () => {
   await pool?.end();

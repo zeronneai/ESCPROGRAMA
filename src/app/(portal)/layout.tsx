@@ -10,6 +10,7 @@ import { NotificationBell } from "@/components/notification-bell";
 import { RealtimeSync } from "@/components/realtime-sync";
 import { AvisoConciliacion } from "@/components/finanzas/aviso-conciliacion";
 import { AvisoMetaProspeccion } from "@/components/prospeccion/aviso-meta";
+import { AvisoIncidenciasIso } from "@/components/incidencias/aviso-iso";
 import { RIESGO_ROLES } from "@/lib/riesgos";
 import { CATALOGO, CATALOGO_VISIBLE } from "@/lib/marca";
 import { AddCustomerButton } from "@/components/customers";
@@ -223,7 +224,9 @@ export default async function PortalLayout({ children }: { children: React.React
   const captura = (user.rol === "vendedor" || user.rol === "marketplaces") && !!(await (await createClient()).from("metas_venta").select("id").eq("capturista_id", user.id).limit(1)).data?.length;
   // Vacaciones y permisos (formato RR.HH.): todo el personal; la gerente y el CEO lo administran.
   const rh = [{ href: "/rrhh", label: "Vacaciones y permisos", short: "Vacaciones", icon: "calendar" as const, secondary: true }, ...(user.rol === "gerente" || user.rol === "ceo" ? [{ href: "/rrhh/gerencia", label: "Vacaciones: administrar", short: "RR.HH.", icon: "users" as const, secondary: true }] : [])];
-  const nav = [...base, ...rh, ...(captura ? [{ href: "/captura-ventas", label: "Sumar ventas de José Ortiz", short: "Sumar", icon: "dollar" as const, secondary: true }] : [])].filter((i) => almacenOn || !RUTAS_ALMACEN_VENTAS.includes(i.href));
+  // Bitacora de incidencias (ESC-ALM-FR-003): la llena el supervisor de almacen.
+  const inc = ["supervisor_almacen", "jefe_ventas", "gerente", "ceo", "coordinador_iso", "comprador"].includes(user.rol) ? [{ href: "/incidencias", label: "Bitácora de incidencias", short: "Incidencias", icon: "alert" as const, secondary: user.rol !== "supervisor_almacen" }] : [];
+  const nav = [...base, ...inc, ...rh, ...(captura ? [{ href: "/captura-ventas", label: "Sumar ventas de José Ortiz", short: "Sumar", icon: "dollar" as const, secondary: true }] : [])].filter((i) => almacenOn || !RUTAS_ALMACEN_VENTAS.includes(i.href));
   return (
     <div className="min-h-screen">
       <Suspense fallback={null}>
@@ -240,6 +243,7 @@ export default async function PortalLayout({ children }: { children: React.React
       {(user.rol === "vendedor" || user.rol === "jefe_ventas") && <AvisoConciliacion destino="/vendedor/conciliaciones" />}
       {(user.rol === "gerente" || user.rol === "ceo") && <AvisoConciliacion destino="/finanzas/conciliaciones" />}
       {user.rol === "vendedor" && <AvisoMetaProspeccion />}
+      {user.rol === "coordinador_iso" && <AvisoIncidenciasIso />}
       <main className="pb-safe-nav mx-auto max-w-6xl px-4 pt-5 sm:pt-6">{children}</main>
       <HelpChat rol={user.rol} nombre={user.nombre} />
       <Suspense fallback={null}>

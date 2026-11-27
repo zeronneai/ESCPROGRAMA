@@ -77,7 +77,7 @@ export default async function RrhhGerencia({ searchParams }: { searchParams: Pro
             <h2 className="text-base font-semibold">Por autorizar ({abiertas.length})</h2>
             {abiertas.length ? <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-sm">{abiertas.map((s) => <SolicitudFila key={s.id} s={s} modo="gerente" hoy={hoy} />)}</ul> : <p className="text-sm text-slate-500">No hay solicitudes en espera.</p>}
           </section>
-          <CalendarioRh mes={mes} eventos={(cal.data ?? []) as EventoCal[]} hoy={hoy} sabadoLaborable={c.sabado_laborable} href={(x) => `/rrhh/gerencia?tab=solicitudes&mes=${x}`} />
+          <CalendarioRh mes={mes} eventos={(cal.data ?? []) as EventoCal[]} hoy={hoy} sabadoLaborable={c.sabado_laborable} />
           {resto.length > 0 && (
             <section className="space-y-2">
               <h2 className="text-base font-semibold">Historial</h2>

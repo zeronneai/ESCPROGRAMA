@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth/guards";
 import { friendlyError } from "@/lib/quotes/server";
 import { createClient } from "@/lib/supabase/server";
+import type { EventoCal } from "@/lib/rrhh";
 import type { Result } from "./requests";
 
 const refrescar = () => {
@@ -71,6 +72,17 @@ export async function contarDiasRhAction(desde: string, hasta: string): Promise<
 }
 
 /** Visto bueno del jefe, autorizacion de la gerente (puede cambiar el tipo y los dias) o rechazo. */
+/** Eventos del calendario de un mes (para cambiar de mes sin recargar la pagina). */
+export async function calendarioRhAction(mes: string): Promise<EventoCal[] | null> {
+  await requireUser();
+  if (!/^\d{4}-\d{2}$/.test(mes)) return null;
+  const [y, m] = mes.split("-").map(Number);
+  const fin = `${mes}-${String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, "0")}`;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("rrhh_calendario", { p_desde: `${mes}-01`, p_hasta: fin });
+  return error ? null : ((data ?? []) as EventoCal[]);
+}
+
 export async function resolverRhAction(
   id: string,
   accion: "visto" | "aprobar" | "rechazar",

@@ -63,7 +63,7 @@ export async function quejaEstadoAction(id: string, estado: QuejaEstado, solucio
   return { ok: true };
 }
 
-export async function saveSacAction(id: string | null, input: SacInput): Promise<Result<{ id: string }>> {
+export async function saveSacAction(id: string | null, input: SacInput, alertaId?: string | null): Promise<Result<{ id: string }>> {
   const u = await requireUser();
   if (u.rol !== "coordinador_iso") return { ok: false, error: "Solo el coordinador ISO llena la acción correctiva." };
   const parsed = sacSchema.safeParse(input);
@@ -78,6 +78,11 @@ export async function saveSacAction(id: string | null, input: SacInput): Promise
   }
   const { data, error } = await supabase.from("acciones_correctivas").insert(parsed.data).select("id").single();
   if (error) return { ok: false, error: friendlyError(error.message) };
+  // Si viene del aviso de la bitacora de incidencias, se liga y el aviso se quita.
+  if (alertaId && uuid.safeParse(alertaId).success) {
+    await supabase.rpc("incidencia_alerta_ligar", { p_alerta: alertaId, p_sac: data.id });
+    revalidatePath("/incidencias");
+  }
   refresh(parsed.data.queja_id ? `/calidad/quejas/${parsed.data.queja_id}` : undefined);
   return { ok: true, id: data.id };
 }

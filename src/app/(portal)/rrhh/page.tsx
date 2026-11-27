@@ -155,7 +155,7 @@ export default async function RrhhPage({ searchParams }: { searchParams: Promise
         {mias.length ? <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white shadow-sm">{mias.map((s) => <SolicitudFila key={s.id} s={s} modo="mia" hoy={hoy} />)}</ul> : <p className="text-sm text-slate-500">Aún no has pedido nada.</p>}
       </section>
 
-      <CalendarioRh mes={mes} eventos={(cal.data ?? []) as EventoCal[]} hoy={hoy} sabadoLaborable={c.sabado_laborable} href={(m) => `/rrhh?mes=${m}`} />
+      <CalendarioRh mes={mes} eventos={(cal.data ?? []) as EventoCal[]} hoy={hoy} sabadoLaborable={c.sabado_laborable} />
     </div>
   );
 }

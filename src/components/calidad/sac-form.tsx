@@ -35,7 +35,7 @@ function YesNo({ value, onChange, ro }: { value: boolean | null; onChange: (v: b
   );
 }
 
-export function SacForm({ id, initial, readOnly, quejas, folio = null }: { id: string | null; initial: SacValues; readOnly: boolean; quejas: { id: string; numero: string; cliente_nombre: string }[]; folio?: string | null }) {
+export function SacForm({ id, initial, readOnly, quejas, folio = null, alertaId = null }: { id: string | null; initial: SacValues; readOnly: boolean; quejas: { id: string; numero: string; cliente_nombre: string }[]; folio?: string | null; alertaId?: string | null }) {
   // Una clausula capturada solo con el numero (ej. "8.5.1") se muestra con su nombre de la lista.
   const clausulaIni = CLAUSULAS_ISO.find((c) => c === initial.clausula.trim() || (!!initial.clausula.trim() && c.startsWith(`${initial.clausula.trim()} `))) ?? initial.clausula;
   const [v, setV] = useState<SacValues>({ ...initial, clausula: clausulaIni });
@@ -59,7 +59,7 @@ export function SacForm({ id, initial, readOnly, quejas, folio = null }: { id: s
       className="space-y-6"
       onSubmit={(e) => {
         e.preventDefault();
-        run("save", () => saveSacAction(id, v as unknown as SacInput), (r) => {
+        run("save", () => saveSacAction(id, v as unknown as SacInput, alertaId), (r) => {
           if (id) {
             router.refresh();
           } else if (r.ok) router.push(`/calidad/sac/${r.id}`);
